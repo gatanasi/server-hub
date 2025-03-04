@@ -2,14 +2,14 @@
 - [x] Duckdns :white_check_mark:
 - [x] Wireguard
 - [x] Tailscale
-- Homepage
-- Videos converter
-- Stirling PDF
-- ConvertX
-- Kuma?
-- Traeffik?
-- rclone for backups / restic?
-- Longhorn to backup Kubernetes?
-- Kubernetes with flux?
-- ArgoCD?
-- MinIO?
+- [ ] Homepage
+- [ ] Videos converter
+- [ ] Stirling PDF
+- [ ] ConvertX
+- [ ] Kuma?
+- [ ] Traeffik?
+- [ ] rclone for backups / restic?
+- [ ] Longhorn to backup Kubernetes?
+- [ ] Kubernetes with flux?
+- [ ] ArgoCD?
+- [ ] MinIO?
