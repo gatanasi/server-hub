@@ -1,2 +1,15 @@
-# server-hub
-Central point for my self-hosted applications and tools
+# List of applications
+- [x] Duckdns :white_check_mark:
+- [x] Wireguard
+- [x] Tailscale
+- Homepage
+- Videos converter
+- Stirling PDF
+- ConvertX
+- Kuma?
+- Traeffik?
+- rclone for backups / restic?
+- Longhorn to backup Kubernetes?
+- Kubernetes with flux?
+- ArgoCD?
+- MinIO?

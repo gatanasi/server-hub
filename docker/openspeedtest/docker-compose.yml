@@ -1,0 +1,14 @@
+services:
+    speedtest:
+    env_file: .env
+    environment:
+        - ENABLE_LETSENCRYPT=true
+        - DOMAIN_NAME=openspeedtest
+        - USER_EMAIL=${USER_EMAIL}
+        - VERIFY_OWNERSHIP=${VERIFY_OWNERSHIP}
+    restart: unless-stopped
+    container_name: openspeedtest
+    ports:
+        - '80:3000'
+        - '443:3001'
+    image: openspeedtest/latest
