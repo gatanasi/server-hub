@@ -6,7 +6,7 @@ rc-update add docker default
 rc-service docker start
 
 # Add doas user to the docker group
-addgroup ${DOAS_USER} docker
+adduser "${DOAS_USER}" docker
 
 # Isolate containers with a user namespace
 adduser -SDHs /sbin/nologin dockremap

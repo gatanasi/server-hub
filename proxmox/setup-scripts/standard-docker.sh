@@ -10,7 +10,7 @@ for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; do
 
 # Add the docker group and add the current user
 sudo groupadd docker
-sudo usermod -aG docker $USER
+sudo usermod -aG docker "$USER"
 
 # Add Docker's official GPG key
 sudo apt-get update

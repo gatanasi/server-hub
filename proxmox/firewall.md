@@ -1,0 +1,37 @@
+## Cluster firewall
+```
+[OPTIONS]
+enable: 1
+
+[ALIASES]
+gateway 10.10.0.1 # UCG Fiber
+local-network 10.10.0.0/24
+
+[RULES]
+IN ACCEPT -p tcp -dport 8006 -log nolog # Proxmox GUI
+IN Ping(ACCEPT) -source dc/local-network -log nolog # Allow ping from local network
+IN ACCEPT -source dc/gateway -p udp -dport 10001 -log nolog
+IN DROP -dest 10.10.0.255 -p udp -log nolog # Subnet broadcast
+IN DROP -dest 255.255.255.255 -p udp -log nolog # Limited broadcast
+IN DROP -log warning
+
+[group tailscale]
+IN Ping(ACCEPT) -log nolog
+IN ACCEPT -p tcp -dport 443 -log debug
+IN ACCEPT -p udp -dport 3478 -log debug
+IN ACCEPT -p udp -sport 41641 -log debug
+
+[group webserver]
+IN Ping(ACCEPT) -log nolog
+IN Web(ACCEPT) -log nolog
+```
+
+## Wireguard VPN firewall
+```
+[OPTIONS]
+enable: 1
+
+[RULES]
+IN Ping(ACCEPT) -log nolog
+IN ACCEPT -p udp -dport 62496 -log nolog # Wireguard VPN
+```

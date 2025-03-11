@@ -2,10 +2,12 @@
 - [x] Duckdns :white_check_mark:
 - [x] Wireguard
 - [x] Tailscale
+- [ ] ConvertX
+- [ ] Watchtower
+- [ ] GoAccess
 - [ ] Homepage
 - [ ] Videos converter
 - [ ] Stirling PDF
-- [ ] ConvertX
 - [ ] Kuma?
 - [ ] Traeffik?
 - [ ] rclone for backups / restic?
