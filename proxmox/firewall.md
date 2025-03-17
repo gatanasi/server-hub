@@ -6,6 +6,7 @@ enable: 1
 [ALIASES]
 gateway 10.10.0.1 # UCG Fiber
 local-network 10.10.0.0/24
+proxmox 10.10.0.200
 
 [RULES]
 IN ACCEPT -p tcp -dport 8006 -log nolog # Proxmox GUI
@@ -19,6 +20,7 @@ IN DROP -log warning
 IN Ping(ACCEPT) -log nolog
 IN ACCEPT -p tcp -dport 443 -log debug
 IN ACCEPT -p udp -dport 3478 -log debug
+IN ACCEPT -p tcp -dport 5252 -log nolog # Tailscale Web UI
 IN ACCEPT -p udp -sport 41641 -log debug
 
 [group webserver]
