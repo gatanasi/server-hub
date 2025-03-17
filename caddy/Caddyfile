@@ -1,0 +1,25 @@
+{
+        email {env.ADMIN_EMAIL}
+}
+
+(tls_config) {
+        tls {
+                dns cloudflare {
+                        api_token {env.CF_API_TOKEN}
+                }
+        }
+}
+
+*.gatanasios.com {
+        import tls_config
+
+        @speed host speed.gatanasios.com
+        handle @speed {
+                reverse_proxy https://openspeedtest.vm {
+                        transport http {
+                                tls
+                                tls_insecure_skip_verify
+                        }
+                }
+        }
+}

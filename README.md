@@ -2,14 +2,17 @@
 - [x] Duckdns :white_check_mark:
 - [x] Wireguard
 - [x] Tailscale
-- [ ] ConvertX
+- [x] ConvertX
+- [x] Caddy
+- [ ] InfluxDB
+- [ ] Grafana
+- [ ] Swiss invoices?
 - [ ] Watchtower
-- [ ] GoAccess
+- [ ] GoAccess?
 - [ ] Homepage
 - [ ] Videos converter
 - [ ] Stirling PDF
 - [ ] Kuma?
-- [ ] Traeffik?
 - [ ] rclone for backups / restic?
 - [ ] Longhorn to backup Kubernetes?
 - [ ] Kubernetes with flux?
