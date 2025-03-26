@@ -20,6 +20,9 @@
                                 tls
                                 tls_insecure_skip_verify
                         }
+                        request_buffers 35mib
+                        response_buffers 35mib
+                        flush_interval -1
                 }
         }
 }
