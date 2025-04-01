@@ -1,4 +1,7 @@
+## Windows 11 ISO downloaded on 2025-04-01
+
 https://guides.hakedev.com/wiki/proxmox/windows-11-clone
+https://pve.proxmox.com/wiki/Windows_11_guest_best_practices
 
 ```
 C:\Windows\System32\Sysprep\sysprep.exe /audit

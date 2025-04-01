@@ -1,9 +1,12 @@
 # List of applications
 - [x] Duckdns :white_check_mark:
 - [x] Wireguard
+- [x] Cloudflare Tunnel
 - [x] Tailscale
 - [x] ConvertX
 - [x] Caddy
+- [ ] k3s
+- [ ] Rancher
 - [ ] InfluxDB
 - [ ] Grafana
 - [ ] Swiss invoices?
@@ -15,6 +18,6 @@
 - [ ] Kuma?
 - [ ] rclone for backups / restic?
 - [ ] Longhorn to backup Kubernetes?
-- [ ] Kubernetes with flux?
-- [ ] ArgoCD?
+- [ ] ArgoCD vs Flux?
 - [ ] MinIO?
+- [ ] Octopus?

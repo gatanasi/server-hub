@@ -15,4 +15,4 @@ qm set "$VMID" --ciuser "$DISTRO"
 qm set "$VMID" --ipconfig0 ip=dhcp
 qm set "$VMID" --boot c --bootdisk scsi0
 qm set "$VMID" --serial0 socket --vga serial0
-qm disk resize "$VMID" scsi0 4G
+qm disk resize "$VMID" scsi0 5G
