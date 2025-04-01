@@ -10,10 +10,21 @@
         }
 }
 
-*.gatanasios.com {
+*.home.gatanasios.com {
         import tls_config
 
-        @speed host speed.gatanasios.com
+        @rancher host rancher.home.gatanasios.com
+        handle @rancher {
+                reverse_proxy https://10.10.10.12 {
+                        header_up Host {http.request.host}
+
+                        transport http {
+                                tls_insecure_skip_verify
+                        }
+                }
+        }
+
+        @speed host speed.home.gatanasios.com
         handle @speed {
                 reverse_proxy https://openspeedtest.vm {
                         transport http {
