@@ -13,6 +13,11 @@
 *.home.gatanasios.com {
         import tls_config
 
+        @wg-easy host wg-easy.home.gatanasios.com
+        handle @wg-easy {
+                reverse_proxy http://10.10.10.250:51821
+        }
+
         @rancher host rancher.home.gatanasios.com
         handle @rancher {
                 reverse_proxy https://10.10.10.12 {
