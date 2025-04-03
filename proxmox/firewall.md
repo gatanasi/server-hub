@@ -26,15 +26,13 @@ IN ACCEPT -p udp -dport 443 -log nolog
 
 [group tailscale]
 IN Ping(ACCEPT) -log nolog
-IN ACCEPT -p tcp -dport 443 -log nolog
-IN ACCEPT -p udp -dport 3478 -log nolog
 IN ACCEPT -p tcp -dport 5252 -log nolog # Tailscale Web UI
 IN ACCEPT -p udp -sport 41641 -log nolog
 
 [group wireguard]
 IN Ping(ACCEPT) -log nolog
-IN ACCEPT -p udp -dport 62496 -log nolog
 IN ACCEPT -p tcp -dport 51821 -log nolog # WG-Easy Web UI
+IN ACCEPT -p udp -dport 62496 -log nolog
 ```
 
 ## Windows 11
