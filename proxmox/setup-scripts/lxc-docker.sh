@@ -1,8 +1,7 @@
 #!/bin/sh
 
-adduser debian
-adduser debian sudo
-sudo passwd -l root
+NEW_USER="debian"
 
-sudo usermod -aG docker "$USER"
-exit
+adduser "$NEW_USER"
+usermod -aG sudo "$NEW_USER" && passwd -l root
+usermod -aG docker "$NEW_USER"
