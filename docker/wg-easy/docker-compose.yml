@@ -10,7 +10,7 @@ services:
       - PASSWORD_HASH=${PASSWORD_HASH}
       - WG_DEFAULT_DNS=10.10.0.1
 
-    image: ghcr.io/wg-easy/wg-easy:14
+    image: ghcr.io/wg-easy/wg-easy:15
     container_name: wg-easy
     volumes:
       - etc_wireguard:/etc/wireguard
