@@ -1,0 +1,41 @@
+{
+        email {env.ADMIN_EMAIL}
+}
+
+(tls_config) {
+        tls {
+                dns cloudflare {env.CF_API_TOKEN}
+                resolvers 1.1.1.1
+        }
+}
+
+(common_proxy_headers) {
+        header_up Host {http.request.host}
+        header_up X-Real-IP {http.request.remote.host}
+}
+
+:8081 {
+        respond "OK" 200
+}
+
+*.home.gatanasios.com {
+        import tls_config
+
+        @wg-easy host wg-easy.home.gatanasios.com
+        handle @wg-easy {
+                reverse_proxy http://wireguard.vm:51821 {
+                        import common_proxy_headers
+                }
+        }
+
+        @video-converter host video-converter.home.gatanasios.com
+        handle @video-converter {
+                reverse_proxy http://video-converter.vm:3000 {
+                        import common_proxy_headers
+                }
+        }
+
+        handle {
+                respond "Not Found" 404
+        }
+}

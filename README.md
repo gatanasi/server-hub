@@ -1,10 +1,13 @@
 # List of applications
 - [x] Duckdns :white_check_mark:
-- [x] Wireguard
-- [x] Cloudflare Tunnel
-- [x] Tailscale
-- [x] ConvertX
-- [x] Caddy
+- [x] Wireguard :white_check_mark:
+- [x] Cloudflare Tunnel :white_check_mark:
+- [x] Tailscale :white_check_mark:
+- [x] Caddy :white_check_mark:
+- [x] Open Speed Test :white_check_mark:
+- [x] Videos converter :white_check_mark:
+- [ ] ConvertX
+- [ ] Invoice Ninja?
 - [ ] k3s
 - [ ] Rancher
 - [ ] InfluxDB
@@ -13,9 +16,8 @@
 - [ ] Watchtower
 - [ ] GoAccess?
 - [ ] Homepage
-- [ ] Videos converter
 - [ ] Stirling PDF
-- [ ] Kuma?
+- [ ] Uptime Kuma?
 - [ ] rclone for backups / restic?
 - [ ] Longhorn to backup Kubernetes?
 - [ ] ArgoCD vs Flux?
