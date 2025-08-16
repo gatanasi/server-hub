@@ -7,6 +7,6 @@ services:
         restart: unless-stopped
         container_name: openspeedtest
         ports:
-    #        - "80:3000"
+            - "80:3000"
             - "443:3001"
-        image: openspeedtest/latest@sha256:1745e913f596fe98882b286a67751efdae74774e9caa742a4934bb056e8748d2
+        image: openspeedtest/latest:v2.0.6
