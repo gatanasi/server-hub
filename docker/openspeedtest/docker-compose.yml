@@ -1,11 +1,11 @@
 services:
     speedtest:
+        container_name: openspeedtest
         env_file: .env
         environment:
             - DOMAIN_NAME=${DOMAIN_NAME}
             - USER_EMAIL=${USER_EMAIL}
         restart: unless-stopped
-        container_name: openspeedtest
         ports:
             - "80:3000"
             - "443:3001"

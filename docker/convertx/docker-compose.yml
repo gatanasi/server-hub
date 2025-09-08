@@ -1,8 +1,8 @@
 services:
-  convertx: 
+  convertx:
+    container_name: convertx
     env_file: .env
     image: ghcr.io/c4illin/convertx@sha256:346589f154332997329fdc888417d4b24c49cc9140eab80e637a68cfbdd8041b
-    container_name: convertx
     restart: unless-stopped
     ports:
       - "443:3000"

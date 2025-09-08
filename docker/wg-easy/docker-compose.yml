@@ -3,6 +3,7 @@ volumes:
 
 services:
   wg-easy:
+    container_name: wg-easy
     environment:
       - LANG=en
       - WG_HOST=${WG_HOST}
@@ -11,7 +12,6 @@ services:
       - WG_DEFAULT_DNS=10.10.0.1
 
     image: ghcr.io/wg-easy/wg-easy:15@sha256:bb8152762c36f824eb42bb2f3c5ab8ad952818fbef677d584bc69ec513b251b0
-    container_name: wg-easy
     volumes:
       - etc_wireguard:/etc/wireguard
     ports:
