@@ -5,18 +5,20 @@ enable: 1
 
 [ALIASES]
 gateway 10.10.0.1 # UCG Fiber
+gateway-v6 fe80::fcf2:13ff:febc:a282 # UCG Fiber IPv6
 gateway-vm 10.10.10.1 # UCG Fiber VM
 local-network 10.10.0.0/24
 proxmox 10.10.0.200
 
 [IPSET ubiquiti-gateway]
 dc/gateway
+dc/gateway-v6
 dc/gateway-vm
 
 [RULES]
 IN Ping(ACCEPT) -log nolog
-IN ACCEPT -p tcp -dport 8006 -log nolog # Proxmox GUI
 IN SSH(ACCEPT) -source 10.10.0.50 -log nolog
+IN ACCEPT -p tcp -dport 8006 -log nolog # Proxmox GUI
 IN ACCEPT -source +dc/ubiquiti-gateway -p udp -dport 10001 -log nolog
 IN DROP -dest 10.10.0.255 -p udp -log nolog # Subnet broadcast
 IN DROP -dest 255.255.255.255 -p udp -log nolog # Limited broadcast
