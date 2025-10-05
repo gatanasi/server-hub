@@ -35,6 +35,13 @@
                 }
         }
 
+        @ollama host ollama.home.gatanasios.com
+        handle @ollama {
+                reverse_proxy http://ollama.vm:11434 {
+                        import common_proxy_headers
+                }
+        }
+
         handle {
                 respond "Not Found" 404
         }
