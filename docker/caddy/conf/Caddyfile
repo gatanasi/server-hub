@@ -32,6 +32,7 @@
         handle @video-converter {
                 reverse_proxy http://video-converter.vm:3000 {
                         import common_proxy_headers
+                        flush_interval -1
                 }
         }
 
@@ -39,6 +40,15 @@
         handle @ollama {
                 reverse_proxy http://ollama.vm:11434 {
                         import common_proxy_headers
+                        flush_interval -1
+                }
+        }
+
+        @n8n host n8n.home.gatanasios.com
+        handle @n8n {
+                reverse_proxy http://n8n.vm:5678 {
+                        import common_proxy_headers
+                        flush_interval -1
                 }
         }
 
