@@ -1,0 +1,3 @@
+FROM gemma3:27b-it-qat
+PARAMETER num_gpu 63
+PARAMETER num_ctx 131072
