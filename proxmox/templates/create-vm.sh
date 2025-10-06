@@ -25,7 +25,7 @@ IMAGE_PATH="$3"
 
 # --- Template Creation ---
 echo "Creating VM ${VMID} for ${DISTRO} from image ${IMAGE_PATH}..."
-qm create "${VMID}" --memory 4096 --cores 2 --cpulimit 2 --name "${DISTRO}" --cpu x86-64-v4 --machine q35,viommu=intel --ostype l26 --agent enabled=1 --net0 virtio,bridge=vmbr0,firewall=1,tag=10 --onboot 1 --tags "${DISTRO}" --template 1
+qm create "${VMID}" --memory 4096 --cores 4 --cpulimit 4 --name "${DISTRO}" --cpu x86-64-v4 --machine q35,viommu=intel --ostype l26 --agent enabled=1 --net0 virtio,bridge=vmbr0,firewall=1,tag=10 --onboot 1 --tags "${DISTRO}" --template 1
 
 # --- Secure Boot Logic ---
 # Determine if Secure Boot should be enabled based on Distro
