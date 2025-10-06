@@ -5,7 +5,7 @@ volumes:
 
 x-shared: &shared
   restart: always
-  image: docker.n8n.io/n8nio/n8n
+  image: docker.n8n.io/n8nio/n8n@sha256:57f95a26b1b28527053fba6316d9d046395d9b4da9d0da486e838384a38fcf37
   environment:
     - DB_TYPE=postgresdb
     - DB_POSTGRESDB_HOST=postgres
@@ -30,7 +30,7 @@ x-shared: &shared
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16@sha256:fb9aa6d07b0fe53e94e8470977f316d1cdb39b8cdb33c45279ff0bbe32067c25
     restart: always
     environment:
       - POSTGRES_USER
@@ -48,7 +48,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:6-alpine
+    image: redis:6-alpine@sha256:2185e741f4c1e7b0ea9ca1e163a3767c4270a73086b6bbea2049a7203212fb7f
     restart: always
     volumes:
       - redis_storage:/data
