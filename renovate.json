@@ -12,19 +12,16 @@
       "groupSlug": "github-actions"
     },
     {
-      "comment": "Separate PR for each major Docker image update",
       "matchManagers": ["docker"],
       "matchUpdateTypes": ["major"]
     },
     {
-      "comment": "Group all minor and patch Docker image updates into a single PR",
       "matchManagers": ["docker"],
       "matchUpdateTypes": ["minor", "patch"],
       "groupName": "docker minor updates",
       "groupSlug": "docker-minor-patch"
     },
     {
-      "comment": "Group all Docker digest updates into a single PR",
       "matchManagers": ["docker"],
       "matchUpdateTypes": ["digest"],
       "groupName": "docker digest updates",
