@@ -5,6 +5,8 @@
 (tls_config) {
         tls {
                 dns cloudflare {env.CF_API_TOKEN}
+                propagation_timeout 3m
+                propagation_delay 1m
                 resolvers 1.1.1.1
         }
 }
