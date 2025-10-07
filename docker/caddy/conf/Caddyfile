@@ -1,60 +1,60 @@
 {
-        email {env.ADMIN_EMAIL}
+	email {env.ADMIN_EMAIL}
 }
 
 (tls_config) {
-        tls {
-                dns cloudflare {env.CF_API_TOKEN}
-                propagation_timeout 3m
-                propagation_delay 1m
-                resolvers 1.1.1.1
-        }
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+		propagation_timeout 3m
+		propagation_delay 1m
+		resolvers 1.1.1.1
+	}
 }
 
 (common_proxy_headers) {
-        header_up Host {http.request.host}
-        header_up X-Real-IP {http.request.remote.host}
+	header_up Host {http.request.host}
+	header_up X-Real-IP {http.request.remote.host}
 }
 
 :8081 {
-        respond "OK" 200
+	respond "OK" 200
 }
 
 *.home.gatanasios.com {
-        import tls_config
+	import tls_config
 
-        @wg-easy host wg-easy.home.gatanasios.com
-        handle @wg-easy {
-                reverse_proxy http://wireguard.vm:51821 {
-                        import common_proxy_headers
-                }
-        }
+	@wg-easy host wg-easy.home.gatanasios.com
+	handle @wg-easy {
+		reverse_proxy http://wireguard.vm:51821 {
+			import common_proxy_headers
+		}
+	}
 
-        @video-converter host video-converter.home.gatanasios.com
-        handle @video-converter {
-                reverse_proxy http://video-converter.vm:3000 {
-                        import common_proxy_headers
-                        flush_interval -1
-                }
-        }
+	@video-converter host video-converter.home.gatanasios.com
+	handle @video-converter {
+		reverse_proxy http://video-converter.vm:3000 {
+			import common_proxy_headers
+			flush_interval -1
+		}
+	}
 
-        @ollama host ollama.home.gatanasios.com
-        handle @ollama {
-                reverse_proxy http://ollama.vm:11434 {
-                        import common_proxy_headers
-                        flush_interval -1
-                }
-        }
+	@ollama host ollama.home.gatanasios.com
+	handle @ollama {
+		reverse_proxy http://ollama.vm:11434 {
+			import common_proxy_headers
+			flush_interval -1
+		}
+	}
 
-        @n8n host n8n.home.gatanasios.com
-        handle @n8n {
-                reverse_proxy http://n8n.vm:5678 {
-                        import common_proxy_headers
-                        flush_interval -1
-                }
-        }
+	@n8n host n8n.home.gatanasios.com
+	handle @n8n {
+		reverse_proxy http://n8n.vm:5678 {
+			import common_proxy_headers
+			flush_interval -1
+		}
+	}
 
-        handle {
-                respond "Not Found" 404
-        }
+	handle {
+		respond "Not Found" 404
+	}
 }
