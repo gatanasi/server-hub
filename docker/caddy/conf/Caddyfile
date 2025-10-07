@@ -20,17 +20,15 @@
 	respond "OK" 200
 }
 
-*.home.gatanasios.com {
-	import tls_config
-
-	@wg-easy host wg-easy.home.gatanasios.com
+(routes) {
+	@wg-easy expression {host}.startsWith("wg-easy")
 	handle @wg-easy {
 		reverse_proxy http://wireguard.vm:51821 {
 			import common_proxy_headers
 		}
 	}
 
-	@video-converter host video-converter.home.gatanasios.com
+	@video-converter expression {host}.startsWith("video-converter")
 	handle @video-converter {
 		reverse_proxy http://video-converter.vm:3000 {
 			import common_proxy_headers
@@ -38,7 +36,7 @@
 		}
 	}
 
-	@ollama host ollama.home.gatanasios.com
+	@ollama expression {host}.startsWith("ollama")
 	handle @ollama {
 		reverse_proxy http://ollama.vm:11434 {
 			import common_proxy_headers
@@ -46,7 +44,7 @@
 		}
 	}
 
-	@n8n host n8n.home.gatanasios.com
+	@n8n expression {host}.startsWith("n8n")
 	handle @n8n {
 		reverse_proxy http://n8n.vm:5678 {
 			import common_proxy_headers
@@ -57,4 +55,14 @@
 	handle {
 		respond "Not Found" 404
 	}
+}
+
+*.home.gatanasios.com {
+	import tls_config
+	import routes
+}
+
+*.gatanasios.com {
+	tls internal
+	import routes
 }
