@@ -19,7 +19,7 @@ x-shared: &shared
     - N8N_ENCRYPTION_KEY=${ENCRYPTION_KEY}
     - N8N_HOST=${N8N_HOST}
     - N8N_PROTOCOL=https
-    - WEBHOOK_URL=https://${N8N_HOST}
+    - WEBHOOK_URL=${WEBHOOK_URL}
     - N8N_PROXY_HOPS=1
     - GENERIC_TIMEZONE=Europe/Zurich
   links:
