@@ -16,11 +16,26 @@
 	header_up X-Real-IP {http.request.remote.host}
 }
 
+(common_cors) {
+	@homeOrigin header_regexp Origin ^https://([a-z0-9-]+\.)?home\.gatanasios\.com(:\d+)?$
+	header @homeOrigin Access-Control-Allow-Origin "*"
+	header @homeOrigin Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+	header @homeOrigin Access-Control-Allow-Headers "{http.request.header.Access-Control-Request-Headers}"
+
+	@preflight {
+		method OPTIONS
+		header_regexp Origin ^https://([a-z0-9-]+\.)?home\.gatanasios\.com(:\d+)?$
+	}
+	respond @preflight 204
+}
+
 :8081 {
 	respond "OK" 200
 }
 
 (routes) {
+	import common_cors
+
 	@wg-easy expression {host}.startsWith("wg-easy")
 	handle @wg-easy {
 		reverse_proxy http://wireguard.vm:51821 {
