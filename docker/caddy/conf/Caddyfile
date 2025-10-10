@@ -79,5 +79,20 @@
 
 *.gatanasios.com {
 	tls internal
-	import routes
+
+	map {host} {target_host} {
+		~^(.+)\.gatanasios\.com$ ${1}.home.gatanasios.com
+		default ""
+	}
+
+	@has_target expression `{target_host} != ""`
+	handle @has_target {
+		reverse_proxy {target_host}:443 {
+			header_up Host {target_host}
+			transport http {
+				tls
+				tls_server_name {target_host}
+			}
+		}
+	}
 }
