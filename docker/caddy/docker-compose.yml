@@ -2,7 +2,6 @@ services:
   caddy:
     container_name: caddy
     env_file: .env
-    image: custom-caddy:latest
     build: .
     restart: unless-stopped
     cap_add:
