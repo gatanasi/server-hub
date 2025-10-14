@@ -67,6 +67,13 @@
 		}
 	}
 
+	@odoo expression {host}.startsWith("odoo")
+	handle @odoo {
+		reverse_proxy http://odoo.vm:8069 {
+			import common_proxy_headers
+		}
+	}
+
 	handle {
 		respond "Not Found" 404
 	}
