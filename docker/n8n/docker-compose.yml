@@ -5,7 +5,7 @@ volumes:
 
 x-shared: &shared
   restart: always
-  image: docker.n8n.io/n8nio/n8n@sha256:38e83833f4933c2e50a908b7accce76909e23878158762d6c21beb72cb4c657f
+  image: docker.n8n.io/n8nio/n8n:latest
   environment:
     - DB_TYPE=postgresdb
     - DB_POSTGRESDB_HOST=postgres
