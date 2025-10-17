@@ -5,7 +5,7 @@ services:
     image: ghcr.io/c4illin/convertx@sha256:53f2c04ebe63fdfb4d812ee66b78a5db9360c729f3defe3dcc864256ff91a7cb
     restart: unless-stopped
     ports:
-      - "443:3000"
+      - "8080:3000"
     environment:
       - ALLOW_UNAUTHENTICATED=true
       - AUTO_DELETE_EVERY_N_HOURS=6

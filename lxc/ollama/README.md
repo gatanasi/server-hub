@@ -34,5 +34,5 @@ Environment="HSA_ENABLE_COMPRESSION=1"
 Environment="OLLAMA_FLASH_ATTENTION=1"
 Environment="OLLAMA_KV_CACHE_TYPE=q8_0"
 Environment="OLLAMA_CONTEXT_LENGTH=131072"
-Environment="OLLAMA_HOST=0.0.0.0"
+Environment="OLLAMA_HOST=0.0.0.0:8080"
 ```

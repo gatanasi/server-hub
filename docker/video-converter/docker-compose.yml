@@ -4,7 +4,7 @@ services:
     image: ghcr.io/gatanasi/video-converter:2.3.1@sha256:d6d1cb47ba27b2920ada2e5b9ccd4311e5816d6d14accc650f3ea867414dd05c
     restart: unless-stopped
     ports:
-      - "${HOST_PORT:-3000}:3000"
+      - "8080:3000"
     environment:
       GOOGLE_DRIVE_API_KEY: ${GOOGLE_DRIVE_API_KEY}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}

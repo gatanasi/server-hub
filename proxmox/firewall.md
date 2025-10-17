@@ -4,12 +4,12 @@
 enable: 1
 
 [ALIASES]
+caddy 10.10.10.130
 gateway 10.10.0.1 # UCG Fiber
 gateway-v6 fe80::fcf2:13ff:febc:a282 # UCG Fiber IPv6
 gateway-vm 10.10.10.1 # UCG Fiber VM
 local-network 10.10.0.0/24
 proxmox 10.10.0.200
-caddy 10.10.10.130
 
 [IPSET ubiquiti-gateway]
 dc/gateway
@@ -25,10 +25,10 @@ IN DROP -dest 10.10.0.255 -p udp -log nolog # Subnet broadcast
 IN DROP -dest 255.255.255.255 -p udp -log nolog # Limited broadcast
 IN DROP -log debug
 
-[group ollama]
-IN Ping(ACCEPT) -log nolog
-IN ACCEPT -source dc/caddy -p tcp -dport 11434 -log nolog
-IN ACCEPT -source dc/caddy -p udp -dport 11434 -log nolog
+[group only-caddy]
+IN ACCEPT -source dc/caddy -p tcp -dport 8080 -log nolog
+IN ACCEPT -source dc/caddy -p udp -dport 8080 -log nolog
+IN REJECT -log info
 
 [group tailscale]
 IN Ping(ACCEPT) -log nolog
@@ -38,9 +38,7 @@ IN ACCEPT -p udp -dport 41641 -log nolog
 [group webserver]
 IN Ping(ACCEPT) -log nolog
 IN Web(ACCEPT) -log nolog
-IN ACCEPT -p udp -dport 80 -log nolog
-IN ACCEPT -p udp -dport 443 -log nolog
-IN ACCEPT -p tcp -dport 3000 -log nolog
+IN ACCEPT -p udp -dport 80,443 -log nolog # Web UDP
 
 [group wireguard]
 IN Ping(ACCEPT) -log nolog
