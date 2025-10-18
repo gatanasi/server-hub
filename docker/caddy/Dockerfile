@@ -5,6 +5,8 @@ RUN xcaddy build \
 
 FROM caddy:2.10.2@sha256:786b7527345b82faf39e664ea26c71cc57bcb3a89bb2eada94bf0b2dc5304f0a
 
-RUN apk add curl
+RUN apk add --no-cache \
+    curl \
+    nss-tools
 
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
