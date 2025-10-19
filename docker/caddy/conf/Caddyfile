@@ -34,7 +34,8 @@
 (common_cors) {
 	@homeOrigin header_regexp Origin ^https://([a-z0-9-]+\.)?home\.gatanasios\.com(:\d+)?$
 
-	header @homeOrigin Access-Control-Allow-Origin "*"
+	header @homeOrigin Access-Control-Allow-Origin "{http.request.header.Origin}"
+	header @homeOrigin Access-Control-Allow-Credentials "true"
 	header @homeOrigin Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS"
 	header @homeOrigin Access-Control-Allow-Headers "{http.request.header.Access-Control-Request-Headers}"
 
@@ -104,21 +105,7 @@
 }
 
 *.gatanasios.com {
-	tls internal
-
-	map {host} {target_host} {
-		~^(.+)\.gatanasios\.com$ ${1}.home.gatanasios.com
-		default ""
-	}
-
-	@has_target expression `{target_host} != ""`
-	handle @has_target {
-		reverse_proxy {target_host}:443 {
-			header_up Host {target_host}
-			transport http {
-				tls
-				tls_server_name {target_host}
-			}
-		}
-	}
+	import production_config
+	import tls_config
+	import routes
 }
