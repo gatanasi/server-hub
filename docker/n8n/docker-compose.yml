@@ -54,7 +54,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:6-alpine@sha256:77697a75da9f94e9357b61fcaf8345f69e3d9d32e9d15032c8415c21263977dc
+    image: redis:8-alpine@sha256:59b6e694653476de2c992937ebe1c64182af4728e54bb49e9b7a6c26614d8933
     restart: always
     volumes:
       - redis_storage:/data
