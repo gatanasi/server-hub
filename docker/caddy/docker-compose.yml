@@ -1,12 +1,13 @@
 services:
   caddy:
     container_name: caddy
-    env_file: .env
     build: .
     restart: unless-stopped
     environment:
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       CF_API_TOKEN: ${CF_API_TOKEN}
+      DOMAIN_NAME: ${DOMAIN_NAME}
+      INTERNAL_CORS_ORIGIN_ESCAPED_DOMAIN: ${INTERNAL_CORS_ORIGIN_ESCAPED_DOMAIN}
     cap_add:
       - NET_ADMIN
     ports:

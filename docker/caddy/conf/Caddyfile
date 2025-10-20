@@ -31,21 +31,14 @@
 	header_up X-Real-IP {http.request.remote.host}
 }
 
-(common_cors) {
-	@homeOrigin header_regexp Origin ^https://([a-z0-9-]+\.)?home\.gatanasios\.com(:\d+)?$
+(internal_cors) {
+	@homeOrigin header_regexp Origin ^https://([a-z0-9-]+\.)?{$INTERNAL_CORS_ORIGIN_ESCAPED_DOMAIN}(:\d+)?$
 
 	header @homeOrigin Access-Control-Allow-Origin "{http.request.header.Origin}"
 	header @homeOrigin Access-Control-Allow-Credentials "true"
 	header @homeOrigin Access-Control-Allow-Methods "GET, POST, PUT, DELETE, PATCH, OPTIONS"
 	header @homeOrigin Access-Control-Allow-Headers "{http.request.header.Access-Control-Request-Headers}"
-
-	@preflight {
-		method OPTIONS
-		header_regexp Origin ^https://([a-z0-9-]+\.)?home\.gatanasios\.com(:\d+)?$
-	}
-	handle @preflight {
-		respond 204
-	}
+	header @homeOrigin Vary "Origin"
 }
 
 :8081 {
@@ -53,8 +46,6 @@
 }
 
 (routes) {
-	import common_cors
-
 	@wg-easy expression {host}.startsWith("wg-easy")
 	handle @wg-easy {
 		reverse_proxy http://wireguard.vm:51821 {
@@ -80,6 +71,8 @@
 
 	@n8n expression {host}.startsWith("n8n")
 	handle @n8n {
+		import internal_cors
+
 		reverse_proxy http://n8n.vm:8080 {
 			import common_proxy_headers
 			flush_interval -1
@@ -98,13 +91,7 @@
 	}
 }
 
-*.home.gatanasios.com {
-	import production_config
-	import tls_config
-	import routes
-}
-
-*.gatanasios.com {
+*.home.{$DOMAIN_NAME} *.{$DOMAIN_NAME} {
 	import production_config
 	import tls_config
 	import routes
