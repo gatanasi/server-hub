@@ -19,7 +19,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:16@sha256:029f480c232c94a0a0f9828efd522ac58c36a1ebedbd459fc31245971a073b6d
+    image: postgres:16@sha256:f554b7e953b6fc0f72fe2b34e34f935f7ecc4f5bab9d1006467b30bfc6fc7ea1
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
