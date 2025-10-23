@@ -15,8 +15,10 @@ services:
       - PGDATABASE=${POSTGRES_DB}
       - PGUSER=${POSTGRES_USER}
       - PGPASSWORD=${POSTGRES_PASSWORD}
-    command: --init base # Default username: admin, password: admin
+    command: --init base --db-filter=.* # Default username: admin, password: admin
     restart: unless-stopped
+    networks:
+      - odoo_net
 
   db:
     image: postgres:16@sha256:f554b7e953b6fc0f72fe2b34e34f935f7ecc4f5bab9d1006467b30bfc6fc7ea1
@@ -32,7 +34,12 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - odoo_net
 
 volumes:
   odoo_data:
   db_data:
+
+networks:
+  odoo_net:
