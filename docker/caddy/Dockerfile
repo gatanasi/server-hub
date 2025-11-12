@@ -3,7 +3,7 @@ FROM caddy:2.10.2-builder@sha256:e8ec35d0787c123c0776d5e22570f2eeba76a7303901041
 RUN xcaddy build \
     --with github.com/caddy-dns/cloudflare
 
-FROM caddy:2.10.2@sha256:786b7527345b82faf39e664ea26c71cc57bcb3a89bb2eada94bf0b2dc5304f0a
+FROM caddy:2.10.2@sha256:cef7fe17d4df3b0843eae25bed319d6140b1a7bb13ccef076f5f1783d5bca9b1
 
 RUN apk add --no-cache \
     curl \
