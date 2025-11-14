@@ -36,7 +36,7 @@ x-shared: &shared
 
 services:
   postgres:
-    image: postgres:16@sha256:f554b7e953b6fc0f72fe2b34e34f935f7ecc4f5bab9d1006467b30bfc6fc7ea1
+    image: postgres:16@sha256:63e37736c98d5df8bd8fb122910d6d1812396c4311355754fffc150efd5fe4bf
     restart: always
     environment:
       - POSTGRES_USER
