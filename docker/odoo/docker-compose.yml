@@ -1,6 +1,6 @@
 services:
   odoo:
-    image: odoo:19.0@sha256:28457d4c74b2861a56feb38fe7a74107110a66af7627bbec54099a1f5deeede0
+    image: odoo:19.0@sha256:14c77d72303158553838d0f1e27f664b27bf79991eb9927fea98098cd011e20b
     depends_on:
       db:
         condition: service_healthy
