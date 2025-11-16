@@ -16,7 +16,7 @@
 - [ ] Watchtower
 - [ ] GoAccess?
 - [ ] Homepage
-- [ ] Stirling PDF
+- [x] Stirling PDF
 - [ ] Uptime Kuma?
 - [ ] rclone for backups / restic?
 - [ ] Longhorn to backup Kubernetes?

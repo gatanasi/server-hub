@@ -61,6 +61,14 @@
 		}
 	}
 
+	@stirling-pdf expression {host}.startsWith("stirling-pdf")
+	handle @stirling-pdf {
+		reverse_proxy http://stirling-pdf.vm:8080 {
+			import common_proxy_headers
+			flush_interval -1
+		}
+	}
+
 	@ollama expression {host}.startsWith("ollama")
 	handle @ollama {
 		reverse_proxy http://ollama.vm:8080 {
