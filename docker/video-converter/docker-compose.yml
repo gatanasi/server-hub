@@ -1,7 +1,7 @@
 services:
   video-converter:
     container_name: video-converter
-    image: ghcr.io/gatanasi/video-converter:2.3.1@sha256:d6d1cb47ba27b2920ada2e5b9ccd4311e5816d6d14accc650f3ea867414dd05c
+    image: ghcr.io/gatanasi/video-converter:2.3.3@sha256:8271537fd648054a4a766dc0c8a6c3b81f43bd3bebcf233cc607d0fe40912f49
     restart: unless-stopped
     ports:
       - "8080:3000"
