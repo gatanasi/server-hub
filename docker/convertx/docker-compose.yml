@@ -2,7 +2,7 @@ services:
   convertx:
     container_name: convertx
     env_file: .env
-    image: ghcr.io/c4illin/convertx@sha256:2397d94fa091e48f1fbfcb97dd28d6c36cf7bdac2a33fb5cd66813e6ab723849
+    image: ghcr.io/c4illin/convertx:v0.16.1
     restart: unless-stopped
     ports:
       - "8080:3000"
