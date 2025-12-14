@@ -1,6 +1,6 @@
 services:
   odoo:
-    image: odoo:19.0-20251208
+    image: odoo:19.0-20251208@sha256:4d344f40154dd0627b7078c3dcb40cf1db7c0944473c1898eb63492659b398ef
     depends_on:
       db:
         condition: service_healthy
@@ -21,7 +21,7 @@ services:
       - odoo_net
 
   db:
-    image: postgres:16.11
+    image: postgres:16.11@sha256:d4c3314b2dd74ff23cd6cd07e4d7e737cb6ef791c22a7cbd744cfbfb4815df72
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
