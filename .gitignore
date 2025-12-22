@@ -1,2 +1,2 @@
-.env.mine
 .DS_Store
+*.decrypted.*
