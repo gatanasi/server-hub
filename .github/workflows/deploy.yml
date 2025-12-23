@@ -27,7 +27,7 @@ jobs:
 
       - name: Install SSH Key
         if: steps.filter.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
-        uses: shimataro/ssh-key-action@v2
+        uses: shimataro/ssh-key-action@d4fffb50872869abe2d9a9098a6d9c5aa7d16be4 # v2.7.0
         with:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           known_hosts: "unnecessary_placeholder" 
