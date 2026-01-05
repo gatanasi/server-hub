@@ -369,6 +369,65 @@ Go to Actions → Deploy Docker Apps → Run workflow → Enter app name
 
 ---
 
+## Secrets Management with SOPS
+
+This project uses [SOPS](https://github.com/getsops/sops) (Secrets OPerationS) with [age](https://github.com/FiloSottile/age) encryption to securely store environment variables in the repository.
+
+### How It Works
+
+1. **Encrypted files**: `.env.enc` files in `docker/<app>/` contain encrypted secrets
+2. **Decryption key**: Located on deployer.vm at `~/.config/sops/age/keys.txt`
+3. **Automatic decryption**: The Ansible playbook automatically decrypts `.env.enc` → `.env` during deployment
+4. **Security**: Decrypted `.env` files have mode `0600` and are NEVER copied to Git
+
+### Configuration
+
+The `.sops.yaml` file defines encryption rules:
+
+```yaml
+creation_rules:
+  - path_regex: .*\.env\.enc$
+    age: "age1e8jjnzsjeyc8aczd4555l56cwm6k83muevexmu4e4m4y3yva9qhqnx2hnx"
+```
+
+### Deployer VM Setup for SOPS
+
+```bash
+# Install SOPS (on deployer.vm)
+wget -qO /tmp/sops.deb https://github.com/getsops/sops/releases/download/v3.9.4/sops_3.9.4_amd64.deb
+sudo dpkg -i /tmp/sops.deb
+
+# Create age key directory (if not exists)
+mkdir -p ~/.config/sops/age
+
+# The age private key should be placed at:
+# ~/.config/sops/age/keys.txt
+# Format: AGE-SECRET-KEY-1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+### Managing Secrets
+
+```bash
+# Encrypt a new .env file
+sops --input-type dotenv --output-type dotenv -e .env > .env.enc
+
+# Decrypt to view (DO NOT commit decrypted files!)
+sops --input-type dotenv --output-type dotenv -d .env.enc
+
+# Edit encrypted file in place
+sops --input-type dotenv --output-type dotenv .env.enc
+```
+
+### Adding Secrets for a New App
+
+1. Create `.env` file locally with your secrets
+2. Encrypt it: `sops --input-type dotenv --output-type dotenv -e .env > docker/<app>/.env.enc`
+3. Delete the unencrypted `.env` file
+4. Commit the `.env.enc` file
+5. The deployment will automatically decrypt it on the target VM
+
+---
+
 ## Troubleshooting
 
 ### Deployment fails with "Permission denied"

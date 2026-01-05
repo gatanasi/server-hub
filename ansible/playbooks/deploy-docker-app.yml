@@ -102,19 +102,48 @@
       loop: "{{ files_to_copy.files }}"
       loop_control:
         label: "{{ item.path | basename }}"
-      when: item.path | basename != '.env'
+      when: 
+        - item.path | basename != '.env'
+        - item.path | basename != '.env.enc'
+
+    # SOPS encrypted .env handling
+    - name: Check if encrypted .env.enc exists in source
+      ansible.builtin.stat:
+        path: "{{ app_source_dir }}/.env.enc"
+      delegate_to: localhost
+      register: env_enc_file
+
+    - name: Decrypt .env.enc using SOPS (on deployer)
+      ansible.builtin.command:
+        cmd: "sops --input-type dotenv --output-type dotenv -d {{ app_source_dir }}/.env.enc"
+      delegate_to: localhost
+      register: decrypted_env
+      changed_when: false
+      no_log: true
+      when: env_enc_file.stat.exists
+
+    - name: Write decrypted .env to target
+      ansible.builtin.copy:
+        content: "{{ decrypted_env.stdout }}"
+        dest: "{{ app_target_dir }}/.env"
+        mode: '0600'
+      no_log: true
+      when: env_enc_file.stat.exists
 
     - name: Check if .env file exists on target
       ansible.builtin.stat:
         path: "{{ app_target_dir }}/.env"
       register: env_file
 
-    - name: Warn if .env file is missing
+    - name: Warn if .env file is missing (and no .env.enc found)
       ansible.builtin.debug:
         msg: |
           WARNING: No .env file found at {{ app_target_dir }}/.env
-          If this app requires environment variables, create the .env file manually.
-      when: not env_file.stat.exists
+          No .env.enc file found in source either.
+          If this app requires environment variables, create them manually.
+      when: 
+        - not env_file.stat.exists
+        - not env_enc_file.stat.exists
 
     - name: Pull latest Docker images
       ansible.builtin.command:

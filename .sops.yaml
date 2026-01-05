@@ -1,3 +1,5 @@
 creation_rules:
   - path_regex: .*\.env\.enc$
     age: "age1e8jjnzsjeyc8aczd4555l56cwm6k83muevexmu4e4m4y3yva9qhqnx2hnx"
+    # File format hint for dotenv files
+    unencrypted_regex: "^$"
