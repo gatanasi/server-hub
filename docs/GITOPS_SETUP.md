@@ -108,6 +108,8 @@ chmod 600 ~/.deploy-secrets
 chmod +x ~/git/server-hub/deploy/*.sh
 ```
 
+> **Note**: Git doesn't preserve execute permissions. The `trigger-deploy.sh` script automatically re-applies `chmod +x` after each `git pull` to prevent "Permission denied" errors.
+
 ### Step 1.5: Set Up SSH Keys to Target VMs
 
 For each target VM, ensure deployer.vm can SSH without password:
@@ -147,12 +149,17 @@ This creates the restricted SSH key that allows the runner to trigger deployment
 # SSH into deployer.vm
 ssh deployer@deployer.vm
 
+# Create a dedicated directory for deploy keys (for backup/reference)
+mkdir -p ~/deploy-keys
+
 # Generate a new keypair specifically for GitHub Actions
-ssh-keygen -t ed25519 -C "github-runner-deploy-key" -f ~/.ssh/github_runner_key -N ""
+ssh-keygen -t ed25519 -C "github-runner-deploy-key" -f ~/deploy-keys/runner-key -N ""
 
 # Display the public key
-cat ~/.ssh/github_runner_key.pub
+cat ~/deploy-keys/runner-key.pub
 ```
+
+> **Important**: Keep the `~/deploy-keys/` directory as a backup. If you need to rotate keys or re-configure GitHub Secrets, you'll need the private key from here.
 
 ### Step 2.2: Configure Forced Command
 
@@ -160,7 +167,7 @@ Add the public key to `authorized_keys` with security restrictions:
 
 ```bash
 # Get the public key content
-PUBKEY=$(cat ~/.ssh/github_runner_key.pub)
+PUBKEY=$(cat ~/deploy-keys/runner-key.pub)
 
 # Add with forced command restriction
 echo "command=\"/home/deployer/git/server-hub/deploy/trigger-deploy.sh\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ${PUBKEY}" >> ~/.ssh/authorized_keys
@@ -170,20 +177,23 @@ echo "command=\"/home/deployer/git/server-hub/deploy/trigger-deploy.sh\",no-port
 
 ```bash
 # This should show the script usage (not a shell)
-ssh -i ~/.ssh/github_runner_key deployer@localhost
+ssh -i ~/deploy-keys/runner-key deployer@localhost
 
-# This should trigger a deployment
-ssh -i ~/.ssh/github_runner_key deployer@localhost n8n
+# This should trigger a deployment (or show errors if target not set up)
+ssh -i ~/deploy-keys/runner-key deployer@localhost n8n
 ```
 
 ### Step 2.4: Get Values for GitHub Secrets
 
 ```bash
 # Get the PRIVATE key (this goes to GitHub Secrets - NEVER commit this!)
-cat ~/.ssh/github_runner_key
+cat ~/deploy-keys/runner-key
 
 # Get the SSH host key for known_hosts
 ssh-keyscan -t ed25519 deployer.vm
+
+# Get the key fingerprint (for verification)
+ssh-keygen -lf ~/deploy-keys/runner-key.pub
 ```
 
 ---
@@ -196,7 +206,7 @@ Go to: **Repository → Settings → Secrets and variables → Actions → New r
 
 | Secret Name | How to Get Value |
 |-------------|------------------|
-| `DEPLOYER_SSH_KEY` | Output of `cat ~/.ssh/github_runner_key` on deployer.vm |
+| `DEPLOYER_SSH_KEY` | Output of `cat ~/deploy-keys/runner-key` on deployer.vm |
 | `DEPLOYER_HOST` | `deployer.vm` (or IP address) |
 | `DEPLOYER_USER` | `deployer` |
 | `DEPLOYER_SSH_KNOWN_HOSTS` | Output of `ssh-keyscan -t ed25519 deployer.vm` |
@@ -376,10 +386,20 @@ chmod +x ~/git/server-hub/deploy/*.sh
 
 ### Container name conflict
 
+If you see "container name is already in use", it means containers with the same name exist from a previous deployment (possibly in a different directory).
+
 ```bash
-# On target VM, stop existing containers
-docker compose -f /path/to/existing/docker-compose.yml down
+# Option 1: Stop and remove existing containers by name
+ssh <user>@<target>.vm "docker stop n8n n8n-worker && docker rm n8n n8n-worker"
+
+# Option 2: Stop all containers from original docker-compose location
+ssh <user>@<target>.vm "cd /path/to/original && docker compose down"
+
+# Option 3: Force remove specific containers
+ssh <user>@<target>.vm "docker rm -f n8n n8n-worker"
 ```
+
+> **Note**: After resolving conflicts, re-trigger the deployment.
 
 ### Missing .env file
 

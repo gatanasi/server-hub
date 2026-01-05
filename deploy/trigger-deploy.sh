@@ -89,6 +89,9 @@ pull_latest_repo() {
     git fetch origin main
     git reset --hard origin/main
     
+    # Ensure deploy scripts are executable (git doesn't preserve permissions)
+    chmod +x "${REPO_DIR}/deploy/"*.sh 2>/dev/null || true
+    
     log "Git pull complete. Current commit: $(git rev-parse --short HEAD)"
 }
 
