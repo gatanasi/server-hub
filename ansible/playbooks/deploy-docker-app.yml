@@ -43,6 +43,8 @@
         else
           echo "{\"bot_token\": \"\", \"chat_id\": \"\"}"
         fi
+      args:
+        executable: /bin/bash
       register: telegram_creds_raw
       changed_when: false
       no_log: true
