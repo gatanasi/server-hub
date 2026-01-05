@@ -288,33 +288,28 @@
       ansible.builtin.pause:
         seconds: 5
 
-    - name: Check if jq is available for health checks
-      ansible.builtin.command:
-        cmd: which jq
-      register: jq_check
-      changed_when: false
-      failed_when: false
-
-    - name: Get services with healthchecks (with jq)
+    - name: Get services with healthchecks
       ansible.builtin.shell: |
-        cd "{{ app_target_dir }}" && \
-        {{ docker_compose_cmd }} ps --format json 2>/dev/null | \
-        jq -rs '[.[] | select(.Health != null and .Health != "")] | length'
+        cd "{{ app_target_dir }}"
+        # Try jq first, fallback to grep if jq fails or is not installed
+        if command -v jq &>/dev/null; then
+          COUNT=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
+            jq -rs '[.[] | select(.Health != null and .Health != "")] | length' 2>/dev/null)
+          if [[ $? -eq 0 && -n "$COUNT" ]]; then
+            echo "$COUNT"
+            exit 0
+          fi
+        fi
+        # Fallback: count lines with health status in docker-compose ps output
+        {{ docker_compose_cmd }} ps 2>/dev/null | grep -cE '\(healthy\)|\(unhealthy\)|\(starting\)' || echo "0"
+      args:
+        executable: /bin/bash
       register: healthcheck_count
       changed_when: false
-      when: jq_check.rc == 0
-
-    - name: Get services with healthchecks (without jq)
-      ansible.builtin.shell: |
-        cd "{{ app_target_dir }}" && \
-        {{ docker_compose_cmd }} ps 2>/dev/null | grep -c "(healthy\|unhealthy\|starting)" || echo "0"
-      register: healthcheck_count_fallback
-      changed_when: false
-      when: jq_check.rc != 0
 
     - name: Set healthcheck count
       ansible.builtin.set_fact:
-        healthcheck_services: "{{ healthcheck_count.stdout | default(healthcheck_count_fallback.stdout) | default('0') | int }}"
+        healthcheck_services: "{{ healthcheck_count.stdout | default('0') | int }}"
 
     - name: Set healthcheck status variables
       ansible.builtin.set_fact:
@@ -323,83 +318,77 @@
 
     - name: Display healthcheck info
       ansible.builtin.debug:
-        msg: "{{ 'No services with healthchecks found - skipping health verification' if no_healthchecks_defined else 'Found ' + (healthcheck_services | string) + ' service(s) with healthchecks' }}{{ ' (jq not available, using fallback)' if jq_check.rc != 0 else '' }}"
+        msg: "{{ 'No services with healthchecks found - skipping health verification' if no_healthchecks_defined else 'Found ' + (healthcheck_services | string) + ' service(s) with healthchecks' }}"
 
-    - name: Wait for all healthchecks to pass (with jq)
+    - name: Wait for all healthchecks to pass
       ansible.builtin.shell: |
-        cd "{{ app_target_dir }}" && \
-        UNHEALTHY=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
-          jq -rs '[.[] | select(.Health == "unhealthy" or .Health == "starting")] | length')
-        TOTAL=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
-          jq -rs '[.[] | select(.Health != null and .Health != "")] | length')
-        HEALTHY=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
-          jq -rs '[.[] | select(.Health == "healthy")] | length')
-        echo "healthy=$HEALTHY total=$TOTAL unhealthy=$UNHEALTHY"
-        if [[ "$TOTAL" -gt 0 && "$HEALTHY" -eq "$TOTAL" ]]; then
-          exit 0
-        elif [[ "$UNHEALTHY" -gt 0 ]]; then
-          ACTUALLY_UNHEALTHY=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
-            jq -rs '[.[] | select(.Health == "unhealthy")] | length')
-          if [[ "$ACTUALLY_UNHEALTHY" -gt 0 ]]; then
-            exit 2  # Definitely unhealthy
-          fi
+        cd "{{ app_target_dir }}"
+        
+        # Function to check health using jq
+        check_with_jq() {
+          local JSON=$({{ docker_compose_cmd }} ps --format json 2>/dev/null)
+          TOTAL=$(echo "$JSON" | jq -rs '[.[] | select(.Health != null and .Health != "")] | length' 2>/dev/null) || return 1
+          HEALTHY=$(echo "$JSON" | jq -rs '[.[] | select(.Health == "healthy")] | length' 2>/dev/null) || return 1
+          UNHEALTHY=$(echo "$JSON" | jq -rs '[.[] | select(.Health == "unhealthy")] | length' 2>/dev/null) || return 1
+          return 0
+        }
+        
+        # Function to check health using grep (fallback)
+        check_with_grep() {
+          local PS_OUTPUT=$({{ docker_compose_cmd }} ps 2>/dev/null)
+          TOTAL=$(echo "$PS_OUTPUT" | grep -cE '\(healthy\)|\(unhealthy\)|\(starting\)' || echo "0")
+          HEALTHY=$(echo "$PS_OUTPUT" | grep -c '(healthy)' || echo "0")
+          UNHEALTHY=$(echo "$PS_OUTPUT" | grep -c '(unhealthy)' || echo "0")
+        }
+        
+        # Try jq first, fall back to grep
+        if command -v jq &>/dev/null && check_with_jq; then
+          : # jq succeeded
+        else
+          check_with_grep
         fi
-        exit 1  # Still waiting
+        
+        echo "healthy=$HEALTHY total=$TOTAL unhealthy=$UNHEALTHY"
+        
+        if [[ "$UNHEALTHY" -gt 0 ]]; then
+          exit 2  # Definitely unhealthy
+        elif [[ "$TOTAL" -gt 0 && "$HEALTHY" -eq "$TOTAL" ]]; then
+          exit 0  # All healthy
+        else
+          exit 1  # Still waiting
+        fi
+      args:
+        executable: /bin/bash
       register: health_status
       until: health_status.rc == 0
       retries: "{{ (health_check_timeout | int / health_check_interval | int) | int }}"
       delay: "{{ health_check_interval }}"
       failed_when: health_status.rc == 2
       changed_when: false
-      when: 
-        - healthcheck_services | int > 0
-        - jq_check.rc == 0
+      when: healthcheck_services | int > 0
 
-    - name: Wait for all healthchecks to pass (without jq - fallback)
+    - name: Check for containers that exited unexpectedly
       ansible.builtin.shell: |
-        cd "{{ app_target_dir }}" && \
-        PS_OUTPUT=$({{ docker_compose_cmd }} ps 2>/dev/null)
-        UNHEALTHY=$(echo "$PS_OUTPUT" | grep -c "(unhealthy)" || true)
-        STARTING=$(echo "$PS_OUTPUT" | grep -c "(starting)" || true)
-        HEALTHY=$(echo "$PS_OUTPUT" | grep -c "(healthy)" || true)
-        echo "healthy=$HEALTHY starting=$STARTING unhealthy=$UNHEALTHY"
-        if [[ "$UNHEALTHY" -gt 0 ]]; then
-          exit 2  # Definitely unhealthy
-        elif [[ "$STARTING" -gt 0 ]]; then
-          exit 1  # Still waiting
-        else
-          exit 0  # All healthy or no healthchecks
+        cd "{{ app_target_dir }}"
+        # Try jq first, fall back to grep
+        if command -v jq &>/dev/null; then
+          RESULT=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
+            jq -rs '[.[] | select(.State == "exited" or .State == "dead")] | .[].Service' 2>/dev/null)
+          if [[ $? -eq 0 ]]; then
+            echo "$RESULT"
+            exit 0
+          fi
         fi
-      register: health_status_fallback
-      until: health_status_fallback.rc == 0
-      retries: "{{ (health_check_timeout | int / health_check_interval | int) | int }}"
-      delay: "{{ health_check_interval }}"
-      failed_when: health_status_fallback.rc == 2
-      changed_when: false
-      when: 
-        - healthcheck_services | int > 0
-        - jq_check.rc != 0
-
-    - name: Check for containers that exited unexpectedly (with jq)
-      ansible.builtin.shell: |
-        cd "{{ app_target_dir }}" && \
-        {{ docker_compose_cmd }} ps --format json 2>/dev/null | \
-        jq -rs '[.[] | select(.State == "exited" or .State == "dead")] | .[].Service'
+        # Fallback: use grep/awk
+        {{ docker_compose_cmd }} ps 2>/dev/null | grep -E "Exited|Dead" | awk '{print $1}' || true
+      args:
+        executable: /bin/bash
       register: exited_containers
       changed_when: false
-      when: jq_check.rc == 0
-
-    - name: Check for containers that exited unexpectedly (without jq)
-      ansible.builtin.shell: |
-        cd "{{ app_target_dir }}" && \
-        {{ docker_compose_cmd }} ps 2>/dev/null | grep -E "Exited|Dead" | awk '{print $1}' || true
-      register: exited_containers_fallback
-      changed_when: false
-      when: jq_check.rc != 0
 
     - name: Set exited containers list
       ansible.builtin.set_fact:
-        failed_containers: "{{ exited_containers.stdout_lines | default(exited_containers_fallback.stdout_lines) | default([]) }}"
+        failed_containers: "{{ exited_containers.stdout_lines | default([]) }}"
 
     - name: Fail if containers exited
       ansible.builtin.set_fact:
