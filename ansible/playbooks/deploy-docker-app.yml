@@ -111,7 +111,7 @@
     app_source_dir: "{{ repo_dir }}/docker/{{ app_name }}"
     app_target_dir: "{{ app_base_dir }}/{{ app_name }}"
     backup_dir: "{{ app_target_dir }}/.backup"
-    health_check_timeout: 120
+    health_check_timeout: 60
     health_check_interval: 5
     telegram_bot_token: "{{ deploy_telegram_bot_token }}"
     telegram_chat_id: "{{ deploy_telegram_chat_id }}"

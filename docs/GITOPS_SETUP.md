@@ -412,7 +412,7 @@ docker_hosts:
   hosts:
     n8n.vm:
       # Health check settings
-      health_check_timeout: 120    # Max seconds to wait for healthy
+      health_check_timeout: 60    # Max seconds to wait for healthy
       health_check_interval: 5     # Seconds between checks
       
       # Cleanup settings
