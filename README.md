@@ -1,4 +1,5 @@
 # List of applications
+
 - [x] Duckdns :white_check_mark:
 - [x] Wireguard :white_check_mark:
 - [x] Cloudflare Tunnel :white_check_mark:
@@ -6,17 +7,16 @@
 - [x] Caddy :white_check_mark:
 - [x] Open Speed Test :white_check_mark:
 - [x] Videos converter :white_check_mark:
-- [ ] ConvertX
+- [x] Stirling PDF :white_check_mark:
+- [x] ConvertX :white_check_mark:
 - [ ] Invoice Ninja?
 - [ ] k3s
 - [ ] Rancher
 - [ ] InfluxDB
 - [ ] Grafana
 - [ ] Swiss invoices?
-- [ ] Watchtower
 - [ ] GoAccess?
 - [ ] Homepage
-- [x] Stirling PDF
 - [ ] Uptime Kuma?
 - [ ] rclone for backups / restic?
 - [ ] Longhorn to backup Kubernetes?
