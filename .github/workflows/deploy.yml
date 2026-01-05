@@ -1,0 +1,187 @@
+# GitHub Actions Workflow: Deploy Docker Compose Applications
+#
+# This workflow triggers on changes to any docker-compose.yml file in the docker/ directory.
+# It runs on a self-hosted runner and triggers deployment via SSH to the deployer VM.
+#
+# Security Model:
+# - The runner only has SSH access to deployer.vm with a forced command
+# - The runner cannot get a shell on deployer.vm
+# - All deployment logic and credentials live on deployer.vm
+#
+# Required Secrets:
+# - DEPLOYER_SSH_KEY: Private SSH key for github-runner -> deployer.vm
+# - DEPLOYER_HOST: Hostname or IP of deployer.vm
+# - DEPLOYER_USER: Username on deployer.vm (usually 'deployer')
+# - DEPLOYER_SSH_KNOWN_HOSTS: SSH known_hosts entry for deployer.vm
+#
+# Optional Secrets:
+# - TELEGRAM_BOT_TOKEN: Telegram bot token for notifications
+# - TELEGRAM_CHAT_ID: Telegram chat ID for notifications
+#
+
+name: Deploy Docker Apps
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docker/**/docker-compose.yml'
+      - 'docker/**/docker-compose.yaml'
+
+  # Allow manual trigger with app name selection
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Application to deploy (folder name in docker/)'
+        required: true
+        type: string
+
+# Prevent concurrent deployments
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  detect-changes:
+    name: Detect Changed Apps
+    runs-on: self-hosted
+    outputs:
+      apps: ${{ steps.detect.outputs.apps }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need previous commit for diff
+
+      - name: Detect changed docker-compose files
+        id: detect
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Manual trigger - use input
+            APPS='["${{ github.event.inputs.app_name }}"]'
+            echo "Manual deployment requested for: ${{ github.event.inputs.app_name }}"
+          else
+            # Push trigger - detect changed files
+            echo "Detecting changed docker-compose files..."
+            
+            # Get list of changed files
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD -- 'docker/**/docker-compose.yml' 'docker/**/docker-compose.yaml' || echo "")
+            
+            if [[ -z "$CHANGED_FILES" ]]; then
+              echo "No docker-compose files changed"
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "apps=[]" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            
+            echo "Changed files:"
+            echo "$CHANGED_FILES"
+            
+            # Extract app names from paths (docker/<app-name>/docker-compose.yml)
+            APPS=$(echo "$CHANGED_FILES" | sed -n 's|docker/\([^/]*\)/docker-compose.*|\1|p' | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            
+            echo "Apps to deploy: $APPS"
+          fi
+          
+          echo "apps=$APPS" >> $GITHUB_OUTPUT
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+
+  deploy:
+    name: Deploy ${{ matrix.app }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: self-hosted
+    
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.detect-changes.outputs.apps) }}
+      max-parallel: 1  # Deploy one at a time to avoid conflicts
+      fail-fast: false  # Continue deploying other apps if one fails
+    
+    steps:
+      - name: Validate app name
+        run: |
+          APP="${{ matrix.app }}"
+          if [[ ! "$APP" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "::error::Invalid app name: $APP"
+            exit 1
+          fi
+          echo "Deploying app: $APP"
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          # Add deployer host to known_hosts
+          echo "${{ secrets.DEPLOYER_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          
+          # Write SSH private key
+          echo "${{ secrets.DEPLOYER_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Trigger deployment
+        id: deploy
+        run: |
+          echo "::group::Triggering deployment on deployer.vm"
+          
+          # SSH to deployer.vm - the forced command will execute trigger-deploy.sh
+          # We pass the app name as part of the SSH command
+          ssh -i ~/.ssh/deploy_key \
+              -o BatchMode=yes \
+              -o ConnectTimeout=30 \
+              -o StrictHostKeyChecking=yes \
+              "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
+              "${{ matrix.app }}"
+          
+          DEPLOY_EXIT=$?
+          
+          echo "::endgroup::"
+          
+          if [[ $DEPLOY_EXIT -eq 0 ]]; then
+            echo "✅ Deployment successful for ${{ matrix.app }}"
+          else
+            echo "::error::Deployment failed for ${{ matrix.app }}"
+            exit $DEPLOY_EXIT
+          fi
+
+      - name: Cleanup SSH keys
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+          # Keep known_hosts for future runs
+
+      - name: Send failure notification
+        if: failure()
+        run: |
+          if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
+            MESSAGE="❌ <b>Deployment Failed</b>%0A%0AApp: ${{ matrix.app }}%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
+            
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -d "text=$MESSAGE" \
+              -d "parse_mode=HTML" || true
+          fi
+
+  notify-success:
+    name: Notify Success
+    needs: [detect-changes, deploy]
+    if: success() && needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: self-hosted
+    
+    steps:
+      - name: Send success notification
+        run: |
+          if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
+            APPS='${{ needs.detect-changes.outputs.apps }}'
+            MESSAGE="✅ <b>Deployment Successful</b>%0A%0AApps: ${APPS}%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}"
+            
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -d "text=$MESSAGE" \
+              -d "parse_mode=HTML" || true
+          fi

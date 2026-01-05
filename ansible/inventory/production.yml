@@ -1,0 +1,58 @@
+# Ansible Inventory for Docker Compose Applications
+#
+# This inventory maps application names to their target hosts.
+# Each host should have the docker user in the 'docker' group.
+#
+# To add a new application:
+# 1. Add the host under [docker_hosts] with its app-to-host mapping
+# 2. Ensure the target user is in the docker group on the target VM
+# 3. Ensure SSH key from deployer.vm can reach the target
+#
+---
+all:
+  vars:
+    # Default app directory on target hosts
+    app_base_dir: /opt/apps
+    
+    # Docker compose command (v2)
+    docker_compose_cmd: docker compose
+    
+    # Whether to prune old images after deployment
+    docker_prune_after_deploy: true
+
+  children:
+    # Group for all Docker Compose hosts
+    docker_hosts:
+      hosts:
+        # n8n automation platform
+        n8n.vm:
+          ansible_user: n8n
+          ansible_host: n8n.vm
+          # Map app name to this host
+          managed_apps:
+            - n8n
+        
+        # Add more hosts as needed:
+        #
+        # odoo.vm:
+        #   ansible_user: odoo
+        #   ansible_host: odoo.vm
+        #   managed_apps:
+        #     - odoo
+        #
+        # pdf.vm:
+        #   ansible_user: pdf
+        #   ansible_host: pdf.vm
+        #   managed_apps:
+        #     - stirling-pdf
+        #
+        # multi-app.vm:
+        #   ansible_user: apps
+        #   ansible_host: multi-app.vm
+        #   managed_apps:
+        #     - convertx
+        #     - video-converter
+        #     - openspeedtest
+
+# Host pattern for app-to-host mapping
+# This allows us to find which host runs which app

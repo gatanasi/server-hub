@@ -1,0 +1,171 @@
+---
+# deploy-docker-app.yml - Deploy a Docker Compose application
+#
+# This playbook deploys a Docker Compose application to the appropriate host.
+# It finds the host that manages the given app, syncs the docker-compose files,
+# and restarts the containers.
+#
+# Usage:
+#   ansible-playbook playbooks/deploy-docker-app.yml -e "app_name=n8n"
+#
+# Required variables:
+#   - app_name: Name of the application (must match directory in docker/)
+#   - repo_dir: Path to the git repository on deployer.vm (default: /home/deployer/git/server-hub)
+#
+
+- name: Find target host for application
+  hosts: localhost
+  gather_facts: false
+  vars:
+    repo_dir: /home/deployer/git/server-hub
+  
+  tasks:
+    - name: Validate app_name is provided
+      ansible.builtin.assert:
+        that:
+          - app_name is defined
+          - app_name | length > 0
+        fail_msg: "app_name variable must be provided"
+        success_msg: "Deploying application: {{ app_name }}"
+
+    - name: Find host that manages this app
+      ansible.builtin.set_fact:
+        target_host: "{{ item }}"
+      loop: "{{ groups['docker_hosts'] }}"
+      when: app_name in (hostvars[item].managed_apps | default([]))
+
+    - name: Fail if no host manages this app
+      ansible.builtin.fail:
+        msg: |
+          No host found that manages app '{{ app_name }}'.
+          Please add the app to a host's 'managed_apps' list in inventory/production.yml.
+          
+          Current inventory:
+          {% for host in groups['docker_hosts'] %}
+          - {{ host }}: {{ hostvars[host].managed_apps | default([]) | join(', ') }}
+          {% endfor %}
+      when: target_host is not defined
+
+    - name: Display target host
+      ansible.builtin.debug:
+        msg: "Will deploy '{{ app_name }}' to host '{{ target_host }}'"
+
+    - name: Add target host to runtime group
+      ansible.builtin.add_host:
+        name: "{{ target_host }}"
+        groups: deploy_targets
+        deploy_app_name: "{{ app_name }}"
+        deploy_repo_dir: "{{ repo_dir }}"
+
+
+- name: Deploy Docker Compose application
+  hosts: deploy_targets
+  gather_facts: true
+  
+  vars:
+    app_name: "{{ deploy_app_name }}"
+    repo_dir: "{{ deploy_repo_dir }}"
+    app_source_dir: "{{ repo_dir }}/docker/{{ app_name }}"
+    app_target_dir: "{{ app_base_dir }}/{{ app_name }}"
+  
+  tasks:
+    - name: Display deployment info
+      ansible.builtin.debug:
+        msg: |
+          Deploying {{ app_name }}
+          Source: {{ app_source_dir }}
+          Target: {{ app_target_dir }}
+          Host: {{ inventory_hostname }}
+          User: {{ ansible_user }}
+
+    - name: Ensure app directory exists
+      ansible.builtin.file:
+        path: "{{ app_target_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Synchronize docker-compose files
+      ansible.posix.synchronize:
+        src: "{{ app_source_dir }}/"
+        dest: "{{ app_target_dir }}/"
+        delete: false
+        recursive: true
+        rsync_opts:
+          - "--exclude=.git"
+          - "--exclude=.env"
+          - "--exclude=*.log"
+      delegate_to: "{{ groups['docker_hosts'] | first | default(inventory_hostname) }}"
+      # Note: This syncs from deployer.vm to target host
+
+    - name: Check if .env file exists on target
+      ansible.builtin.stat:
+        path: "{{ app_target_dir }}/.env"
+      register: env_file
+
+    - name: Warn if .env file is missing
+      ansible.builtin.debug:
+        msg: |
+          WARNING: No .env file found at {{ app_target_dir }}/.env
+          If this app requires environment variables, create the .env file manually.
+      when: not env_file.stat.exists
+
+    - name: Pull latest Docker images
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} pull"
+        chdir: "{{ app_target_dir }}"
+      register: docker_pull
+      changed_when: "'Pulled' in docker_pull.stdout or 'Downloaded' in docker_pull.stdout"
+
+    - name: Display pull output
+      ansible.builtin.debug:
+        msg: "{{ docker_pull.stdout_lines }}"
+      when: docker_pull.stdout_lines | length > 0
+
+    - name: Restart containers with new configuration
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} up -d --remove-orphans"
+        chdir: "{{ app_target_dir }}"
+      register: docker_up
+      changed_when: true
+
+    - name: Display container status
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} ps"
+        chdir: "{{ app_target_dir }}"
+      register: docker_ps
+      changed_when: false
+
+    - name: Show running containers
+      ansible.builtin.debug:
+        msg: "{{ docker_ps.stdout_lines }}"
+
+    - name: Prune unused Docker images
+      ansible.builtin.command:
+        cmd: docker image prune -f
+      register: docker_prune
+      changed_when: "'Total reclaimed space' in docker_prune.stdout"
+      when: docker_prune_after_deploy | default(true)
+
+    - name: Show prune results
+      ansible.builtin.debug:
+        msg: "{{ docker_prune.stdout }}"
+      when: 
+        - docker_prune_after_deploy | default(true)
+        - docker_prune.stdout | length > 0
+
+
+- name: Deployment summary
+  hosts: localhost
+  gather_facts: false
+  
+  tasks:
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: |
+          ========================================
+          Deployment Complete!
+          ========================================
+          Application: {{ app_name }}
+          Target Host: {{ target_host }}
+          Status: SUCCESS
+          ========================================
