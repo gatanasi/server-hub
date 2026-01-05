@@ -245,11 +245,14 @@ sudo ./svc.sh start
 ### Step 4.3: Install Required Tools
 
 ```bash
-# Install jq (REQUIRED for parsing JSON in workflow)
+# Install git and jq (REQUIRED for workflow)
+# - git: detects changed files in commits
+# - jq: parses JSON for matrix strategy
 sudo apt-get update
-sudo apt-get install -y jq
+sudo apt-get install -y git jq
 
-# Verify installation
+# Verify installations
+git --version
 jq --version
 ```
 
