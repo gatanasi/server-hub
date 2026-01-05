@@ -311,7 +311,18 @@ On deployer.vm:
 ssh-copy-id -i ~/.ssh/id_ed25519.pub <app-name>@<app-name>.vm
 ```
 
-### Step 5.5: Update Ansible Inventory
+### Step 5.5: Install jq (Recommended)
+
+For better health check monitoring, install jq on target VMs:
+
+```bash
+# On the target VM (as root or with sudo)
+apt-get install -y jq
+```
+
+> **Note**: The playbook works without jq but provides more detailed health monitoring with it.
+
+### Step 5.6: Update Ansible Inventory
 
 Edit `ansible/inventory/production.yml` to add the new host.
 
@@ -366,6 +377,91 @@ The deployment workflow triggers on:
 ### From GitHub Actions
 
 Go to Actions → Deploy Docker Apps → Run workflow → Enter app name
+
+---
+
+## Health Checks and Rollback
+
+The deployment playbook automatically verifies container health and rolls back on failure.
+
+### How It Works
+
+1. **Backup Phase**: Before deployment, the playbook backs up:
+   - Current `docker-compose.yml`
+   - Current `.env` file
+   - Current image information
+
+2. **Health Check Phase**: After `docker compose up`, the playbook:
+   - Waits for containers to initialize (5 seconds)
+   - Checks for services with Docker healthchecks
+   - Polls health status every 5 seconds for up to 120 seconds
+   - Detects containers that exited unexpectedly
+
+3. **Rollback Phase**: If health check fails:
+   - Stops the failed containers
+   - Restores `docker-compose.yml` and `.env` from backup
+   - Restarts with previous configuration
+   - Sends Telegram notification
+
+### Configurable Options
+
+In `ansible/inventory/production.yml`, you can set per-host options:
+
+```yaml
+docker_hosts:
+  hosts:
+    n8n.vm:
+      # Health check settings
+      health_check_timeout: 120    # Max seconds to wait for healthy
+      health_check_interval: 5     # Seconds between checks
+      
+      # Cleanup settings
+      docker_prune_after_deploy: true    # Prune unused images
+      cleanup_backups_on_success: false  # Keep backups for manual rollback
+```
+
+### Adding Healthchecks to Your Compose File
+
+```yaml
+services:
+  app:
+    image: your-image
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+```
+
+---
+
+## Telegram Notifications
+
+The playbook sends deployment notifications to Telegram.
+
+### Setup
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) on Telegram
+2. Get your chat ID from [@userinfobot](https://t.me/userinfobot)
+3. Configure on deployer.vm:
+
+```bash
+cat > ~/.deploy-secrets << 'EOF'
+TELEGRAM_BOT_TOKEN="your-bot-token-here"
+TELEGRAM_CHAT_ID="your-chat-id-here"
+EOF
+chmod 600 ~/.deploy-secrets
+```
+
+### Notification Types
+
+| Emoji | Event | Description |
+|-------|-------|-------------|
+| 🚀 | Started | Deployment has begun |
+| ✅ | Success | All containers healthy |
+| ⚠️ | Rollback | Deployment failed, rolled back to previous |
+| 🔴 | Critical | Rollback also failed, manual intervention needed |
 
 ---
 

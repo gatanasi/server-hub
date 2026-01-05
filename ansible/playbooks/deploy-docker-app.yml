@@ -3,7 +3,7 @@
 #
 # This playbook deploys a Docker Compose application to the appropriate host.
 # It finds the host that manages the given app, syncs the docker-compose files,
-# and restarts the containers.
+# restarts the containers, verifies health, and rolls back on failure.
 #
 # Usage:
 #   ansible-playbook playbooks/deploy-docker-app.yml -e "app_name=n8n"
@@ -12,12 +12,19 @@
 #   - app_name: Name of the application (must match directory in docker/)
 #   - repo_dir: Path to the git repository on deployer.vm (default: /home/deployer/git/server-hub)
 #
+# Features:
+#   - SOPS decryption for .env.enc files
+#   - Health check verification with configurable timeout
+#   - Automatic rollback on failure
+#   - Telegram notifications
+#
 
 - name: Find target host for application
   hosts: localhost
   gather_facts: false
   vars:
     repo_dir: /home/deployer/git/server-hub
+    secrets_file: "{{ ansible_env.HOME }}/.deploy-secrets"
   
   tasks:
     - name: Validate app_name is provided
@@ -27,6 +34,25 @@
           - app_name | length > 0
         fail_msg: "app_name variable must be provided"
         success_msg: "Deploying application: {{ app_name }}"
+
+    - name: Load Telegram credentials
+      ansible.builtin.shell: |
+        if [[ -f "{{ secrets_file }}" ]]; then
+          source "{{ secrets_file }}"
+          echo "{\"bot_token\": \"${TELEGRAM_BOT_TOKEN:-}\", \"chat_id\": \"${TELEGRAM_CHAT_ID:-}\"}"
+        else
+          echo "{\"bot_token\": \"\", \"chat_id\": \"\"}"
+        fi
+      register: telegram_creds_raw
+      changed_when: false
+      no_log: true
+
+    - name: Parse Telegram credentials
+      ansible.builtin.set_fact:
+        telegram_bot_token: "{{ (telegram_creds_raw.stdout | from_json).bot_token }}"
+        telegram_chat_id: "{{ (telegram_creds_raw.stdout | from_json).chat_id }}"
+        telegram_enabled: "{{ (telegram_creds_raw.stdout | from_json).bot_token | length > 0 and (telegram_creds_raw.stdout | from_json).chat_id | length > 0 }}"
+      no_log: true
 
     - name: Find host that manages this app
       ansible.builtin.set_fact:
@@ -50,12 +76,29 @@
       ansible.builtin.debug:
         msg: "Will deploy '{{ app_name }}' to host '{{ target_host }}'"
 
+    - name: Send deployment started notification
+      ansible.builtin.uri:
+        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          chat_id: "{{ telegram_chat_id }}"
+          text: "🚀 <b>Deployment Started</b>\n\nApp: <code>{{ app_name }}</code>\nTarget: <code>{{ target_host }}</code>\nTime: {{ lookup('pipe', 'date -Iseconds') }}"
+          parse_mode: "HTML"
+        status_code: [200]
+      when: telegram_enabled | bool
+      ignore_errors: true
+      no_log: true
+
     - name: Add target host to runtime group
       ansible.builtin.add_host:
         name: "{{ target_host }}"
         groups: deploy_targets
         deploy_app_name: "{{ app_name }}"
         deploy_repo_dir: "{{ repo_dir }}"
+        deploy_telegram_bot_token: "{{ telegram_bot_token }}"
+        deploy_telegram_chat_id: "{{ telegram_chat_id }}"
+        deploy_telegram_enabled: "{{ telegram_enabled }}"
 
 
 - name: Deploy Docker Compose application
@@ -67,6 +110,12 @@
     repo_dir: "{{ deploy_repo_dir }}"
     app_source_dir: "{{ repo_dir }}/docker/{{ app_name }}"
     app_target_dir: "{{ app_base_dir }}/{{ app_name }}"
+    backup_dir: "{{ app_target_dir }}/.backup"
+    health_check_timeout: 120
+    health_check_interval: 5
+    telegram_bot_token: "{{ deploy_telegram_bot_token }}"
+    telegram_chat_id: "{{ deploy_telegram_chat_id }}"
+    telegram_enabled: "{{ deploy_telegram_enabled }}"
   
   tasks:
     - name: Display deployment info
@@ -84,6 +133,56 @@
         state: directory
         mode: '0755'
 
+    # === BACKUP PHASE ===
+    - name: Create backup directory
+      ansible.builtin.file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: '0700'
+
+    - name: Check if docker-compose.yml exists (for backup)
+      ansible.builtin.stat:
+        path: "{{ app_target_dir }}/docker-compose.yml"
+      register: existing_compose
+
+    - name: Backup current docker-compose.yml
+      ansible.builtin.copy:
+        src: "{{ app_target_dir }}/docker-compose.yml"
+        dest: "{{ backup_dir }}/docker-compose.yml.bak"
+        remote_src: true
+        mode: '0644'
+      when: existing_compose.stat.exists
+
+    - name: Check if .env exists (for backup)
+      ansible.builtin.stat:
+        path: "{{ app_target_dir }}/.env"
+      register: existing_env
+
+    - name: Backup current .env
+      ansible.builtin.copy:
+        src: "{{ app_target_dir }}/.env"
+        dest: "{{ backup_dir }}/.env.bak"
+        remote_src: true
+        mode: '0600'
+      when: existing_env.stat.exists
+      no_log: true
+
+    - name: Get current image digests for rollback
+      ansible.builtin.shell: |
+        cd "{{ app_target_dir }}" && \
+        {{ docker_compose_cmd }} images --format json 2>/dev/null || echo "[]"
+      register: current_images
+      changed_when: false
+      when: existing_compose.stat.exists
+
+    - name: Save current image info
+      ansible.builtin.copy:
+        content: "{{ current_images.stdout }}"
+        dest: "{{ backup_dir }}/images.json"
+        mode: '0644'
+      when: existing_compose.stat.exists and current_images.stdout | length > 2
+
+    # === DEPLOYMENT PHASE ===
     - name: Find files to copy (excluding .env and logs)
       ansible.builtin.find:
         paths: "{{ app_source_dir }}"
@@ -152,11 +251,6 @@
       register: docker_pull
       changed_when: "'Pulled' in docker_pull.stdout or 'Downloaded' in docker_pull.stdout"
 
-    - name: Display pull output
-      ansible.builtin.debug:
-        msg: "{{ docker_pull.stdout_lines }}"
-      when: docker_pull.stdout_lines | length > 0
-
     - name: Restart containers with new configuration
       ansible.builtin.command:
         cmd: "{{ docker_compose_cmd }} up -d --remove-orphans"
@@ -164,30 +258,267 @@
       register: docker_up
       changed_when: true
 
+    # === HEALTH CHECK PHASE ===
+    - name: Wait for containers to initialize
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: Check if jq is available for health checks
+      ansible.builtin.command:
+        cmd: which jq
+      register: jq_check
+      changed_when: false
+      failed_when: false
+
+    - name: Get services with healthchecks (with jq)
+      ansible.builtin.shell: |
+        cd "{{ app_target_dir }}" && \
+        {{ docker_compose_cmd }} ps --format json 2>/dev/null | \
+        jq -rs '[.[] | select(.Health != null and .Health != "")] | length'
+      register: healthcheck_count
+      changed_when: false
+      when: jq_check.rc == 0
+
+    - name: Get services with healthchecks (without jq)
+      ansible.builtin.shell: |
+        cd "{{ app_target_dir }}" && \
+        {{ docker_compose_cmd }} ps 2>/dev/null | grep -c "(healthy\|unhealthy\|starting)" || echo "0"
+      register: healthcheck_count_fallback
+      changed_when: false
+      when: jq_check.rc != 0
+
+    - name: Set healthcheck count
+      ansible.builtin.set_fact:
+        healthcheck_services: "{{ healthcheck_count.stdout | default(healthcheck_count_fallback.stdout) | default('0') | int }}"
+
+    - name: Display healthcheck info
+      ansible.builtin.debug:
+        msg: "Found {{ healthcheck_services }} service(s) with healthchecks{{ ' (jq not available, using fallback)' if jq_check.rc != 0 else '' }}"
+
+    - name: Wait for all healthchecks to pass (with jq)
+      ansible.builtin.shell: |
+        cd "{{ app_target_dir }}" && \
+        UNHEALTHY=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
+          jq -rs '[.[] | select(.Health == "unhealthy" or .Health == "starting")] | length')
+        TOTAL=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
+          jq -rs '[.[] | select(.Health != null and .Health != "")] | length')
+        HEALTHY=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
+          jq -rs '[.[] | select(.Health == "healthy")] | length')
+        echo "healthy=$HEALTHY total=$TOTAL unhealthy=$UNHEALTHY"
+        if [[ "$TOTAL" -gt 0 && "$HEALTHY" -eq "$TOTAL" ]]; then
+          exit 0
+        elif [[ "$UNHEALTHY" -gt 0 ]]; then
+          ACTUALLY_UNHEALTHY=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
+            jq -rs '[.[] | select(.Health == "unhealthy")] | length')
+          if [[ "$ACTUALLY_UNHEALTHY" -gt 0 ]]; then
+            exit 2  # Definitely unhealthy
+          fi
+        fi
+        exit 1  # Still waiting
+      register: health_status
+      until: health_status.rc == 0
+      retries: "{{ (health_check_timeout | int / health_check_interval | int) | int }}"
+      delay: "{{ health_check_interval }}"
+      failed_when: health_status.rc == 2
+      changed_when: false
+      when: 
+        - healthcheck_services | int > 0
+        - jq_check.rc == 0
+
+    - name: Wait for all healthchecks to pass (without jq - fallback)
+      ansible.builtin.shell: |
+        cd "{{ app_target_dir }}" && \
+        PS_OUTPUT=$({{ docker_compose_cmd }} ps 2>/dev/null)
+        UNHEALTHY=$(echo "$PS_OUTPUT" | grep -c "(unhealthy)" || true)
+        STARTING=$(echo "$PS_OUTPUT" | grep -c "(starting)" || true)
+        HEALTHY=$(echo "$PS_OUTPUT" | grep -c "(healthy)" || true)
+        echo "healthy=$HEALTHY starting=$STARTING unhealthy=$UNHEALTHY"
+        if [[ "$UNHEALTHY" -gt 0 ]]; then
+          exit 2  # Definitely unhealthy
+        elif [[ "$STARTING" -gt 0 ]]; then
+          exit 1  # Still waiting
+        else
+          exit 0  # All healthy or no healthchecks
+        fi
+      register: health_status_fallback
+      until: health_status_fallback.rc == 0
+      retries: "{{ (health_check_timeout | int / health_check_interval | int) | int }}"
+      delay: "{{ health_check_interval }}"
+      failed_when: health_status_fallback.rc == 2
+      changed_when: false
+      when: 
+        - healthcheck_services | int > 0
+        - jq_check.rc != 0
+
+    - name: Check for containers that exited unexpectedly (with jq)
+      ansible.builtin.shell: |
+        cd "{{ app_target_dir }}" && \
+        {{ docker_compose_cmd }} ps --format json 2>/dev/null | \
+        jq -rs '[.[] | select(.State == "exited" or .State == "dead")] | .[].Service'
+      register: exited_containers
+      changed_when: false
+      when: jq_check.rc == 0
+
+    - name: Check for containers that exited unexpectedly (without jq)
+      ansible.builtin.shell: |
+        cd "{{ app_target_dir }}" && \
+        {{ docker_compose_cmd }} ps 2>/dev/null | grep -E "Exited|Dead" | awk '{print $1}' || true
+      register: exited_containers_fallback
+      changed_when: false
+      when: jq_check.rc != 0
+
+    - name: Set exited containers list
+      ansible.builtin.set_fact:
+        failed_containers: "{{ exited_containers.stdout_lines | default(exited_containers_fallback.stdout_lines) | default([]) }}"
+
+    - name: Fail if containers exited
+      ansible.builtin.set_fact:
+        deployment_failed: true
+        failure_reason: "Containers exited unexpectedly: {{ failed_containers | join(', ') }}"
+      when: failed_containers | length > 0
+
+    - name: Mark deployment as successful
+      ansible.builtin.set_fact:
+        deployment_failed: false
+      when: deployment_failed is not defined
+
+    # === ROLLBACK PHASE (if needed) ===
+    - name: Rollback block
+      block:
+        - name: Log rollback start
+          ansible.builtin.debug:
+            msg: "ROLLING BACK: {{ failure_reason | default('Health check failed') }}"
+
+        - name: Stop failed containers
+          ansible.builtin.command:
+            cmd: "{{ docker_compose_cmd }} down"
+            chdir: "{{ app_target_dir }}"
+          ignore_errors: true
+
+        - name: Check if backup exists
+          ansible.builtin.stat:
+            path: "{{ backup_dir }}/docker-compose.yml.bak"
+          register: backup_exists
+
+        - name: Restore docker-compose.yml from backup
+          ansible.builtin.copy:
+            src: "{{ backup_dir }}/docker-compose.yml.bak"
+            dest: "{{ app_target_dir }}/docker-compose.yml"
+            remote_src: true
+            mode: '0644'
+          when: backup_exists.stat.exists
+
+        - name: Check if .env backup exists
+          ansible.builtin.stat:
+            path: "{{ backup_dir }}/.env.bak"
+          register: env_backup_exists
+
+        - name: Restore .env from backup
+          ansible.builtin.copy:
+            src: "{{ backup_dir }}/.env.bak"
+            dest: "{{ app_target_dir }}/.env"
+            remote_src: true
+            mode: '0600'
+          when: env_backup_exists.stat.exists
+          no_log: true
+
+        - name: Restart with previous configuration
+          ansible.builtin.command:
+            cmd: "{{ docker_compose_cmd }} up -d"
+            chdir: "{{ app_target_dir }}"
+          when: backup_exists.stat.exists
+
+        - name: Send rollback notification
+          ansible.builtin.uri:
+            url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              chat_id: "{{ telegram_chat_id }}"
+              text: "⚠️ <b>Deployment Rolled Back</b>\n\nApp: <code>{{ app_name }}</code>\nHost: <code>{{ inventory_hostname }}</code>\nReason: {{ failure_reason | default('Health check failed') }}\n\nPrevious version has been restored."
+              parse_mode: "HTML"
+            status_code: [200]
+          delegate_to: localhost
+          when: telegram_enabled | bool
+          ignore_errors: true
+          no_log: true
+
+        - name: Fail the playbook after rollback
+          ansible.builtin.fail:
+            msg: "Deployment failed and was rolled back. Reason: {{ failure_reason | default('Health check failed') }}"
+
+      when: deployment_failed | bool
+      rescue:
+        - name: Rollback itself failed
+          ansible.builtin.debug:
+            msg: "WARNING: Rollback failed! Manual intervention required."
+
+        - name: Send critical failure notification
+          ansible.builtin.uri:
+            url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              chat_id: "{{ telegram_chat_id }}"
+              text: "🔴 <b>CRITICAL: Rollback Failed</b>\n\nApp: <code>{{ app_name }}</code>\nHost: <code>{{ inventory_hostname }}</code>\n\n⚠️ Manual intervention required!"
+              parse_mode: "HTML"
+            status_code: [200]
+          delegate_to: localhost
+          when: telegram_enabled | bool
+          ignore_errors: true
+          no_log: true
+
+        - name: Fail after rollback failure
+          ansible.builtin.fail:
+            msg: "CRITICAL: Deployment failed AND rollback failed. Manual intervention required!"
+
+    # === SUCCESS PHASE ===
     - name: Display container status
       ansible.builtin.command:
         cmd: "{{ docker_compose_cmd }} ps"
         chdir: "{{ app_target_dir }}"
       register: docker_ps
       changed_when: false
+      when: not deployment_failed | default(false)
 
     - name: Show running containers
       ansible.builtin.debug:
         msg: "{{ docker_ps.stdout_lines }}"
+      when: not deployment_failed | default(false)
 
     - name: Prune unused Docker images
       ansible.builtin.command:
         cmd: docker image prune -f
       register: docker_prune
       changed_when: "'Total reclaimed space' in docker_prune.stdout"
-      when: docker_prune_after_deploy | default(true)
-
-    - name: Show prune results
-      ansible.builtin.debug:
-        msg: "{{ docker_prune.stdout }}"
       when: 
         - docker_prune_after_deploy | default(true)
-        - docker_prune.stdout | length > 0
+        - not deployment_failed | default(false)
+
+    - name: Clean up old backups (keep only latest)
+      ansible.builtin.file:
+        path: "{{ backup_dir }}"
+        state: absent
+      when: 
+        - not deployment_failed | default(false)
+        - cleanup_backups_on_success | default(false)
+
+    - name: Send success notification
+      ansible.builtin.uri:
+        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          chat_id: "{{ telegram_chat_id }}"
+          text: "✅ <b>Deployment Successful</b>\n\nApp: <code>{{ app_name }}</code>\nHost: <code>{{ inventory_hostname }}</code>\nContainers: {{ docker_ps.stdout_lines | select('match', '.*Up.*') | list | length }} running"
+          parse_mode: "HTML"
+        status_code: [200]
+      delegate_to: localhost
+      when: 
+        - telegram_enabled | bool
+        - not deployment_failed | default(false)
+      ignore_errors: true
+      no_log: true
 
 
 - name: Deployment summary
