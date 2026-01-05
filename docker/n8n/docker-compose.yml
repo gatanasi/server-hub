@@ -70,6 +70,12 @@ services:
     <<: *shared
     ports:
       - 8080:5678
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:5678/healthz || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   n8n-worker:
     container_name: n8n-worker
@@ -77,3 +83,11 @@ services:
     command: worker
     depends_on:
       - n8n
+    # Workers don't expose HTTP endpoints - they process jobs from the queue
+    # Check that the worker process is running by verifying the node process exists
+    healthcheck:
+      test: ['CMD-SHELL', 'pgrep -f "node.*worker" || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
