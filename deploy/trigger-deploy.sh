@@ -59,7 +59,7 @@ send_notification() {
     fi
     
     if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then
-        local text="${title}%0A%0A${message}%0AHost: $(hostname)%0ATime: $(date '+%Y-%m-%d %H:%M:%S')"
+        local text="${title}%0A%0A${message}"
         curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d "chat_id=${TELEGRAM_CHAT_ID}" \
             -d "text=${text}" \
@@ -79,6 +79,28 @@ validate_app_name() {
     if [[ ! -f "${REPO_DIR}/docker/${app}/docker-compose.yml" ]]; then
         error "No docker-compose.yml found for app: ${app}"
     fi
+}
+
+# Extract version from a docker-compose.yml file
+# Looks for the main service image and extracts the tag
+extract_version() {
+    local compose_file="$1"
+    local version=""
+    
+    if [[ -f "${compose_file}" ]]; then
+        # Extract image tag, handling various formats:
+        # - image: nginx:1.25
+        # - image: "docker.io/n8nio/n8n:2.1.4"
+        # - image: postgres:16.11@sha256:...
+        version=$(grep -E "^\s*image:" "${compose_file}" 2>/dev/null | \
+            grep -v "x-shared" | \
+            head -1 | \
+            sed "s/.*image:\s*//; s/[\"']//g" | \
+            cut -d@ -f1 | \
+            xargs 2>/dev/null || echo "")
+    fi
+    
+    echo "${version:-unknown}"
 }
 
 pull_latest_repo() {
@@ -155,16 +177,30 @@ main() {
     # Step 1: Validate app name (security check)
     validate_app_name "${app_name}"
     
-    # Step 2: Pull latest code from git
+    # Step 2: Capture current version before pulling new code
+    local compose_file="${REPO_DIR}/docker/${app_name}/docker-compose.yml"
+    local old_version
+    old_version=$(extract_version "${compose_file}")
+    
+    # Step 3: Pull latest code from git
     pull_latest_repo
     
-    # Step 3: Run Ansible playbook
+    # Step 4: Get new version after pull
+    local new_version
+    new_version=$(extract_version "${compose_file}")
+    
+    # Step 5: Run Ansible playbook
     run_ansible_playbook "${app_name}"
     
-    # Step 4: Send success notification
-    local commit_hash
-    commit_hash=$(cd "${REPO_DIR}" && git rev-parse --short HEAD)
-    send_notification "✅ Deployment SUCCESS" "App: ${app_name}%0ACommit: ${commit_hash}"
+    # Step 6: Send success notification with version info
+    local version_info
+    if [[ "${old_version}" != "${new_version}" && "${old_version}" != "unknown" ]]; then
+        version_info="Version: <code>${old_version}</code> → <code>${new_version}</code>"
+    else
+        version_info="Version: <code>${new_version}</code>"
+    fi
+    
+    send_notification "✅ Deployment SUCCESS" "App: <code>${app_name}</code>%0A${version_info}"
     
     log "=========================================="
     log "Deployment completed successfully!"
