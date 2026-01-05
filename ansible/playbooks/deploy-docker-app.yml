@@ -84,18 +84,25 @@
         state: directory
         mode: '0755'
 
-    - name: Synchronize docker-compose files
-      ansible.posix.synchronize:
-        src: "{{ app_source_dir }}/"
-        dest: "{{ app_target_dir }}/"
-        delete: false
-        recursive: true
-        rsync_opts:
-          - "--exclude=.git"
-          - "--exclude=.env"
-          - "--exclude=*.log"
-      delegate_to: "{{ groups['docker_hosts'] | first | default(inventory_hostname) }}"
-      # Note: This syncs from deployer.vm to target host
+    - name: Find files to copy (excluding .env and logs)
+      ansible.builtin.find:
+        paths: "{{ app_source_dir }}"
+        recurse: true
+        file_type: file
+        excludes:
+          - "*.log"
+      delegate_to: localhost
+      register: files_to_copy
+
+    - name: Copy docker-compose files to target
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "{{ app_target_dir }}/{{ item.path | relpath(app_source_dir) }}"
+        mode: '0644'
+      loop: "{{ files_to_copy.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      when: item.path | basename != '.env'
 
     - name: Check if .env file exists on target
       ansible.builtin.stat:
