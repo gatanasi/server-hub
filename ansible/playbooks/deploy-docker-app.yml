@@ -140,7 +140,7 @@
         state: directory
         mode: '0700'
 
-    - name: Check if docker-compose.yml exists (for backup)
+    - name: Check if docker-compose.yml exists
       ansible.builtin.stat:
         path: "{{ app_target_dir }}/docker-compose.yml"
       register: existing_compose
@@ -153,7 +153,7 @@
         mode: '0644'
       when: existing_compose.stat.exists
 
-    - name: Check if .env exists (for backup)
+    - name: Check if .env exists
       ansible.builtin.stat:
         path: "{{ app_target_dir }}/.env"
       register: existing_env
@@ -183,7 +183,7 @@
       when: existing_compose.stat.exists and current_images.stdout | length > 2
 
     # === DEPLOYMENT PHASE ===
-    - name: Find files to copy (excluding .env and logs)
+    - name: Prepare application files for transfer
       ansible.builtin.find:
         paths: "{{ app_source_dir }}"
         recurse: true
@@ -205,7 +205,7 @@
         - item.path | basename != '.env'
         - item.path | basename != '.env.enc'
 
-    # SOPS encrypted .env handling
+    # Handle encrypted environment variables
     - name: Check if encrypted .env.enc exists in source
       ansible.builtin.stat:
         path: "{{ app_source_dir }}/.env.enc"
@@ -383,7 +383,7 @@
       when: deployment_failed is not defined
 
     # === ROLLBACK PHASE (if needed) ===
-    - name: Rollback block
+    - name: Execute rollback procedures
       block:
         - name: Log rollback start
           ansible.builtin.debug:
