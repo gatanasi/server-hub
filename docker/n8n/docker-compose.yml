@@ -77,3 +77,4 @@ services:
     command: worker
     depends_on:
       - n8n# Trigger test - git now on runner
+# Trigger test - v3 key
