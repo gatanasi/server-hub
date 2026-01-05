@@ -314,9 +314,14 @@
       ansible.builtin.set_fact:
         healthcheck_services: "{{ healthcheck_count.stdout | default(healthcheck_count_fallback.stdout) | default('0') | int }}"
 
+    - name: Set healthcheck status variables
+      ansible.builtin.set_fact:
+        no_healthchecks_defined: "{{ healthcheck_services | int == 0 }}"
+        healthcheck_warning: "{{ '⚠️ No healthchecks defined - consider adding healthcheck to docker-compose.yml' if (healthcheck_services | int == 0) else '' }}"
+
     - name: Display healthcheck info
       ansible.builtin.debug:
-        msg: "Found {{ healthcheck_services }} service(s) with healthchecks{{ ' (jq not available, using fallback)' if jq_check.rc != 0 else '' }}"
+        msg: "{{ 'No services with healthchecks found - skipping health verification' if no_healthchecks_defined else 'Found ' + (healthcheck_services | string) + ' service(s) with healthchecks' }}{{ ' (jq not available, using fallback)' if jq_check.rc != 0 else '' }}"
 
     - name: Wait for all healthchecks to pass (with jq)
       ansible.builtin.shell: |
@@ -533,7 +538,7 @@
         body_format: form-urlencoded
         body:
           chat_id: "{{ telegram_chat_id }}"
-          text: "✅ <b>Deployment Successful</b>\n\nApp: <code>{{ app_name }}</code>\nVersion: <code>{{ new_version }}</code>\nStatus: Healthy"
+          text: "✅ <b>Deployment Successful</b>\n\nApp: <code>{{ app_name }}</code>\nVersion: <code>{{ new_version }}</code>\nStatus: {{ 'Running (no healthchecks)' if no_healthchecks_defined | default(false) else 'Healthy' }}{{ '\n\n' + healthcheck_warning if healthcheck_warning | default('') | length > 0 else '' }}"
           parse_mode: "HTML"
         status_code: [200]
       delegate_to: localhost
