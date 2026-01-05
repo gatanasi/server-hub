@@ -55,7 +55,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
-          fetch-depth: 2  # Need previous commit for diff
+          fetch-depth: 0  # Fetch full history to compare all pushed commits
 
       - name: Detect changed docker-compose files
         id: detect
@@ -68,8 +68,15 @@ jobs:
             # Push trigger - detect changed files
             echo "Detecting changed docker-compose and .env.enc files..."
             
+            # Use github.event.before to compare ALL pushed commits, not just the last one
+            # This handles batch pushes correctly (e.g., pushing 5 commits at once)
+            BEFORE_SHA="${{ github.event.before }}"
+            AFTER_SHA="${{ github.sha }}"
+            
+            echo "Comparing commits: $BEFORE_SHA...$AFTER_SHA"
+            
             # Get list of changed files (docker-compose.yml, docker-compose.yaml, and .env.enc)
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD -- 'docker/**/docker-compose.yml' 'docker/**/docker-compose.yaml' 'docker/**/.env.enc' || echo "")
+            CHANGED_FILES=$(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA" -- 'docker/**/docker-compose.yml' 'docker/**/docker-compose.yaml' 'docker/**/.env.enc' || echo "")
             
             if [[ -z "$CHANGED_FILES" ]]; then
               echo "No deployment-related files changed"
