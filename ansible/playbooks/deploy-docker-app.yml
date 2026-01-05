@@ -24,7 +24,7 @@
   gather_facts: false
   vars:
     repo_dir: /home/deployer/git/server-hub
-    secrets_file: "{{ ansible_env.HOME }}/.deploy-secrets"
+    secrets_file: "{{ lookup('env', 'HOME') }}/.deploy-secrets"
   
   tasks:
     - name: Validate app_name is provided
