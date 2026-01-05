@@ -25,7 +25,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="/home/deployer/git/server-hub"
 ANSIBLE_DIR="${REPO_DIR}/ansible"
-LOG_DIR="/var/log/deployments"
+LOG_DIR="/home/deployer/logs/deployments"
 LOG_FILE="${LOG_DIR}/deploy-$(date +%Y%m%d-%H%M%S).log"
 
 # Telegram configuration (set these in /home/deployer/.deploy-secrets)
