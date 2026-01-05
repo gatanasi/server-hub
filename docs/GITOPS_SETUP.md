@@ -245,9 +245,12 @@ sudo ./svc.sh start
 ### Step 4.3: Install Required Tools
 
 ```bash
-# Install jq (needed for parsing JSON in workflow)
+# Install jq (REQUIRED for parsing JSON in workflow)
 sudo apt-get update
 sudo apt-get install -y jq
+
+# Verify installation
+jq --version
 ```
 
 ### Step 4.4: Verify Network Connectivity

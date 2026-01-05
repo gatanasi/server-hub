@@ -3,7 +3,7 @@ volumes:
   n8n_storage:
   redis_storage:
 
-# GitOps managed - changes trigger automatic deployment
+# GitOps managed - changes trigger automatic deployment via GitHub Actions
 x-shared: &shared
   restart: always
   image: docker.n8n.io/n8nio/n8n:1.123.7@sha256:a2e1a0adbe39f110f6fe7b9cc53c0a872adf3b023be3e3d89afd15da777bd85c
