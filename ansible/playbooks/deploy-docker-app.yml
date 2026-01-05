@@ -76,20 +76,6 @@
       ansible.builtin.debug:
         msg: "Will deploy '{{ app_name }}' to host '{{ target_host }}'"
 
-    - name: Send deployment started notification
-      ansible.builtin.uri:
-        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
-        method: POST
-        body_format: form-urlencoded
-        body:
-          chat_id: "{{ telegram_chat_id }}"
-          text: "🚀 <b>Deployment Started</b>\n\nApp: <code>{{ app_name }}</code>\nTarget: <code>{{ target_host }}</code>\nTime: {{ lookup('pipe', 'date -Iseconds') }}"
-          parse_mode: "HTML"
-        status_code: [200]
-      when: telegram_enabled | bool
-      ignore_errors: true
-      no_log: true
-
     - name: Add target host to runtime group
       ansible.builtin.add_host:
         name: "{{ target_host }}"
@@ -126,6 +112,43 @@
           Target: {{ app_target_dir }}
           Host: {{ inventory_hostname }}
           User: {{ ansible_user }}
+
+    # === VERSION INFO & NOTIFICATION ===
+    - name: Get new version from source
+      ansible.builtin.shell: |
+        grep "image:" "{{ app_source_dir }}/docker-compose.yml" | head -1 | sed 's/.*image: //; s/"//g; s/'"'"'//g' | cut -d@ -f1
+      delegate_to: localhost
+      register: new_version_raw
+      changed_when: false
+      failed_when: false
+
+    - name: Get old version from target
+      ansible.builtin.shell: |
+        grep "image:" "{{ app_target_dir }}/docker-compose.yml" | head -1 | sed 's/.*image: //; s/"//g; s/'"'"'//g' | cut -d@ -f1
+      register: old_version_raw
+      changed_when: false
+      failed_when: false
+      ignore_errors: true
+
+    - name: Set version variables
+      ansible.builtin.set_fact:
+        new_version: "{{ new_version_raw.stdout | default('unknown') }}"
+        old_version: "{{ old_version_raw.stdout | default('none') }}"
+
+    - name: Send deployment started notification
+      ansible.builtin.uri:
+        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          chat_id: "{{ telegram_chat_id }}"
+          text: "🚀 <b>Deployment Started</b>\n\nApp: <code>{{ app_name }}</code>\nUpdate: <code>{{ old_version }}</code> → <code>{{ new_version }}</code>"
+          parse_mode: "HTML"
+        status_code: [200]
+      delegate_to: localhost
+      when: telegram_enabled | bool
+      ignore_errors: true
+      no_log: true
 
     - name: Ensure app directory exists
       ansible.builtin.file:
@@ -435,7 +458,7 @@
             body_format: form-urlencoded
             body:
               chat_id: "{{ telegram_chat_id }}"
-              text: "⚠️ <b>Deployment Rolled Back</b>\n\nApp: <code>{{ app_name }}</code>\nHost: <code>{{ inventory_hostname }}</code>\nReason: {{ failure_reason | default('Health check failed') }}\n\nPrevious version has been restored."
+              text: "⚠️ <b>Deployment Rolled Back</b>\n\nApp: <code>{{ app_name }}</code>\nError: {{ failure_reason | default('Health check failed') }}\nCurrent: Restored to <code>{{ old_version }}</code>"
               parse_mode: "HTML"
             status_code: [200]
           delegate_to: localhost
@@ -460,7 +483,7 @@
             body_format: form-urlencoded
             body:
               chat_id: "{{ telegram_chat_id }}"
-              text: "🔴 <b>CRITICAL: Rollback Failed</b>\n\nApp: <code>{{ app_name }}</code>\nHost: <code>{{ inventory_hostname }}</code>\n\n⚠️ Manual intervention required!"
+              text: "🔴 <b>CRITICAL: Rollback Failed</b>\n\nApp: <code>{{ app_name }}</code>\n\n⚠️ Manual intervention required!"
               parse_mode: "HTML"
             status_code: [200]
           delegate_to: localhost
@@ -510,7 +533,7 @@
         body_format: form-urlencoded
         body:
           chat_id: "{{ telegram_chat_id }}"
-          text: "✅ <b>Deployment Successful</b>\n\nApp: <code>{{ app_name }}</code>\nHost: <code>{{ inventory_hostname }}</code>\nContainers: {{ docker_ps.stdout_lines | select('match', '.*Up.*') | list | length }} running"
+          text: "✅ <b>Deployment Successful</b>\n\nApp: <code>{{ app_name }}</code>\nVersion: <code>{{ new_version }}</code>\nStatus: Healthy"
           parse_mode: "HTML"
         status_code: [200]
       delegate_to: localhost
