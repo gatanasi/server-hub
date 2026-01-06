@@ -80,8 +80,12 @@
     app_source_dir: "{{ repo_dir }}/docker/{{ app_name }}"
     app_target_dir: "{{ app_base_dir }}/{{ app_name }}"
     backup_dir: "{{ app_target_dir }}/.backup"
-    health_check_timeout: 60
+    # Health check timeout is dynamically calculated from docker-compose healthcheck.start_period
+    # Falls back to this default if no healthchecks are defined or parsing fails
+    health_check_timeout_default: 90
     health_check_interval: 5
+    # Buffer time added to start_period for timeout calculation (accounts for check execution)
+    health_check_buffer: 30
     telegram_bot_token: "{{ deploy_telegram_bot_token }}"
     telegram_chat_id: "{{ deploy_telegram_chat_id }}"
     telegram_enabled: "{{ deploy_telegram_enabled }}"
@@ -268,6 +272,38 @@
     - name: Wait for containers to initialize
       ansible.builtin.pause:
         seconds: 5
+
+    - name: Extract max healthcheck start_period from docker-compose.yml
+      ansible.builtin.shell: |
+        cd "{{ app_target_dir }}"
+        # Parse start_period values from docker-compose.yml (handles formats: 30s, 1m, 120s, etc.)
+        MAX_SECONDS=0
+        while IFS= read -r period; do
+          [[ -z "$period" ]] && continue
+          # Convert to seconds
+          if [[ "$period" =~ ^([0-9]+)s$ ]]; then
+            SECONDS_VAL="${BASH_REMATCH[1]}"
+          elif [[ "$period" =~ ^([0-9]+)m$ ]]; then
+            SECONDS_VAL=$((${BASH_REMATCH[1]} * 60))
+          else
+            SECONDS_VAL=0
+          fi
+          [[ $SECONDS_VAL -gt $MAX_SECONDS ]] && MAX_SECONDS=$SECONDS_VAL
+        done < <(grep -E '^\s+start_period:' docker-compose.yml 2>/dev/null | sed 's/.*start_period:\s*//; s/["'\'']*//g')
+        echo "$MAX_SECONDS"
+      args:
+        executable: /bin/bash
+      register: max_start_period_raw
+      changed_when: false
+      failed_when: false
+
+    - name: Calculate health check timeout
+      ansible.builtin.set_fact:
+        health_check_timeout: "{{ [((max_start_period_raw.stdout | default('0') | int) + (health_check_buffer | int)), (health_check_timeout_default | int)] | max }}"
+
+    - name: Display health check configuration
+      ansible.builtin.debug:
+        msg: "Health check timeout: {{ health_check_timeout }}s (max start_period: {{ max_start_period_raw.stdout | default('0') }}s + buffer: {{ health_check_buffer }}s)"
 
     - name: Verify service health
       ansible.builtin.include_tasks: tasks/verify-service-health.yml
