@@ -13,7 +13,7 @@
 - name: "{{ current_app }} | Set app variables"
   ansible.builtin.set_fact:
     app_dir: "{{ app_base_dir }}/{{ current_app }}"
-    app_backup_dir: "{{ backup_destination }}/{{ inventory_hostname }}/{{ current_app }}"
+    app_backup_dir: "{{ backup_destination }}/{{ current_app }}"
 
 - name: "{{ current_app }} | Check if app directory exists"
   ansible.builtin.stat:
@@ -128,18 +128,10 @@
       register: backup_results
       when: docker_volumes | length > 0
 
-    # === BACKUP COMPOSE FILES ===
-    # Note: .env files are NOT backed up here as they are stored in GitHub
-    # encrypted with SOPS. To restore .env files, use the deploy playbook.
-    - name: "{{ current_app }} | Backup docker-compose.yml"
-      ansible.builtin.copy:
-        src: "{{ app_dir }}/docker-compose.yml"
-        dest: "{{ app_backup_dir }}/docker-compose_{{ backup_timestamp }}.yml"
-        remote_src: true
-        mode: '0640'
-      when: docker_volumes | length > 0
-
     # === RESTART SERVICES ===
+    # Note: docker-compose.yml and .env files are NOT backed up here
+    # as they are stored in GitHub (with SOPS encryption for .env).
+    # To restore config files, use the deploy playbook.
     - name: "{{ current_app }} | Start application stack"
       ansible.builtin.command:
         cmd: "{{ docker_compose_cmd }} start"
@@ -160,11 +152,24 @@
       changed_when: false
       when: docker_volumes | length > 0
 
-    - name: "{{ current_app }} | Calculate backup summary"
+    - name: "{{ current_app }} | Get backup sizes"
       ansible.builtin.shell: |
-        du -sh "{{ app_backup_dir }}"/*_{{ backup_timestamp }}.* 2>/dev/null | awk '{sum+=$1} END {print NR " files"}'
-      register: backup_summary
+        for vol in {{ docker_volumes | join(' ') }}; do
+          FILE="{{ app_backup_dir }}/${vol}_{{ backup_timestamp }}.tar.gz"
+          if [ -f "$FILE" ]; then
+            SIZE=$(du -h "$FILE" | cut -f1)
+            echo "${vol}:${SIZE}"
+          fi
+        done
+      args:
+        executable: /bin/bash
+      register: backup_sizes_raw
       changed_when: false
+      when: docker_volumes | length > 0
+
+    - name: "{{ current_app }} | Parse backup sizes"
+      ansible.builtin.set_fact:
+        backup_details: "{{ backup_sizes_raw.stdout_lines | default([]) }}"
       when: docker_volumes | length > 0
 
     - name: "{{ current_app }} | Display backup summary"
@@ -173,9 +178,15 @@
           ✅ Backup completed for {{ current_app }}
           Volumes backed up: {{ docker_volumes | length }}
           Location: {{ app_backup_dir }}
+          Details: {{ backup_details | join(', ') }}
       when: docker_volumes | length > 0
 
     # === SEND NOTIFICATION ===
+    - name: "{{ current_app }} | Build volume details for notification"
+      ansible.builtin.set_fact:
+        volume_details_text: "{{ backup_details | map('regex_replace', '^([^:]+):(.+)$', '  • \\1: \\2') | join('\n') }}"
+      when: docker_volumes | length > 0
+
     - name: "{{ current_app }} | Send success notification"
       ansible.builtin.uri:
         url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
@@ -183,7 +194,7 @@
         body_format: form-urlencoded
         body:
           chat_id: "{{ telegram_chat_id }}"
-          text: "💾 <b>Backup Completed</b>\n\nHost: <code>{{ inventory_hostname }}</code>\nApp: <code>{{ current_app }}</code>\nVolumes: {{ docker_volumes | length }}\nTimestamp: <code>{{ backup_timestamp }}</code>"
+          text: "💾 <b>Backup Completed</b>\n\n<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ current_app }}</code>\n\n<b>Volumes ({{ docker_volumes | length }}):</b>\n<pre>{{ volume_details_text }}</pre>"
           parse_mode: "HTML"
         status_code: [200]
       delegate_to: localhost

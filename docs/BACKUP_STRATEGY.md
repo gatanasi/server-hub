@@ -24,15 +24,15 @@ All persistent data is stored in **Docker named volumes** on each host. A centra
                     │     /mnt/backups        │
                     │   (NFS/SMB Share)       │
                     │                         │
-                    │  ├── n8n.vm/            │
-                    │  │   └── n8n/           │
-                    │  │       ├── postgres_*.tar.gz
-                    │  │       ├── n8n_*.tar.gz
-                    │  │       └── redis_*.tar.gz
-                    │  ├── odoo.vm/           │
-                    │  │   └── odoo/          │
-                    │  └── pdf.vm/            │
-                    │       └── stirling-pdf/ │
+                    │  ├── n8n/               │
+                    │  │   ├── db_storage_*.tar.gz
+                    │  │   ├── n8n_storage_*.tar.gz
+                    │  │   └── redis_storage_*.tar.gz
+                    │  ├── odoo/              │
+                    │  │   ├── db_data_*.tar.gz
+                    │  │   └── odoo_data_*.tar.gz
+                    │  └── stirling-pdf/      │
+                    │       └── data_*.tar.gz │
                     └─────────────────────────┘
 ```
 
@@ -67,29 +67,27 @@ For each application:
 | Item | Description |
 |------|-------------|
 | Docker Volumes | All named volumes defined in docker-compose.yml |
-| docker-compose.yml | Application configuration |
 
-> **Note:** `.env` files are **NOT** backed up by this playbook. They are stored in GitHub encrypted with [SOPS](https://github.com/getsops/sops). To restore `.env` files, use the deploy playbook which decrypts them automatically.
+> **Note:** Configuration files (`docker-compose.yml` and `.env`) are **NOT** backed up by this playbook. They are stored in GitHub (with [SOPS](https://github.com/getsops/sops) encryption for `.env`). To restore config files, use the deploy playbook.
 
 ### Backup Process
 
 1. **Stop** the application stack gracefully
 2. **Create** tar.gz archives of each Docker volume
-3. **Copy** docker-compose.yml
-4. **Start** the application stack
-5. **Verify** services are healthy
-6. **Cleanup** backups older than retention period
-7. **Notify** via Telegram (if configured)
+3. **Start** the application stack
+4. **Verify** services are healthy
+5. **Cleanup** backups older than retention period
+6. **Notify** via Telegram (with volume sizes)
 
 ### Backup File Naming
 
 ```
-/mnt/backups/{hostname}/{app_name}/{volume_name}_{timestamp}.tar.gz
+/mnt/backups/{app_name}/{volume_name}_{timestamp}.tar.gz
 
 Example:
-/mnt/backups/n8n.vm/n8n/n8n_db_storage_20260106T143000.tar.gz
-/mnt/backups/n8n.vm/n8n/n8n_n8n_storage_20260106T143000.tar.gz
-/mnt/backups/n8n.vm/n8n/docker-compose_20260106T143000.yml
+/mnt/backups/n8n/n8n_db_storage_20260106T143000.tar.gz
+/mnt/backups/n8n/n8n_n8n_storage_20260106T143000.tar.gz
+/mnt/backups/n8n/n8n_redis_storage_20260106T143000.tar.gz
 ```
 
 ---
@@ -299,7 +297,7 @@ find /mnt/backups -name "*.tar.gz" -mtime -1 -ls
 
 ```bash
 # Test extracting a backup without writing
-tar -tzf /mnt/backups/n8n.vm/n8n/n8n_db_storage_20260106T143000.tar.gz > /dev/null && echo "OK"
+tar -tzf /mnt/backups/n8n/n8n_db_storage_20260106T143000.tar.gz > /dev/null && echo "OK"
 ```
 
 ### Space Usage
