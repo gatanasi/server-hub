@@ -178,6 +178,7 @@ crontab -e
 ### Option 2: n8n Workflow
 
 Create an n8n workflow that:
+
 1. Triggers daily via Schedule node
 2. Runs the backup playbook via SSH Execute node
 3. Sends notification on completion/failure

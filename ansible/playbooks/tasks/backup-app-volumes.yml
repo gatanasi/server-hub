@@ -115,13 +115,15 @@
           tar -czf "/backup/{{ item }}_{{ backup_timestamp }}.tar.gz" -C /source .
         
         # Verify backup was created
-        if [[ -f "${BACKUP_FILE}" ]]; then
+        if [ -f "${BACKUP_FILE}" ]; then
           SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
           echo "SUCCESS: Created ${BACKUP_FILE} (${SIZE})"
         else
           echo "ERROR: Failed to create backup for ${VOLUME_NAME}"
           exit 1
         fi
+      args:
+        executable: /bin/bash
       loop: "{{ docker_volumes }}"
       register: backup_results
       when: docker_volumes | length > 0
