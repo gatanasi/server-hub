@@ -28,12 +28,23 @@
 - name: "{{ current_app }} | Backup application"
   when: app_compose_file.stat.exists
   block:
-    - name: "{{ current_app }} | Create app backup directory"
+    - name: "{{ current_app }} | Create app backup directory (try without sudo)"
       ansible.builtin.file:
         path: "{{ app_backup_dir }}"
         state: directory
         mode: '0750'
+      register: app_mkdir_result
+      ignore_errors: true
+
+    - name: "{{ current_app }} | Create app backup directory (with sudo if needed)"
+      ansible.builtin.file:
+        path: "{{ app_backup_dir }}"
+        state: directory
+        mode: '0750'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
       become: true
+      when: app_mkdir_result is failed
 
     - name: "{{ current_app }} | Get list of volumes from docker-compose"
       ansible.builtin.shell: |

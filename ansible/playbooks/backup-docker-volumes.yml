@@ -95,12 +95,23 @@
             mount -t cifs //nas.local/backups {{ backup_destination }} -o username=backup,password=xxx
       when: not backup_dest_stat.stat.exists
 
-    - name: Create host backup directory
+    - name: Create host backup directory (try without sudo first)
       ansible.builtin.file:
         path: "{{ backup_destination }}/{{ inventory_hostname }}"
         state: directory
         mode: '0750'
+      register: mkdir_result
+      ignore_errors: true
+
+    - name: Create host backup directory (with sudo if needed)
+      ansible.builtin.file:
+        path: "{{ backup_destination }}/{{ inventory_hostname }}"
+        state: directory
+        mode: '0750'
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
       become: true
+      when: mkdir_result is failed
 
   tasks:
     # === ITERATE OVER EACH MANAGED APP ===
