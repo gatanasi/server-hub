@@ -1,0 +1,220 @@
+---
+# backup-app-volumes.yml - Backup Docker volumes for a single application
+#
+# This task file is included by backup-docker-volumes.yml for each app.
+# It stops the app, backs up volumes, and restarts the app.
+#
+# Required variables:
+#   - current_app: Name of the application to backup
+#   - backup_destination: Base path for backups
+#   - backup_timestamp: Timestamp string for backup filename
+#
+
+- name: "{{ current_app }} | Set app variables"
+  ansible.builtin.set_fact:
+    app_dir: "{{ app_base_dir }}/{{ current_app }}"
+    app_backup_dir: "{{ backup_destination }}/{{ inventory_hostname }}/{{ current_app }}"
+
+- name: "{{ current_app }} | Check if app directory exists"
+  ansible.builtin.stat:
+    path: "{{ app_dir }}/docker-compose.yml"
+  register: app_compose_file
+
+- name: "{{ current_app }} | Skip if app not deployed"
+  ansible.builtin.debug:
+    msg: "Skipping {{ current_app }} - not deployed on {{ inventory_hostname }}"
+  when: not app_compose_file.stat.exists
+
+- name: "{{ current_app }} | Backup application"
+  when: app_compose_file.stat.exists
+  block:
+    - name: "{{ current_app }} | Create app backup directory"
+      ansible.builtin.file:
+        path: "{{ app_backup_dir }}"
+        state: directory
+        mode: '0750'
+
+    - name: "{{ current_app }} | Get list of volumes from docker-compose"
+      ansible.builtin.shell: |
+        cd "{{ app_dir }}"
+        {{ docker_compose_cmd }} config --volumes 2>/dev/null || echo ""
+      register: app_volumes_raw
+      changed_when: false
+
+    - name: "{{ current_app }} | Parse volume names"
+      ansible.builtin.set_fact:
+        app_volumes: "{{ app_volumes_raw.stdout_lines | select | list }}"
+
+    - name: "{{ current_app }} | Get Docker volume full names"
+      ansible.builtin.shell: |
+        cd "{{ app_dir }}"
+        # Get the project name (directory name or COMPOSE_PROJECT_NAME)
+        PROJECT_NAME=$({{ docker_compose_cmd }} config --format json 2>/dev/null | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
+        if [[ -z "$PROJECT_NAME" ]]; then
+          PROJECT_NAME=$(basename "{{ app_dir }}")
+        fi
+        
+        # List actual Docker volumes for this project
+        docker volume ls --format '{{ '{{' }}.Name{{ '}}' }}' | grep "^${PROJECT_NAME}_" || true
+      register: docker_volumes_raw
+      changed_when: false
+
+    - name: "{{ current_app }} | Set Docker volume list"
+      ansible.builtin.set_fact:
+        docker_volumes: "{{ docker_volumes_raw.stdout_lines | select | list }}"
+
+    - name: "{{ current_app }} | Display volumes to backup"
+      ansible.builtin.debug:
+        msg: "Will backup {{ docker_volumes | length }} volume(s): {{ docker_volumes | join(', ') }}"
+
+    - name: "{{ current_app }} | Skip if no volumes"
+      ansible.builtin.debug:
+        msg: "No Docker volumes found for {{ current_app }}"
+      when: docker_volumes | length == 0
+
+    # === STOP SERVICES ===
+    - name: "{{ current_app }} | Stop application stack"
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} stop -t {{ stop_timeout }}"
+        chdir: "{{ app_dir }}"
+      register: stop_result
+      when: docker_volumes | length > 0
+
+    - name: "{{ current_app }} | Wait for containers to stop"
+      ansible.builtin.pause:
+        seconds: 5
+      when: docker_volumes | length > 0
+
+    # === BACKUP VOLUMES ===
+    - name: "{{ current_app }} | Backup each volume"
+      ansible.builtin.shell: |
+        VOLUME_NAME="{{ item }}"
+        BACKUP_FILE="{{ app_backup_dir }}/{{ item }}_{{ backup_timestamp }}.tar.gz"
+        
+        echo "Backing up volume: ${VOLUME_NAME}"
+        
+        # Create backup using a temporary container
+        docker run --rm \
+          -v "${VOLUME_NAME}:/source:ro" \
+          -v "{{ app_backup_dir }}:/backup" \
+          alpine:latest \
+          tar -czf "/backup/{{ item }}_{{ backup_timestamp }}.tar.gz" -C /source .
+        
+        # Verify backup was created
+        if [[ -f "${BACKUP_FILE}" ]]; then
+          SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
+          echo "SUCCESS: Created ${BACKUP_FILE} (${SIZE})"
+        else
+          echo "ERROR: Failed to create backup for ${VOLUME_NAME}"
+          exit 1
+        fi
+      loop: "{{ docker_volumes }}"
+      register: backup_results
+      when: docker_volumes | length > 0
+
+    # === BACKUP COMPOSE FILES ===
+    - name: "{{ current_app }} | Backup docker-compose.yml"
+      ansible.builtin.copy:
+        src: "{{ app_dir }}/docker-compose.yml"
+        dest: "{{ app_backup_dir }}/docker-compose_{{ backup_timestamp }}.yml"
+        remote_src: true
+        mode: '0640'
+      when: docker_volumes | length > 0
+
+    - name: "{{ current_app }} | Check for .env file"
+      ansible.builtin.stat:
+        path: "{{ app_dir }}/.env"
+      register: env_file
+
+    - name: "{{ current_app }} | Backup .env file (encrypted)"
+      ansible.builtin.shell: |
+        # Create encrypted backup of .env
+        # Using openssl to encrypt sensitive data
+        cat "{{ app_dir }}/.env" | openssl enc -aes-256-cbc -pbkdf2 -salt \
+          -pass pass:"{{ ansible_machine_id }}" \
+          -out "{{ app_backup_dir }}/env_{{ backup_timestamp }}.enc"
+        chmod 600 "{{ app_backup_dir }}/env_{{ backup_timestamp }}.enc"
+      when: 
+        - docker_volumes | length > 0
+        - env_file.stat.exists
+      no_log: true
+
+    # === RESTART SERVICES ===
+    - name: "{{ current_app }} | Start application stack"
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} start"
+        chdir: "{{ app_dir }}"
+      register: start_result
+      when: docker_volumes | length > 0
+
+    - name: "{{ current_app }} | Wait for services to be ready"
+      ansible.builtin.pause:
+        seconds: 10
+      when: docker_volumes | length > 0
+
+    - name: "{{ current_app }} | Verify services are running"
+      ansible.builtin.shell: |
+        cd "{{ app_dir }}"
+        {{ docker_compose_cmd }} ps --format json 2>/dev/null | head -20
+      register: services_status
+      changed_when: false
+      when: docker_volumes | length > 0
+
+    - name: "{{ current_app }} | Calculate backup summary"
+      ansible.builtin.shell: |
+        du -sh "{{ app_backup_dir }}"/*_{{ backup_timestamp }}.* 2>/dev/null | awk '{sum+=$1} END {print NR " files"}'
+      register: backup_summary
+      changed_when: false
+      when: docker_volumes | length > 0
+
+    - name: "{{ current_app }} | Display backup summary"
+      ansible.builtin.debug:
+        msg: |
+          ✅ Backup completed for {{ current_app }}
+          Volumes backed up: {{ docker_volumes | length }}
+          Location: {{ app_backup_dir }}
+      when: docker_volumes | length > 0
+
+    # === SEND NOTIFICATION ===
+    - name: "{{ current_app }} | Send success notification"
+      ansible.builtin.uri:
+        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          chat_id: "{{ telegram_chat_id }}"
+          text: "💾 <b>Backup Completed</b>\n\nHost: <code>{{ inventory_hostname }}</code>\nApp: <code>{{ current_app }}</code>\nVolumes: {{ docker_volumes | length }}\nTimestamp: <code>{{ backup_timestamp }}</code>"
+          parse_mode: "HTML"
+        status_code: [200]
+      delegate_to: localhost
+      when:
+        - telegram_enabled | bool
+        - docker_volumes | length > 0
+      ignore_errors: true
+      no_log: true
+
+  rescue:
+    - name: "{{ current_app }} | Backup failed - ensure services are running"
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} up -d"
+        chdir: "{{ app_dir }}"
+      ignore_errors: true
+
+    - name: "{{ current_app }} | Send failure notification"
+      ansible.builtin.uri:
+        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          chat_id: "{{ telegram_chat_id }}"
+          text: "❌ <b>Backup FAILED</b>\n\nHost: <code>{{ inventory_hostname }}</code>\nApp: <code>{{ current_app }}</code>\n\n⚠️ Services have been restarted"
+          parse_mode: "HTML"
+        status_code: [200]
+      delegate_to: localhost
+      when: telegram_enabled | bool
+      ignore_errors: true
+      no_log: true
+
+    - name: "{{ current_app }} | Fail the task"
+      ansible.builtin.fail:
+        msg: "Backup failed for {{ current_app }} on {{ inventory_hostname }}"

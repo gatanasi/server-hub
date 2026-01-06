@@ -1,0 +1,135 @@
+---
+# backup-docker-volumes.yml - Backup Docker volumes for all managed applications
+#
+# This playbook connects to each Docker host, stops the application stack,
+# backs up all Docker volumes to a shared folder, and restarts the services.
+#
+# Usage:
+#   # Backup all apps on all hosts
+#   ansible-playbook playbooks/backup-docker-volumes.yml
+#
+#   # Backup specific app
+#   ansible-playbook playbooks/backup-docker-volumes.yml -e "app_name=n8n"
+#
+#   # Backup all apps on specific host
+#   ansible-playbook playbooks/backup-docker-volumes.yml -l n8n.vm
+#
+#   # Dry run (show what would be backed up)
+#   ansible-playbook playbooks/backup-docker-volumes.yml --check
+#
+# Required variables (set in inventory or via -e):
+#   - backup_destination: NFS/SMB mount path for backups (default: /mnt/backups)
+#   - backup_retention_days: How many days to keep backups (default: 7)
+#
+# Features:
+#   - Graceful stop with timeout
+#   - Compressed tar.gz backups with timestamps
+#   - Automatic cleanup of old backups
+#   - Telegram notifications on success/failure
+#   - Minimal downtime approach
+#
+
+- name: Backup Docker Volumes
+  hosts: docker_hosts
+  gather_facts: true
+  become: true
+  
+  vars:
+    # Backup destination (should be an NFS/SMB mount)
+    backup_destination: /mnt/backups
+    
+    # How many days to retain backups
+    backup_retention_days: 7
+    
+    # Timestamp format for backup files
+    backup_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+    
+    # Timeout for stopping containers (seconds)
+    stop_timeout: 60
+    
+    # Load telegram credentials from secrets file
+    secrets_file: "{{ lookup('env', 'HOME') }}/.deploy-secrets"
+
+  pre_tasks:
+    - name: Load Telegram credentials
+      ansible.builtin.shell: |
+        if [[ -f "{{ secrets_file }}" ]]; then
+          source "{{ secrets_file }}"
+          echo "{\"bot_token\": \"${TELEGRAM_BOT_TOKEN:-}\", \"chat_id\": \"${TELEGRAM_CHAT_ID:-}\"}"
+        else
+          echo "{\"bot_token\": \"\", \"chat_id\": \"\"}"
+        fi
+      args:
+        executable: /bin/bash
+      register: telegram_creds_raw
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+      no_log: true
+
+    - name: Parse Telegram credentials
+      ansible.builtin.set_fact:
+        telegram_bot_token: "{{ (telegram_creds_raw.stdout | from_json).bot_token }}"
+        telegram_chat_id: "{{ (telegram_creds_raw.stdout | from_json).chat_id }}"
+        telegram_enabled: "{{ (telegram_creds_raw.stdout | from_json).bot_token | length > 0 and (telegram_creds_raw.stdout | from_json).chat_id | length > 0 }}"
+      run_once: true
+      no_log: true
+
+    - name: Verify backup destination exists
+      ansible.builtin.stat:
+        path: "{{ backup_destination }}"
+      register: backup_dest_stat
+
+    - name: Fail if backup destination is not mounted
+      ansible.builtin.fail:
+        msg: |
+          Backup destination {{ backup_destination }} does not exist!
+          Please ensure the NFS/SMB share is mounted.
+          
+          Example mount commands:
+            # NFS
+            mount -t nfs nas.local:/backups {{ backup_destination }}
+            
+            # SMB/CIFS
+            mount -t cifs //nas.local/backups {{ backup_destination }} -o username=backup,password=xxx
+      when: not backup_dest_stat.stat.exists
+
+    - name: Create host backup directory
+      ansible.builtin.file:
+        path: "{{ backup_destination }}/{{ inventory_hostname }}"
+        state: directory
+        mode: '0750'
+
+  tasks:
+    # === ITERATE OVER EACH MANAGED APP ===
+    - name: Backup each managed application
+      ansible.builtin.include_tasks: tasks/backup-app-volumes.yml
+      loop: "{{ managed_apps | default([]) }}"
+      loop_control:
+        loop_var: current_app
+      when: >
+        (app_name is not defined) or 
+        (app_name == current_app)
+
+  post_tasks:
+    - name: Cleanup old backups
+      ansible.builtin.find:
+        paths: "{{ backup_destination }}/{{ inventory_hostname }}"
+        patterns: "*.tar.gz"
+        age: "{{ backup_retention_days }}d"
+        recurse: true
+      register: old_backups
+
+    - name: Remove old backup files
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_backups.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      when: old_backups.files | length > 0
+
+    - name: Display cleanup summary
+      ansible.builtin.debug:
+        msg: "Cleaned up {{ old_backups.files | length }} old backup(s) older than {{ backup_retention_days }} days"
+      when: old_backups.files | length > 0
