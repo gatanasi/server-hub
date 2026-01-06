@@ -69,10 +69,12 @@
       no_log: true
 
     - name: Parse Telegram credentials
+      vars:
+        telegram_creds: "{{ telegram_creds_raw.stdout | from_json }}"
       ansible.builtin.set_fact:
-        telegram_bot_token: "{{ (telegram_creds_raw.stdout | from_json).bot_token }}"
-        telegram_chat_id: "{{ (telegram_creds_raw.stdout | from_json).chat_id }}"
-        telegram_enabled: "{{ (telegram_creds_raw.stdout | from_json).bot_token | length > 0 and (telegram_creds_raw.stdout | from_json).chat_id | length > 0 }}"
+        telegram_bot_token: "{{ telegram_creds.bot_token }}"
+        telegram_chat_id: "{{ telegram_creds.chat_id }}"
+        telegram_enabled: "{{ telegram_creds.bot_token | length > 0 and telegram_creds.chat_id | length > 0 }}"
       run_once: true
       no_log: true
 

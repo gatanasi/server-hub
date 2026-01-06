@@ -57,19 +57,20 @@
       ansible.builtin.set_fact:
         app_volumes: "{{ app_volumes_raw.stdout_lines | select | list }}"
 
+    - name: "{{ current_app }} | Get docker compose config JSON"
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} config --format json"
+        chdir: "{{ app_dir }}"
+      register: compose_config_raw
+      changed_when: false
+
+    - name: "{{ current_app }} | Parse project name from config"
+      ansible.builtin.set_fact:
+        project_name: "{{ (compose_config_raw.stdout | from_json).name | default(current_app) }}"
+
     - name: "{{ current_app }} | Get Docker volume full names"
-      ansible.builtin.shell: |
-        cd "{{ app_dir }}"
-        # Get the project name (directory name or COMPOSE_PROJECT_NAME)
-        PROJECT_NAME=$({{ docker_compose_cmd }} config --format json 2>/dev/null | grep -o '"name":"[^"]*"' | head -1 | cut -d'"' -f4)
-        if [ -z "$PROJECT_NAME" ]; then
-          PROJECT_NAME=$(basename "{{ app_dir }}")
-        fi
-        
-        # List actual Docker volumes for this project
-        docker volume ls --format '{{ '{{' }}.Name{{ '}}' }}' | grep "^${PROJECT_NAME}_" || true
-      args:
-        executable: /bin/bash
+      ansible.builtin.command:
+        cmd: "docker volume ls --format '{{ '{{' }}.Name{{ '}}' }}' --filter 'name=^{{ project_name }}_'"
       register: docker_volumes_raw
       changed_when: false
 
@@ -139,10 +140,105 @@
       register: start_result
       when: docker_volumes | length > 0
 
-    - name: "{{ current_app }} | Wait for services to be ready"
+    - name: "{{ current_app }} | Wait for containers to initialize"
       ansible.builtin.pause:
-        seconds: 10
+        seconds: 5
       when: docker_volumes | length > 0
+
+    # === HEALTH CHECK PHASE ===
+    - name: "{{ current_app }} | Get services with healthchecks"
+      ansible.builtin.shell: |
+        cd "{{ app_dir }}"
+        if command -v jq &>/dev/null; then
+          COUNT=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
+            jq -rs '[.[] | select(.Health != null and .Health != "")] | length' 2>/dev/null)
+          if [[ $? -eq 0 && -n "$COUNT" ]]; then
+            echo "$COUNT"
+            exit 0
+          fi
+        fi
+        {{ docker_compose_cmd }} ps 2>/dev/null | grep -cE '\(healthy\)|\(unhealthy\)|\(starting\)' || echo "0"
+      args:
+        executable: /bin/bash
+      register: healthcheck_count
+      changed_when: false
+      when: docker_volumes | length > 0
+
+    - name: "{{ current_app }} | Set healthcheck count"
+      ansible.builtin.set_fact:
+        healthcheck_services: "{{ healthcheck_count.stdout | default('0') | int }}"
+      when: docker_volumes | length > 0
+
+    - name: "{{ current_app }} | Wait for healthchecks to pass"
+      ansible.builtin.shell: |
+        cd "{{ app_dir }}"
+        
+        check_with_jq() {
+          local JSON=$({{ docker_compose_cmd }} ps --format json 2>/dev/null)
+          TOTAL=$(echo "$JSON" | jq -rs '[.[] | select(.Health != null and .Health != "")] | length' 2>/dev/null) || return 1
+          HEALTHY=$(echo "$JSON" | jq -rs '[.[] | select(.Health == "healthy")] | length' 2>/dev/null) || return 1
+          UNHEALTHY=$(echo "$JSON" | jq -rs '[.[] | select(.Health == "unhealthy")] | length' 2>/dev/null) || return 1
+          return 0
+        }
+        
+        check_with_grep() {
+          local PS_OUTPUT=$({{ docker_compose_cmd }} ps 2>/dev/null)
+          TOTAL=$(echo "$PS_OUTPUT" | grep -cE '\(healthy\)|\(unhealthy\)|\(starting\)' || echo "0")
+          HEALTHY=$(echo "$PS_OUTPUT" | grep -c '(healthy)' || echo "0")
+          UNHEALTHY=$(echo "$PS_OUTPUT" | grep -c '(unhealthy)' || echo "0")
+        }
+        
+        if command -v jq &>/dev/null && check_with_jq; then
+          :
+        else
+          check_with_grep
+        fi
+        
+        echo "healthy=$HEALTHY total=$TOTAL unhealthy=$UNHEALTHY"
+        
+        if [[ "$UNHEALTHY" -gt 0 ]]; then
+          exit 2
+        elif [[ "$TOTAL" -gt 0 && "$HEALTHY" -eq "$TOTAL" ]]; then
+          exit 0
+        else
+          exit 1
+        fi
+      args:
+        executable: /bin/bash
+      register: health_status
+      until: health_status.rc == 0
+      retries: 12
+      delay: 5
+      failed_when: health_status.rc == 2
+      changed_when: false
+      when:
+        - docker_volumes | length > 0
+        - healthcheck_services | int > 0
+
+    - name: "{{ current_app }} | Check for exited containers"
+      ansible.builtin.shell: |
+        cd "{{ app_dir }}"
+        if command -v jq &>/dev/null; then
+          RESULT=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
+            jq -rs '[.[] | select(.State == "exited" or .State == "dead")] | .[].Service' 2>/dev/null)
+          if [[ $? -eq 0 ]]; then
+            echo "$RESULT"
+            exit 0
+          fi
+        fi
+        {{ docker_compose_cmd }} ps 2>/dev/null | grep -E "Exited|Dead" | awk '{print $1}' || true
+      args:
+        executable: /bin/bash
+      register: exited_containers
+      changed_when: false
+      when: docker_volumes | length > 0
+
+    - name: "{{ current_app }} | Fail if containers exited"
+      ansible.builtin.fail:
+        msg: "Container(s) exited unexpectedly after restart: {{ exited_containers.stdout_lines | join(', ') }}"
+      when:
+        - docker_volumes | length > 0
+        - exited_containers.stdout | length > 0
 
     - name: "{{ current_app }} | Verify services are running"
       ansible.builtin.shell: |
@@ -185,6 +281,7 @@
     - name: "{{ current_app }} | Build volume details for notification"
       ansible.builtin.set_fact:
         volume_details_text: "{{ backup_details | map('regex_replace', '^([^:]+):(.+)$', '  • \\1: \\2') | join('\n') }}"
+        health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
       when: docker_volumes | length > 0
 
     - name: "{{ current_app }} | Send success notification"
@@ -194,7 +291,7 @@
         body_format: form-urlencoded
         body:
           chat_id: "{{ telegram_chat_id }}"
-          text: "💾 <b>Backup Completed</b>\n\n<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ current_app }}</code>\n\n<b>Volumes ({{ docker_volumes | length }}):</b>\n<pre>{{ volume_details_text }}</pre>"
+          text: "💾 <b>Backup Completed</b>\n\n<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ current_app }}</code>\n\n<b>Volumes ({{ docker_volumes | length }}):</b>\n<pre>{{ volume_details_text }}</pre>\n\n{{ health_status_text }}"
           parse_mode: "HTML"
         status_code: [200]
       delegate_to: localhost

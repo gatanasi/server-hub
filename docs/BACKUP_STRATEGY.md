@@ -243,7 +243,7 @@ crontab -e
 0 3 * * * cd ~/git/server-hub/ansible && ansible-playbook playbooks/backup-docker-volumes.yml >> ~/logs/backup.log 2>&1
 ```
 
-### Option 2: n8n Workflow
+### Option 3: n8n Workflow
 
 Create an n8n workflow that:
 
@@ -251,7 +251,7 @@ Create an n8n workflow that:
 2. Runs the backup playbook via SSH Execute node
 3. Sends notification on completion/failure
 
-### Option 3: systemd Timer
+### Option 4: systemd Timer
 
 Create `/etc/systemd/system/docker-backup.timer`:
 
