@@ -255,6 +255,23 @@
           ========================================
 
     # === SEND NOTIFICATION ===
+    - name: Get restored volume sizes
+      ansible.builtin.shell: |
+        for file in {{ restore_files.files | map(attribute='path') | join(' ') }}; do
+          VOLUME_NAME=$(basename "$file" | sed 's/_{{ restore_timestamp }}\.tar\.gz$//')
+          SIZE=$(du -h "$file" | cut -f1)
+          echo "${VOLUME_NAME}:${SIZE}"
+        done
+      args:
+        executable: /bin/bash
+      register: restore_sizes_raw
+      changed_when: false
+
+    - name: Build volume details for notification
+      ansible.builtin.set_fact:
+        restore_details: "{{ restore_sizes_raw.stdout_lines | default([]) }}"
+        restore_details_text: "{{ restore_sizes_raw.stdout_lines | default([]) | map('regex_replace', '^([^:]+):(.+)$', '  • \\1: \\2') | join('\n') }}"
+
     - name: Send success notification
       ansible.builtin.uri:
         url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
@@ -262,7 +279,7 @@
         body_format: form-urlencoded
         body:
           chat_id: "{{ telegram_chat_id }}"
-          text: "🔄 <b>Restore Completed</b>\n\n<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n<b>Volumes:</b> {{ restore_files.files | length }}"
+          text: "🔄 <b>Restore Completed</b>\n\n<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n<b>Volumes restored ({{ restore_files.files | length }}):</b>\n<pre>{{ restore_details_text }}</pre>\n\n✅ Services restarted and healthy"
           parse_mode: "HTML"
         status_code: [200]
       delegate_to: localhost
