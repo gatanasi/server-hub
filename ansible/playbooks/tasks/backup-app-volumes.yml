@@ -33,6 +33,7 @@
         path: "{{ app_backup_dir }}"
         state: directory
         mode: '0750'
+      become: true
 
     - name: "{{ current_app }} | Get list of volumes from docker-compose"
       ansible.builtin.shell: |

@@ -58,7 +58,7 @@
 - name: Restore Docker Volumes
   hosts: restore_targets
   gather_facts: true
-  become: true
+  # Note: become is not needed if user is in docker group
   
   vars:
     app_name: "{{ restore_app_name }}"

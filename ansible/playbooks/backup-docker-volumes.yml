@@ -32,7 +32,8 @@
 - name: Backup Docker Volumes
   hosts: docker_hosts
   gather_facts: true
-  become: true
+  # Note: become is not needed if user is in docker group
+  # Use become only for specific tasks that require root (e.g., creating backup dirs)
   
   vars:
     # Backup destination (should be an NFS/SMB mount)
@@ -99,6 +100,7 @@
         path: "{{ backup_destination }}/{{ inventory_hostname }}"
         state: directory
         mode: '0750'
+      become: true
 
   tasks:
     # === ITERATE OVER EACH MANAGED APP ===
