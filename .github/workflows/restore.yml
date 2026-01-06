@@ -88,8 +88,9 @@ jobs:
             echo "::error::Invalid backup_source path: $BACKUP_SRC. Must be an absolute path without special characters."
             exit 1
           fi
-          if [[ "$BACKUP_SRC" == *".."* ]]; then
-            echo "::error::backup_source cannot contain path traversal (..)"
+          # Explicitly forbid '..' as a path component to prevent directory traversal
+          if [[ "$BACKUP_SRC" =~ (^|/)\.\./|/\.\.$|(^|/)\.\. ]]; then
+            echo "::error::backup_source cannot contain path traversal components ('..')"
             exit 1
           fi
           
@@ -136,23 +137,25 @@ jobs:
           
           case "$OPERATION" in
             list_backups)
-              EXTRA_VARS="$EXTRA_VARS -e list_only=true"
+              EXTRA_VARS="${EXTRA_VARS} -e list_only=true"
               ;;
             restore_latest)
-              EXTRA_VARS="$EXTRA_VARS -e auto_confirm=true"
+              EXTRA_VARS="${EXTRA_VARS} -e auto_confirm=true"
               ;;
             restore_specific)
-              EXTRA_VARS="$EXTRA_VARS -e auto_confirm=true -e backup_timestamp='${TIMESTAMP}'"
+              EXTRA_VARS="${EXTRA_VARS} -e auto_confirm=true -e backup_timestamp='${TIMESTAMP}'"
               ;;
           esac
           
           # SSH to deployer.vm and run the restore playbook
+          # Build the full remote command for proper quoting
+          REMOTE_CMD="cd ~/git/server-hub/ansible && ansible-playbook playbooks/restore-docker-volumes.yml ${EXTRA_VARS}"
           OUTPUT=$(ssh -i ~/.ssh/deploy_key \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
-              "cd ~/git/server-hub/ansible && ansible-playbook playbooks/restore-docker-volumes.yml ${EXTRA_VARS}" 2>&1)
+              "${REMOTE_CMD}" 2>&1)
           
           RESTORE_EXIT=$?
           

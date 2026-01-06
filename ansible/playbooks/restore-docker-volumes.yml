@@ -68,10 +68,24 @@
     requested_timestamp: "{{ restore_backup_timestamp }}"
     list_only: "{{ restore_list_only | bool }}"
     
+    # Helper image for backup/restore operations (pinned for reproducibility)
+    helper_image: alpine:3.20
+    
     # Load telegram credentials from secrets file
     secrets_file: "{{ lookup('env', 'HOME') }}/.deploy-secrets"
 
   pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - docker_compose_cmd is defined
+          - docker_compose_cmd | length > 0
+          - app_base_dir is defined
+          - app_base_dir | length > 0
+        fail_msg: >
+          Required variables missing. Ensure 'docker_compose_cmd' and 'app_base_dir' are defined
+          in the inventory (e.g., group_vars/docker_hosts.yml).
+
     - name: Load Telegram credentials
       ansible.builtin.include_tasks: tasks/load-telegram-credentials.yml
 
@@ -186,6 +200,7 @@
       block:
         - name: Restore each volume
           ansible.builtin.shell: |
+            set -euo pipefail
             BACKUP_FILE="{{ item.path }}"
             BASENAME="$(basename "${BACKUP_FILE}")"
             SUFFIX="_{{ restore_timestamp }}.tar.gz"
@@ -197,11 +212,12 @@
             docker volume create "${VOLUME_NAME}" 2>/dev/null || true
             
             # Clear existing data and restore using find for safety
+            # The '|| true' handles case where directory is already empty
             docker run --rm \
               -v "${VOLUME_NAME}:/dest" \
               -v "{{ app_backup_dir }}:/backup:ro" \
-              alpine:3.20 \
-              sh -c "cd /dest && find . -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null; tar -xzf '/backup/{{ item.path | basename }}' -C /dest"
+              {{ helper_image }} \
+              sh -c "cd /dest && find . -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true; tar -xzf '/backup/{{ item.path | basename }}' -C /dest"
             
             echo "SUCCESS: Restored ${VOLUME_NAME}"
           args:
@@ -257,12 +273,16 @@
         # === SEND NOTIFICATION ===
         - name: Get restored volume sizes
           ansible.builtin.shell: |
-            for file in {{ restore_files.files | map(attribute='path') | map('quote') | join(' ') }}; do
+            set -euo pipefail
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
               filename="$(basename "$file")"
               VOLUME_NAME="${filename%_{{ restore_timestamp }}.tar.gz}"
-              SIZE=$(du -h "$file" | cut -f1)
+              SIZE="$(du -h "$file" | cut -f1)"
               echo "${VOLUME_NAME}:${SIZE}"
-            done
+            done <<'EOF'
+            {{ restore_files.files | map(attribute='path') | join('\n') }}
+            EOF
           args:
             executable: /bin/bash
           register: restore_sizes_raw

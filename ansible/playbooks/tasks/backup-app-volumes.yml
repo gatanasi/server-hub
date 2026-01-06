@@ -46,17 +46,6 @@
       become: true
       when: app_mkdir_result is failed
 
-    - name: "{{ current_app }} | Get list of volumes from docker-compose"
-      ansible.builtin.shell: |
-        cd "{{ app_dir }}"
-        {{ docker_compose_cmd }} config --volumes 2>/dev/null || echo ""
-      register: app_volumes_raw
-      changed_when: false
-
-    - name: "{{ current_app }} | Parse volume names"
-      ansible.builtin.set_fact:
-        app_volumes: "{{ app_volumes_raw.stdout_lines | select | list }}"
-
     - name: "{{ current_app }} | Get docker compose config JSON"
       ansible.builtin.command:
         cmd: "{{ docker_compose_cmd }} config --format json"
@@ -70,7 +59,7 @@
 
     - name: "{{ current_app }} | Get Docker volume full names"
       ansible.builtin.command:
-        cmd: "docker volume ls --format '{{ '{{' }}.Name{{ '}}' }}' --filter 'name=^{{ project_name }}_'"
+        cmd: "docker volume ls --format '{{ '{{' }}.Name{{ '}}' }}' --filter 'name=^{{ project_name | regex_escape }}_'"
       register: docker_volumes_raw
       changed_when: false
 
@@ -103,6 +92,7 @@
     # === BACKUP VOLUMES ===
     - name: "{{ current_app }} | Backup each volume"
       ansible.builtin.shell: |
+        set -euo pipefail
         VOLUME_NAME="{{ item }}"
         BACKUP_FILE="{{ app_backup_dir }}/{{ item }}_{{ backup_timestamp }}.tar.gz"
         
@@ -112,12 +102,12 @@
         docker run --rm \
           -v "${VOLUME_NAME}:/source:ro" \
           -v "{{ app_backup_dir }}:/backup" \
-          alpine:3.20 \
+          {{ helper_image }} \
           tar -czf "/backup/{{ item }}_{{ backup_timestamp }}.tar.gz" -C /source .
         
         # Verify backup was created
         if [ -f "${BACKUP_FILE}" ]; then
-          SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
+          SIZE="$(du -h "${BACKUP_FILE}" | cut -f1)"
           echo "SUCCESS: Created ${BACKUP_FILE} (${SIZE})"
         else
           echo "ERROR: Failed to create backup for ${VOLUME_NAME}"
@@ -130,9 +120,12 @@
       when: docker_volumes | length > 0
 
     # === RESTART SERVICES ===
-    # Note: docker-compose.yml and .env files are NOT backed up here
-    # as they are stored in GitHub (with SOPS encryption for .env).
-    # To restore config files, use the deploy playbook.
+    # Note: docker-compose.yml and .env files are NOT backed up by this task;
+    # they are stored in GitHub (with SOPS encryption for .env) and restored
+    # by re-running the deploy playbook. In a disaster recovery scenario,
+    # first run the deploy playbook to recreate the application config and
+    # docker-compose stack from Git, then restore the volume backups created
+    # by this playbook.
     - name: "{{ current_app }} | Start application stack"
       ansible.builtin.command:
         cmd: "{{ docker_compose_cmd }} start"
@@ -162,10 +155,11 @@
 
     - name: "{{ current_app }} | Get backup sizes"
       ansible.builtin.shell: |
-        for vol in {{ docker_volumes | join(' ') }}; do
+        set -euo pipefail
+        for vol in {{ docker_volumes | map('quote') | join(' ') }}; do
           FILE="{{ app_backup_dir }}/${vol}_{{ backup_timestamp }}.tar.gz"
           if [ -f "$FILE" ]; then
-            SIZE=$(du -h "$FILE" | cut -f1)
+            SIZE="$(du -h "$FILE" | cut -f1)"
             echo "${vol}:${SIZE}"
           fi
         done

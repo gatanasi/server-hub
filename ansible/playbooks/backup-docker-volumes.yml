@@ -48,10 +48,24 @@
     # Timeout for stopping containers (seconds)
     stop_timeout: 60
     
+    # Helper image for backup/restore operations (pinned for reproducibility)
+    helper_image: alpine:3.20
+    
     # Load telegram credentials from secrets file
     secrets_file: "{{ lookup('env', 'HOME') }}/.deploy-secrets"
 
   pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - docker_compose_cmd is defined
+          - docker_compose_cmd | length > 0
+          - app_base_dir is defined
+          - app_base_dir | length > 0
+        fail_msg: >
+          Required variables missing. Ensure 'docker_compose_cmd' and 'app_base_dir' are defined
+          in the inventory (e.g., group_vars/docker_hosts.yml).
+
     - name: Load Telegram credentials
       ansible.builtin.include_tasks: tasks/load-telegram-credentials.yml
 

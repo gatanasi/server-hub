@@ -77,8 +77,9 @@ jobs:
             echo "::error::Invalid backup_destination path: $BACKUP_DEST. Must be an absolute path without special characters."
             exit 1
           fi
-          if [[ "$BACKUP_DEST" == *".."* ]]; then
-            echo "::error::backup_destination cannot contain path traversal (..)"
+          # Explicitly forbid '..' as a path component to prevent directory traversal
+          if [[ "$BACKUP_DEST" =~ (^|/)\.\./|/\.\.$|(^|/)\.\. ]]; then
+            echo "::error::backup_destination cannot contain path traversal components ('..')"
             exit 1
           fi
           
@@ -117,7 +118,7 @@ jobs:
           EXTRA_VARS="-e backup_destination='${BACKUP_DEST}'"
           
           if [[ "$APP_NAME" != "all" ]]; then
-            EXTRA_VARS="$EXTRA_VARS -e app_name='${APP_NAME}'"
+            EXTRA_VARS="${EXTRA_VARS} -e app_name='${APP_NAME}'"
           fi
           
           # Build limit if target host specified
@@ -127,12 +128,14 @@ jobs:
           fi
           
           # SSH to deployer.vm and run the backup playbook
+          # Build the full remote command for proper quoting
+          REMOTE_CMD="cd ~/git/server-hub/ansible && ansible-playbook playbooks/backup-docker-volumes.yml ${EXTRA_VARS} ${LIMIT_ARG}"
           ssh -i ~/.ssh/deploy_key \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
-              "cd ~/git/server-hub/ansible && ansible-playbook playbooks/backup-docker-volumes.yml ${EXTRA_VARS} ${LIMIT_ARG}"
+              "${REMOTE_CMD}"
           
           BACKUP_EXIT=$?
           

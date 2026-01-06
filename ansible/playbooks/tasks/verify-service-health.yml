@@ -93,11 +93,30 @@
         executable: /bin/bash
       register: health_status
       until: health_status.rc == 0
-      retries: "{{ ((health_check_timeout | default(60)) | int / (health_check_interval | default(5)) | int) | int }}"
+      retries: "{{ [((health_check_timeout | default(60)) | int / (health_check_interval | default(5)) | int) | int, 1] | max }}"
       delay: "{{ health_check_interval | default(5) }}"
-      failed_when: health_status.rc == 2
+      failed_when: false
       changed_when: false
       when: healthcheck_services | int > 0
+
+    - name: Fail if services reported unhealthy
+      ansible.builtin.fail:
+        msg: >-
+          One or more services reported an "unhealthy" status during health checks.
+          Last health check output: {{ health_status.stdout | default('') }}
+      when:
+        - healthcheck_services | int > 0
+        - health_status.rc | default(0) == 2
+
+    - name: Fail if health checks timed out
+      ansible.builtin.fail:
+        msg: >-
+          Health checks did not reach "healthy" status before the timeout of
+          {{ health_check_timeout | default(60) }} seconds. Services may still be starting.
+          Last health check output: {{ health_status.stdout | default('') }}
+      when:
+        - healthcheck_services | int > 0
+        - health_status.rc | default(0) == 1
 
     - name: Check for exited containers
       ansible.builtin.shell: |
