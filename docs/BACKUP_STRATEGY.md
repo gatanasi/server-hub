@@ -68,13 +68,14 @@ For each application:
 |------|-------------|
 | Docker Volumes | All named volumes defined in docker-compose.yml |
 | docker-compose.yml | Application configuration |
-| .env file | Encrypted with host machine ID |
+
+> **Note:** `.env` files are **NOT** backed up by this playbook. They are stored in GitHub encrypted with [SOPS](https://github.com/getsops/sops). To restore `.env` files, use the deploy playbook which decrypts them automatically.
 
 ### Backup Process
 
 1. **Stop** the application stack gracefully
 2. **Create** tar.gz archives of each Docker volume
-3. **Copy** docker-compose.yml and encrypted .env
+3. **Copy** docker-compose.yml
 4. **Start** the application stack
 5. **Verify** services are healthy
 6. **Cleanup** backups older than retention period
@@ -90,6 +91,37 @@ Example:
 /mnt/backups/n8n.vm/n8n/n8n_n8n_storage_20260106T143000.tar.gz
 /mnt/backups/n8n.vm/n8n/docker-compose_20260106T143000.yml
 ```
+
+---
+
+## GitHub Actions Workflow
+
+A manual workflow is available to trigger backups from GitHub Actions.
+
+### Triggering a Backup
+
+1. Go to **Actions** → **Backup Docker Volumes**
+2. Click **Run workflow**
+3. Select the application to backup (or "all")
+4. Optionally specify a target host
+5. Click **Run workflow**
+
+### Workflow Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `app_name` | Application to backup | Required |
+| `target_host` | Specific host (e.g., n8n.vm) | All hosts |
+| `backup_destination` | Backup path | `/mnt/backups` |
+
+### Required Secrets
+
+The workflow uses the same secrets as the deploy workflow:
+
+- `DEPLOYER_SSH_KEY` - SSH key to access deployer.vm
+- `DEPLOYER_HOST` - Hostname of deployer.vm
+- `DEPLOYER_USER` - Username on deployer.vm
+- `DEPLOYER_SSH_KNOWN_HOSTS` - Known hosts entry
 
 ---
 
@@ -165,7 +197,22 @@ export TELEGRAM_CHAT_ID="your-chat-id"
 
 ## Scheduling Backups
 
-### Option 1: Cron on Deployer VM
+### Option 1: GitHub Actions (Recommended)
+
+Use the **Backup Docker Volumes** workflow from the GitHub Actions UI for on-demand backups.
+
+For scheduled backups, add a `schedule` trigger to `.github/workflows/backup.yml`:
+
+```yaml
+on:
+  schedule:
+    # Daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    # ... existing inputs
+```
+
+### Option 2: Cron on Deployer VM
 
 ```bash
 # Edit crontab on deployer.vm
@@ -265,7 +312,7 @@ du -sh /mnt/backups/*/
 
 ## Security Considerations
 
-1. **Encrypted .env files**: Environment files are encrypted with the host's machine ID
+1. **SOPS-encrypted secrets**: Environment files are stored in GitHub encrypted with SOPS, not in backups
 2. **Restricted permissions**: Backup directories use mode 0750
 3. **Network security**: Ensure NFS/SMB share is only accessible from Docker hosts
 4. **Retention policy**: Old backups automatically deleted after retention period

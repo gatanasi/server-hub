@@ -129,6 +129,8 @@
       when: docker_volumes | length > 0
 
     # === BACKUP COMPOSE FILES ===
+    # Note: .env files are NOT backed up here as they are stored in GitHub
+    # encrypted with SOPS. To restore .env files, use the deploy playbook.
     - name: "{{ current_app }} | Backup docker-compose.yml"
       ansible.builtin.copy:
         src: "{{ app_dir }}/docker-compose.yml"
@@ -136,24 +138,6 @@
         remote_src: true
         mode: '0640'
       when: docker_volumes | length > 0
-
-    - name: "{{ current_app }} | Check for .env file"
-      ansible.builtin.stat:
-        path: "{{ app_dir }}/.env"
-      register: env_file
-
-    - name: "{{ current_app }} | Backup .env file (encrypted)"
-      ansible.builtin.shell: |
-        # Create encrypted backup of .env
-        # Using openssl to encrypt sensitive data
-        cat "{{ app_dir }}/.env" | openssl enc -aes-256-cbc -pbkdf2 -salt \
-          -pass pass:"{{ ansible_machine_id }}" \
-          -out "{{ app_backup_dir }}/env_{{ backup_timestamp }}.enc"
-        chmod 600 "{{ app_backup_dir }}/env_{{ backup_timestamp }}.enc"
-      when: 
-        - docker_volumes | length > 0
-        - env_file.stat.exists
-      no_log: true
 
     # === RESTART SERVICES ===
     - name: "{{ current_app }} | Start application stack"
