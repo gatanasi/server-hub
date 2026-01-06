@@ -578,18 +578,27 @@ ssh <user>@<target>.vm echo "OK"
 .
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml              # GitHub Actions workflow
+│       ├── deploy.yml              # GitHub Actions deploy workflow
+│       ├── backup.yml              # GitHub Actions backup workflow
+│       └── restore.yml             # GitHub Actions restore workflow
 ├── ansible/
 │   ├── ansible.cfg                 # Ansible configuration
 │   ├── inventory/
 │   │   └── production.yml          # Target VMs inventory
 │   └── playbooks/
-│       └── deploy-docker-app.yml   # Deployment playbook
+│       ├── deploy-docker-app.yml   # Deployment playbook
+│       ├── backup-docker-volumes.yml   # Backup orchestration
+│       ├── restore-docker-volumes.yml  # Restore with confirmation
+│       └── tasks/
+│           ├── backup-app-volumes.yml      # Per-app backup tasks
+│           ├── verify-service-health.yml   # Shared health check logic
+│           └── load-telegram-credentials.yml # Shared credential loading
 ├── deploy/
 │   ├── trigger-deploy.sh           # Main trigger script (forced command)
 │   └── setup-deployer-vm.sh        # One-time setup script
 ├── docs/
-│   └── GITOPS_SETUP.md             # This file
+│   ├── GITOPS_SETUP.md             # This file
+│   └── BACKUP_STRATEGY.md          # Backup/restore documentation
 └── docker/
     ├── n8n/
     │   └── docker-compose.yml
