@@ -92,11 +92,11 @@ Example:
 
 ---
 
-## GitHub Actions Workflow
+## GitHub Actions Workflows
 
-A manual workflow is available to trigger backups from GitHub Actions.
+Manual workflows are available to trigger backups and restores from GitHub Actions.
 
-### Triggering a Backup
+### Backup Workflow
 
 1. Go to **Actions** → **Backup Docker Volumes**
 2. Click **Run workflow**
@@ -104,7 +104,7 @@ A manual workflow is available to trigger backups from GitHub Actions.
 4. Optionally specify a target host
 5. Click **Run workflow**
 
-### Workflow Inputs
+#### Backup Inputs
 
 | Input | Description | Default |
 |-------|-------------|---------|
@@ -112,9 +112,32 @@ A manual workflow is available to trigger backups from GitHub Actions.
 | `target_host` | Specific host (e.g., n8n.vm) | All hosts |
 | `backup_destination` | Backup path | `/mnt/backups` |
 
+### Restore Workflow
+
+⚠️ **WARNING:** Restore will OVERWRITE existing data!
+
+1. Go to **Actions** → **Restore Docker Volumes**
+2. Click **Run workflow**
+3. Select the application to restore
+4. Choose operation:
+   - `list_backups` - View available backups
+   - `restore_latest` - Restore most recent backup
+   - `restore_specific` - Restore specific timestamp
+5. For `restore_specific`, enter the backup timestamp
+6. Click **Run workflow**
+
+#### Restore Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `app_name` | Application to restore | Required |
+| `operation` | list_backups, restore_latest, restore_specific | list_backups |
+| `backup_timestamp` | Timestamp for restore_specific | - |
+| `backup_source` | Backup source path | `/mnt/backups` |
+
 ### Required Secrets
 
-The workflow uses the same secrets as the deploy workflow:
+Both workflows use the same secrets as the deploy workflow:
 
 - `DEPLOYER_SSH_KEY` - SSH key to access deployer.vm
 - `DEPLOYER_HOST` - Hostname of deployer.vm
@@ -123,7 +146,7 @@ The workflow uses the same secrets as the deploy workflow:
 
 ---
 
-## Restore Playbook
+## Restore Playbook (CLI)
 
 ### Usage
 
