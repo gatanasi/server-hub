@@ -1,0 +1,190 @@
+# GitHub Actions Workflow: Backup Docker Volumes
+#
+# This workflow allows manual triggering of Docker volume backups for specific services.
+# It runs on a self-hosted runner and triggers the backup playbook via SSH to the deployer VM.
+#
+# Security Model:
+# - The runner only has SSH access to deployer.vm
+# - All backup logic and credentials live on deployer.vm
+#
+# Required Secrets:
+# - DEPLOYER_SSH_KEY: Private SSH key for github-runner -> deployer.vm
+# - DEPLOYER_HOST: Hostname or IP of deployer.vm
+# - DEPLOYER_USER: Username on deployer.vm (usually 'deployer')
+# - DEPLOYER_SSH_KNOWN_HOSTS: SSH known_hosts entry for deployer.vm
+#
+# Optional Secrets:
+# - TELEGRAM_BOT_TOKEN: Telegram bot token for notifications
+# - TELEGRAM_CHAT_ID: Telegram chat ID for notifications
+#
+
+name: Backup Docker Volumes
+
+on:
+  # Manual trigger only
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Application to backup (e.g., n8n, odoo, caddy)'
+        required: true
+        type: choice
+        options:
+          - n8n
+          - odoo
+          - caddy
+          - wg-easy
+          - stirling-pdf
+          - convertx
+          - video-converter
+          - openspeedtest
+          - all
+      target_host:
+        description: 'Target host (leave empty for all hosts with the app)'
+        required: false
+        type: string
+        default: ''
+      backup_destination:
+        description: 'Backup destination path (default: /mnt/backups)'
+        required: false
+        type: string
+        default: '/mnt/backups'
+
+# Prevent concurrent backups
+concurrency:
+  group: backup-${{ github.event.inputs.app_name }}
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup ${{ github.event.inputs.app_name }}
+    runs-on: self-hosted
+    
+    steps:
+      - name: Validate inputs
+        run: |
+          APP="${{ github.event.inputs.app_name }}"
+          BACKUP_DEST="${{ github.event.inputs.backup_destination }}"
+          TARGET_HOST="${{ github.event.inputs.target_host }}"
+          
+          # Validate app name
+          if [[ ! "$APP" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "::error::Invalid app name: $APP"
+            exit 1
+          fi
+          
+          # Validate backup destination path (must be absolute, no path traversal)
+          if [[ ! "$BACKUP_DEST" =~ ^/[a-zA-Z0-9/_.-]+$ ]]; then
+            echo "::error::Invalid backup_destination path: $BACKUP_DEST. Must be an absolute path without special characters."
+            exit 1
+          fi
+          # Explicitly forbid '..' as a path component to prevent directory traversal
+          if [[ "$BACKUP_DEST" =~ (^|/)\.\./|/\.\.$|(^|/)\.\. ]]; then
+            echo "::error::backup_destination cannot contain path traversal components ('..')"
+            exit 1
+          fi
+          
+          # Validate target host if provided
+          if [[ -n "$TARGET_HOST" && ! "$TARGET_HOST" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+            echo "::error::Invalid target_host: $TARGET_HOST"
+            exit 1
+          fi
+          
+          echo "Starting backup for: $APP"
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          # Add deployer host to known_hosts
+          echo "${{ secrets.DEPLOYER_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          
+          # Write SSH private key
+          echo "${{ secrets.DEPLOYER_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Run backup playbook
+        id: backup
+        run: |
+          echo "::group::Running backup on deployer.vm"
+          
+          # Build ansible-playbook command
+          APP_NAME="${{ github.event.inputs.app_name }}"
+          TARGET_HOST="${{ github.event.inputs.target_host }}"
+          BACKUP_DEST="${{ github.event.inputs.backup_destination }}"
+          
+          # Build extra vars - properly quoted for safety
+          EXTRA_VARS="-e backup_destination='${BACKUP_DEST}'"
+          
+          if [[ "$APP_NAME" != "all" ]]; then
+            EXTRA_VARS="${EXTRA_VARS} -e app_name='${APP_NAME}'"
+          fi
+          
+          # Build limit if target host specified
+          LIMIT_ARG=""
+          if [[ -n "$TARGET_HOST" ]]; then
+            LIMIT_ARG="-l '${TARGET_HOST}'"
+          fi
+          
+          # SSH to deployer.vm and run the backup playbook
+          # Build the full remote command for proper quoting
+          REMOTE_CMD="cd ~/git/server-hub/ansible && ansible-playbook playbooks/backup-docker-volumes.yml ${EXTRA_VARS} ${LIMIT_ARG}"
+          ssh -i ~/.ssh/deploy_key \
+              -o BatchMode=yes \
+              -o ConnectTimeout=30 \
+              -o StrictHostKeyChecking=yes \
+              "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
+              "${REMOTE_CMD}"
+          
+          BACKUP_EXIT=$?
+          
+          echo "::endgroup::"
+          
+          if [[ $BACKUP_EXIT -eq 0 ]]; then
+            echo "✅ Backup successful for ${{ github.event.inputs.app_name }}"
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Backup failed for ${{ github.event.inputs.app_name }}"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit $BACKUP_EXIT
+          fi
+
+      - name: Cleanup SSH keys
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+
+      - name: Send success notification
+        if: success()
+        run: |
+          if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
+            TARGET="${{ github.event.inputs.target_host }}"
+            if [[ -z "$TARGET" ]]; then
+              TARGET="all hosts"
+            fi
+            
+            MESSAGE="💾 <b>Backup Completed</b>%0A%0AApp: <code>${{ github.event.inputs.app_name }}</code>%0ATarget: <code>${TARGET}</code>%0ADestination: <code>${{ github.event.inputs.backup_destination }}</code>%0ATriggered by: ${{ github.actor }}%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
+            
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -d "text=$MESSAGE" \
+              -d "parse_mode=HTML" || true
+          fi
+
+      - name: Send failure notification
+        if: failure()
+        run: |
+          if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
+            TARGET="${{ github.event.inputs.target_host }}"
+            if [[ -z "$TARGET" ]]; then
+              TARGET="all hosts"
+            fi
+            
+            MESSAGE="❌ <b>Backup Failed</b>%0A%0AApp: <code>${{ github.event.inputs.app_name }}</code>%0ATarget: <code>${TARGET}</code>%0ATriggered by: ${{ github.actor }}%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
+            
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -d "text=$MESSAGE" \
+              -d "parse_mode=HTML" || true
+          fi

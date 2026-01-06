@@ -1,0 +1,218 @@
+# GitHub Actions Workflow: Restore Docker Volumes
+#
+# This workflow allows manual triggering of Docker volume restores for specific services.
+# It runs on a self-hosted runner and triggers the restore playbook via SSH to the deployer VM.
+#
+# ⚠️ WARNING: This will OVERWRITE existing data! Use with caution.
+#
+# Security Model:
+# - The runner only has SSH access to deployer.vm
+# - All restore logic and credentials live on deployer.vm
+#
+# Required Secrets:
+# - DEPLOYER_SSH_KEY: Private SSH key for github-runner -> deployer.vm
+# - DEPLOYER_HOST: Hostname or IP of deployer.vm
+# - DEPLOYER_USER: Username on deployer.vm (usually 'deployer')
+# - DEPLOYER_SSH_KNOWN_HOSTS: SSH known_hosts entry for deployer.vm
+#
+# Optional Secrets:
+# - TELEGRAM_BOT_TOKEN: Telegram bot token for notifications
+# - TELEGRAM_CHAT_ID: Telegram chat ID for notifications
+#
+
+name: Restore Docker Volumes
+
+on:
+  # Manual trigger only
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Application to restore (e.g., n8n, odoo, caddy)'
+        required: true
+        type: choice
+        options:
+          - n8n
+          - odoo
+          - caddy
+          - wg-easy
+          - stirling-pdf
+          - convertx
+          - video-converter
+          - openspeedtest
+      operation:
+        description: 'Operation to perform'
+        required: true
+        type: choice
+        options:
+          - list_backups
+          - restore_latest
+          - restore_specific
+        default: 'list_backups'
+      backup_timestamp:
+        description: 'Backup timestamp to restore (only for restore_specific, e.g., 20260106T143000)'
+        required: false
+        type: string
+        default: ''
+      backup_source:
+        description: 'Backup source path (default: /mnt/backups)'
+        required: false
+        type: string
+        default: '/mnt/backups'
+
+# Prevent concurrent restores
+concurrency:
+  group: restore-${{ github.event.inputs.app_name }}
+  cancel-in-progress: false
+
+jobs:
+  restore:
+    name: ${{ github.event.inputs.operation }} - ${{ github.event.inputs.app_name }}
+    runs-on: self-hosted
+    
+    steps:
+      - name: Validate inputs
+        run: |
+          APP="${{ github.event.inputs.app_name }}"
+          OP="${{ github.event.inputs.operation }}"
+          TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
+          BACKUP_SRC="${{ github.event.inputs.backup_source }}"
+          
+          # Validate app name
+          if [[ ! "$APP" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "::error::Invalid app name: $APP"
+            exit 1
+          fi
+          
+          # Validate backup source path (must be absolute, no path traversal)
+          if [[ ! "$BACKUP_SRC" =~ ^/[a-zA-Z0-9/_.-]+$ ]]; then
+            echo "::error::Invalid backup_source path: $BACKUP_SRC. Must be an absolute path without special characters."
+            exit 1
+          fi
+          # Explicitly forbid '..' as a path component to prevent directory traversal
+          if [[ "$BACKUP_SRC" =~ (^|/)\.\./|/\.\.$|(^|/)\.\. ]]; then
+            echo "::error::backup_source cannot contain path traversal components ('..')"
+            exit 1
+          fi
+          
+          # Validate timestamp format for restore_specific
+          if [[ "$OP" == "restore_specific" ]]; then
+            if [[ -z "$TIMESTAMP" ]]; then
+              echo "::error::backup_timestamp is required for restore_specific operation"
+              exit 1
+            fi
+            if [[ ! "$TIMESTAMP" =~ ^[0-9]{8}T[0-9]{6}$ ]]; then
+              echo "::error::Invalid backup_timestamp format: $TIMESTAMP. Expected format: YYYYMMDDTHHMMSS (e.g., 20260106T143000)"
+              exit 1
+            fi
+          fi
+          
+          echo "Operation: $OP for $APP"
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          
+          # Add deployer host to known_hosts
+          echo "${{ secrets.DEPLOYER_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          
+          # Write SSH private key
+          echo "${{ secrets.DEPLOYER_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Run restore playbook
+        id: restore
+        run: |
+          echo "::group::Running restore on deployer.vm"
+          
+          # Build ansible-playbook command
+          APP_NAME="${{ github.event.inputs.app_name }}"
+          OPERATION="${{ github.event.inputs.operation }}"
+          TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
+          BACKUP_SRC="${{ github.event.inputs.backup_source }}"
+          
+          # Build extra vars - properly quoted for safety
+          EXTRA_VARS="-e app_name='${APP_NAME}' -e backup_source='${BACKUP_SRC}'"
+          
+          case "$OPERATION" in
+            list_backups)
+              EXTRA_VARS="${EXTRA_VARS} -e list_only=true"
+              ;;
+            restore_latest)
+              EXTRA_VARS="${EXTRA_VARS} -e auto_confirm=true"
+              ;;
+            restore_specific)
+              EXTRA_VARS="${EXTRA_VARS} -e auto_confirm=true -e backup_timestamp='${TIMESTAMP}'"
+              ;;
+          esac
+          
+          # SSH to deployer.vm and run the restore playbook
+          # Build the full remote command for proper quoting
+          REMOTE_CMD="cd ~/git/server-hub/ansible && ansible-playbook playbooks/restore-docker-volumes.yml ${EXTRA_VARS}"
+          OUTPUT=$(ssh -i ~/.ssh/deploy_key \
+              -o BatchMode=yes \
+              -o ConnectTimeout=30 \
+              -o StrictHostKeyChecking=yes \
+              "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
+              "${REMOTE_CMD}" 2>&1)
+          
+          RESTORE_EXIT=$?
+          
+          echo "$OUTPUT"
+          echo "::endgroup::"
+          
+          # Extract available backups for list operation
+          if [[ "$OPERATION" == "list_backups" ]]; then
+            BACKUPS=$(echo "$OUTPUT" | grep -A 20 "Available backups" | head -20)
+            echo "backups<<EOF" >> $GITHUB_OUTPUT
+            echo "$BACKUPS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+          
+          if [[ $RESTORE_EXIT -eq 0 ]]; then
+            echo "✅ Operation successful"
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Operation failed"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit $RESTORE_EXIT
+          fi
+
+      - name: Cleanup SSH keys
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+
+      - name: Send success notification (restore operations only)
+        if: success() && github.event.inputs.operation != 'list_backups'
+        run: |
+          if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
+            OP="${{ github.event.inputs.operation }}"
+            TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
+            
+            if [[ "$OP" == "restore_latest" ]]; then
+              RESTORE_INFO="latest backup"
+            else
+              RESTORE_INFO="backup ${TIMESTAMP}"
+            fi
+            
+            MESSAGE="🔄 <b>Restore Completed</b>%0A%0A<b>App:</b> <code>${{ github.event.inputs.app_name }}</code>%0A<b>Restored:</b> ${RESTORE_INFO}%0A<b>Triggered by:</b> ${{ github.actor }}%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
+            
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -d "text=$MESSAGE" \
+              -d "parse_mode=HTML" || true
+          fi
+
+      - name: Send failure notification
+        if: failure()
+        run: |
+          if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
+            MESSAGE="❌ <b>Restore Failed</b>%0A%0A<b>App:</b> <code>${{ github.event.inputs.app_name }}</code>%0A<b>Operation:</b> ${{ github.event.inputs.operation }}%0A<b>Triggered by:</b> ${{ github.actor }}%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
+            
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -d "text=$MESSAGE" \
+              -d "parse_mode=HTML" || true
+          fi

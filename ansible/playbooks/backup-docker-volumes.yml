@@ -1,0 +1,150 @@
+---
+# backup-docker-volumes.yml - Backup Docker volumes for all managed applications
+#
+# This playbook connects to each Docker host, stops the application stack,
+# backs up all Docker volumes to a shared folder, and restarts the services.
+#
+# Usage:
+#   # Backup all apps on all hosts
+#   ansible-playbook playbooks/backup-docker-volumes.yml
+#
+#   # Backup specific app
+#   ansible-playbook playbooks/backup-docker-volumes.yml -e "app_name=n8n"
+#
+#   # Backup all apps on specific host
+#   ansible-playbook playbooks/backup-docker-volumes.yml -l n8n.vm
+#
+#   # Dry run (show what would be backed up)
+#   ansible-playbook playbooks/backup-docker-volumes.yml --check
+#
+# Required variables (set in inventory or via -e):
+#   - backup_destination: NFS/SMB mount path for backups (default: /mnt/backups)
+#   - backup_keep_count: How many backups to keep per volume (default: 3)
+#
+# Features:
+#   - Graceful stop with timeout
+#   - Compressed tar.gz backups with timestamps
+#   - Automatic cleanup of old backups
+#   - Telegram notifications on success/failure
+#   - Minimal downtime approach
+#
+
+- name: Backup Docker Volumes
+  hosts: docker_hosts
+  gather_facts: true
+  # Note: become is not needed if user is in docker group
+  # Use become only for specific tasks that require root (e.g., creating backup dirs)
+  
+  vars:
+    # Backup destination (should be an NFS/SMB mount)
+    backup_destination: /mnt/backups
+    
+    # How many backups to keep per volume (oldest are deleted)
+    backup_keep_count: 3
+    
+    # Timestamp format for backup files
+    backup_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
+    
+    # Timeout for stopping containers (seconds)
+    stop_timeout: 60
+    
+    # Helper image for backup/restore operations (pinned for reproducibility)
+    helper_image: alpine:3.20
+    
+    # Load telegram credentials from secrets file
+    secrets_file: "{{ lookup('env', 'HOME') }}/.deploy-secrets"
+
+  pre_tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - docker_compose_cmd is defined
+          - docker_compose_cmd | length > 0
+          - app_base_dir is defined
+          - app_base_dir | length > 0
+        fail_msg: >
+          Required variables missing. Ensure 'docker_compose_cmd' and 'app_base_dir' are defined
+          in the inventory (e.g., group_vars/docker_hosts.yml).
+
+    - name: Load Telegram credentials
+      ansible.builtin.include_tasks: tasks/load-telegram-credentials.yml
+
+    - name: Verify backup destination exists
+      ansible.builtin.stat:
+        path: "{{ backup_destination }}"
+      register: backup_dest_stat
+
+    - name: Fail if backup destination is not mounted
+      ansible.builtin.fail:
+        msg: |
+          Backup destination {{ backup_destination }} does not exist!
+          Please ensure the NFS/SMB share is mounted.
+          
+          Example mount commands:
+            # NFS
+            mount -t nfs nas.local:/backups {{ backup_destination }}
+            
+            # SMB/CIFS
+            mount -t cifs //nas.local/backups {{ backup_destination }} -o username=backup,password=xxx
+      when: not backup_dest_stat.stat.exists
+
+  tasks:
+    # === ITERATE OVER EACH MANAGED APP ===
+    - name: Backup each managed application
+      ansible.builtin.include_tasks: tasks/backup-app-volumes.yml
+      loop: "{{ managed_apps | default([]) }}"
+      loop_control:
+        loop_var: current_app
+      when: >
+        (app_name is not defined) or 
+        (app_name == current_app)
+
+  post_tasks:
+    - name: Find all app backup directories
+      ansible.builtin.find:
+        paths: "{{ backup_destination }}"
+        file_type: directory
+      register: app_backup_dirs
+
+    - name: Cleanup old backups per app (keep last {{ backup_keep_count }})
+      ansible.builtin.shell: |
+        APP_DIR="{{ item.path }}"
+        KEEP={{ backup_keep_count }}
+        DELETED=0
+        
+        # Get unique volume prefixes (everything before the timestamp)
+        # Format: volumename_YYYYMMDDTHHMMSS.tar.gz
+        for PREFIX in $(ls -1 "$APP_DIR"/*.tar.gz 2>/dev/null | sed 's/_[0-9]\{8\}T[0-9]\{6\}\.tar\.gz$//' | sort -u); do
+          # Get all backups for this volume, sorted by timestamp (oldest first)
+          BACKUPS=$(ls -1 "${PREFIX}"_*.tar.gz 2>/dev/null | sort)
+          COUNT=$(echo "$BACKUPS" | wc -l)
+          
+          # Delete oldest backups if we have more than KEEP
+          if [ "$COUNT" -gt "$KEEP" ]; then
+            DELETE_COUNT=$((COUNT - KEEP))
+            echo "$BACKUPS" | head -n "$DELETE_COUNT" | while read FILE; do
+              rm -f "$FILE"
+              echo "Deleted: $(basename "$FILE")"
+              DELETED=$((DELETED + 1))
+            done
+          fi
+        done
+      args:
+        executable: /bin/bash
+      loop: "{{ app_backup_dirs.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      register: cleanup_results
+      changed_when: "'Deleted:' in cleanup_results.stdout"
+
+    - name: Display cleanup summary
+      ansible.builtin.debug:
+        msg: |
+          Backup retention: keeping last {{ backup_keep_count }} backups per volume
+          {% for result in cleanup_results.results %}
+          {% if result.stdout | default('') | length > 0 %}
+          {{ result.item.path | basename }}:
+          {{ result.stdout }}
+          {% endif %}
+          {% endfor %}
+      when: cleanup_results.results | selectattr('stdout', 'defined') | selectattr('stdout', 'search', 'Deleted') | list | length > 0
