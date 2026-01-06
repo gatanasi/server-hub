@@ -75,15 +75,34 @@ jobs:
           APP="${{ github.event.inputs.app_name }}"
           OP="${{ github.event.inputs.operation }}"
           TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
+          BACKUP_SRC="${{ github.event.inputs.backup_source }}"
           
+          # Validate app name
           if [[ ! "$APP" =~ ^[a-zA-Z0-9_-]+$ ]]; then
             echo "::error::Invalid app name: $APP"
             exit 1
           fi
           
-          if [[ "$OP" == "restore_specific" && -z "$TIMESTAMP" ]]; then
-            echo "::error::backup_timestamp is required for restore_specific operation"
+          # Validate backup source path (must be absolute, no path traversal)
+          if [[ ! "$BACKUP_SRC" =~ ^/[a-zA-Z0-9/_.-]+$ ]]; then
+            echo "::error::Invalid backup_source path: $BACKUP_SRC. Must be an absolute path without special characters."
             exit 1
+          fi
+          if [[ "$BACKUP_SRC" == *".."* ]]; then
+            echo "::error::backup_source cannot contain path traversal (..)"
+            exit 1
+          fi
+          
+          # Validate timestamp format for restore_specific
+          if [[ "$OP" == "restore_specific" ]]; then
+            if [[ -z "$TIMESTAMP" ]]; then
+              echo "::error::backup_timestamp is required for restore_specific operation"
+              exit 1
+            fi
+            if [[ ! "$TIMESTAMP" =~ ^[0-9]{8}T[0-9]{6}$ ]]; then
+              echo "::error::Invalid backup_timestamp format: $TIMESTAMP. Expected format: YYYYMMDDTHHMMSS (e.g., 20260106T143000)"
+              exit 1
+            fi
           fi
           
           echo "Operation: $OP for $APP"
@@ -112,8 +131,8 @@ jobs:
           TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
           BACKUP_SRC="${{ github.event.inputs.backup_source }}"
           
-          # Build extra vars
-          EXTRA_VARS="-e app_name=${APP_NAME} -e backup_source=${BACKUP_SRC}"
+          # Build extra vars - properly quoted for safety
+          EXTRA_VARS="-e app_name='${APP_NAME}' -e backup_source='${BACKUP_SRC}'"
           
           case "$OPERATION" in
             list_backups)
@@ -123,7 +142,7 @@ jobs:
               EXTRA_VARS="$EXTRA_VARS -e auto_confirm=true"
               ;;
             restore_specific)
-              EXTRA_VARS="$EXTRA_VARS -e auto_confirm=true -e backup_timestamp=${TIMESTAMP}"
+              EXTRA_VARS="$EXTRA_VARS -e auto_confirm=true -e backup_timestamp='${TIMESTAMP}'"
               ;;
           esac
           

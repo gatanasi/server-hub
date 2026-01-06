@@ -63,10 +63,31 @@ jobs:
       - name: Validate inputs
         run: |
           APP="${{ github.event.inputs.app_name }}"
+          BACKUP_DEST="${{ github.event.inputs.backup_destination }}"
+          TARGET_HOST="${{ github.event.inputs.target_host }}"
+          
+          # Validate app name
           if [[ ! "$APP" =~ ^[a-zA-Z0-9_-]+$ ]]; then
             echo "::error::Invalid app name: $APP"
             exit 1
           fi
+          
+          # Validate backup destination path (must be absolute, no path traversal)
+          if [[ ! "$BACKUP_DEST" =~ ^/[a-zA-Z0-9/_.-]+$ ]]; then
+            echo "::error::Invalid backup_destination path: $BACKUP_DEST. Must be an absolute path without special characters."
+            exit 1
+          fi
+          if [[ "$BACKUP_DEST" == *".."* ]]; then
+            echo "::error::backup_destination cannot contain path traversal (..)"
+            exit 1
+          fi
+          
+          # Validate target host if provided
+          if [[ -n "$TARGET_HOST" && ! "$TARGET_HOST" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+            echo "::error::Invalid target_host: $TARGET_HOST"
+            exit 1
+          fi
+          
           echo "Starting backup for: $APP"
 
       - name: Setup SSH
@@ -92,17 +113,17 @@ jobs:
           TARGET_HOST="${{ github.event.inputs.target_host }}"
           BACKUP_DEST="${{ github.event.inputs.backup_destination }}"
           
-          # Build extra vars
-          EXTRA_VARS="-e backup_destination=${BACKUP_DEST}"
+          # Build extra vars - properly quoted for safety
+          EXTRA_VARS="-e backup_destination='${BACKUP_DEST}'"
           
           if [[ "$APP_NAME" != "all" ]]; then
-            EXTRA_VARS="$EXTRA_VARS -e app_name=${APP_NAME}"
+            EXTRA_VARS="$EXTRA_VARS -e app_name='${APP_NAME}'"
           fi
           
           # Build limit if target host specified
           LIMIT_ARG=""
           if [[ -n "$TARGET_HOST" ]]; then
-            LIMIT_ARG="-l ${TARGET_HOST}"
+            LIMIT_ARG="-l '${TARGET_HOST}'"
           fi
           
           # SSH to deployer.vm and run the backup playbook

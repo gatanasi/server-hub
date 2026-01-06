@@ -73,30 +73,7 @@
 
   pre_tasks:
     - name: Load Telegram credentials
-      ansible.builtin.shell: |
-        if [[ -f "{{ secrets_file }}" ]]; then
-          source "{{ secrets_file }}"
-          echo "{\"bot_token\": \"${TELEGRAM_BOT_TOKEN:-}\", \"chat_id\": \"${TELEGRAM_CHAT_ID:-}\"}"
-        else
-          echo "{\"bot_token\": \"\", \"chat_id\": \"\"}"
-        fi
-      args:
-        executable: /bin/bash
-      register: telegram_creds_raw
-      changed_when: false
-      delegate_to: localhost
-      run_once: true
-      no_log: true
-
-    - name: Parse Telegram credentials
-      vars:
-        telegram_creds: "{{ telegram_creds_raw.stdout | from_json }}"
-      ansible.builtin.set_fact:
-        telegram_bot_token: "{{ telegram_creds.bot_token }}"
-        telegram_chat_id: "{{ telegram_creds.chat_id }}"
-        telegram_enabled: "{{ telegram_creds.bot_token | length > 0 and telegram_creds.chat_id | length > 0 }}"
-      run_once: true
-      no_log: true
+      ansible.builtin.include_tasks: tasks/load-telegram-credentials.yml
 
   tasks:
     - name: Verify backup source exists
@@ -180,6 +157,13 @@
       ansible.builtin.debug:
         msg: "Will restore {{ restore_files.files | length }} volume(s)"
 
+    - name: Validate backup files were found
+      ansible.builtin.fail:
+        msg: >
+          No backup volume archives found for timestamp {{ restore_timestamp }} in
+          {{ app_backup_dir }}. Cannot proceed with restore.
+      when: (restore_files.files | default([])) | length == 0
+
     # === STOP SERVICES ===
     - name: Check if app is running
       ansible.builtin.stat:
@@ -197,195 +181,137 @@
       ansible.builtin.pause:
         seconds: 5
 
-    # === RESTORE VOLUMES ===
-    - name: Restore each volume
-      ansible.builtin.shell: |
-        BACKUP_FILE="{{ item.path }}"
-        VOLUME_NAME=$(basename "${BACKUP_FILE}" | sed 's/_{{ restore_timestamp }}\.tar\.gz$//')
-        
-        echo "Restoring volume: ${VOLUME_NAME}"
-        
-        # Ensure volume exists
-        docker volume create "${VOLUME_NAME}" 2>/dev/null || true
-        
-        # Clear existing data and restore
-        docker run --rm \
-          -v "${VOLUME_NAME}:/dest" \
-          -v "{{ app_backup_dir }}:/backup:ro" \
-          alpine:latest \
-          sh -c "rm -rf /dest/* /dest/..?* /dest/.[!.]* 2>/dev/null; tar -xzf '/backup/$(basename {{ item.path }})' -C /dest"
-        
-        echo "SUCCESS: Restored ${VOLUME_NAME}"
-      loop: "{{ restore_files.files }}"
-      loop_control:
-        label: "{{ item.path | basename }}"
+    # === RESTORE VOLUMES (with error handling) ===
+    - name: Restore volumes block
+      block:
+        - name: Restore each volume
+          ansible.builtin.shell: |
+            BACKUP_FILE="{{ item.path }}"
+            BASENAME="$(basename "${BACKUP_FILE}")"
+            SUFFIX="_{{ restore_timestamp }}.tar.gz"
+            VOLUME_NAME="${BASENAME%${SUFFIX}}"
+            
+            echo "Restoring volume: ${VOLUME_NAME}"
+            
+            # Ensure volume exists
+            docker volume create "${VOLUME_NAME}" 2>/dev/null || true
+            
+            # Clear existing data and restore using find for safety
+            docker run --rm \
+              -v "${VOLUME_NAME}:/dest" \
+              -v "{{ app_backup_dir }}:/backup:ro" \
+              alpine:3.20 \
+              sh -c "cd /dest && find . -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null; tar -xzf '/backup/{{ item.path | basename }}' -C /dest"
+            
+            echo "SUCCESS: Restored ${VOLUME_NAME}"
+          args:
+            executable: /bin/bash
+          loop: "{{ restore_files.files }}"
+          loop_control:
+            label: "{{ item.path | basename }}"
 
-    # === START SERVICES ===
-    # Note: docker-compose.yml is NOT restored from backup as it's in GitHub.
-    # Use the deploy playbook to restore configuration files.
-    - name: Start application stack
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} up -d"
-        chdir: "{{ app_dir }}"
-      when: compose_exists.stat.exists
+        # === START SERVICES ===
+        # Note: docker-compose.yml is NOT restored from backup as it's in GitHub.
+        # Use the deploy playbook to restore configuration files.
+        - name: Start application stack
+          ansible.builtin.command:
+            cmd: "{{ docker_compose_cmd }} up -d"
+            chdir: "{{ app_dir }}"
+          when: compose_exists.stat.exists
 
-    - name: Wait for containers to initialize
-      ansible.builtin.pause:
-        seconds: 5
+        - name: Wait for containers to initialize
+          ansible.builtin.pause:
+            seconds: 5
 
-    # === HEALTH CHECK PHASE ===
-    - name: Get services with healthchecks
-      ansible.builtin.shell: |
-        cd "{{ app_dir }}"
-        if command -v jq &>/dev/null; then
-          COUNT=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
-            jq -rs '[.[] | select(.Health != null and .Health != "")] | length' 2>/dev/null)
-          if [[ $? -eq 0 && -n "$COUNT" ]]; then
-            echo "$COUNT"
-            exit 0
-          fi
-        fi
-        {{ docker_compose_cmd }} ps 2>/dev/null | grep -cE '\(healthy\)|\(unhealthy\)|\(starting\)' || echo "0"
-      args:
-        executable: /bin/bash
-      register: healthcheck_count
-      changed_when: false
-      when: compose_exists.stat.exists
+        # === HEALTH CHECK PHASE ===
+        - name: Verify service health
+          ansible.builtin.include_tasks: tasks/verify-service-health.yml
+          vars:
+            fail_on_unhealthy: true
+          when: compose_exists.stat.exists
 
-    - name: Set healthcheck count
-      ansible.builtin.set_fact:
-        healthcheck_services: "{{ healthcheck_count.stdout | default('0') | int }}"
-      when: compose_exists.stat.exists
+        - name: Verify services are running
+          ansible.builtin.command:
+            cmd: "{{ docker_compose_cmd }} ps"
+            chdir: "{{ app_dir }}"
+          register: services_status
+          changed_when: false
+          when: compose_exists.stat.exists
 
-    - name: Display healthcheck info
-      ansible.builtin.debug:
-        msg: "{{ 'No services with healthchecks found - skipping health verification' if healthcheck_services | int == 0 else 'Found ' + (healthcheck_services | string) + ' service(s) with healthchecks' }}"
-      when: compose_exists.stat.exists
+        - name: Display service status
+          ansible.builtin.debug:
+            msg: "{{ services_status.stdout_lines }}"
+          when: compose_exists.stat.exists
 
-    - name: Wait for healthchecks to pass
-      ansible.builtin.shell: |
-        cd "{{ app_dir }}"
-        
-        check_with_jq() {
-          local JSON=$({{ docker_compose_cmd }} ps --format json 2>/dev/null)
-          TOTAL=$(echo "$JSON" | jq -rs '[.[] | select(.Health != null and .Health != "")] | length' 2>/dev/null) || return 1
-          HEALTHY=$(echo "$JSON" | jq -rs '[.[] | select(.Health == "healthy")] | length' 2>/dev/null) || return 1
-          UNHEALTHY=$(echo "$JSON" | jq -rs '[.[] | select(.Health == "unhealthy")] | length' 2>/dev/null) || return 1
-          return 0
-        }
-        
-        check_with_grep() {
-          local PS_OUTPUT=$({{ docker_compose_cmd }} ps 2>/dev/null)
-          TOTAL=$(echo "$PS_OUTPUT" | grep -cE '\(healthy\)|\(unhealthy\)|\(starting\)' || echo "0")
-          HEALTHY=$(echo "$PS_OUTPUT" | grep -c '(healthy)' || echo "0")
-          UNHEALTHY=$(echo "$PS_OUTPUT" | grep -c '(unhealthy)' || echo "0")
-        }
-        
-        if command -v jq &>/dev/null && check_with_jq; then
-          :
-        else
-          check_with_grep
-        fi
-        
-        echo "healthy=$HEALTHY total=$TOTAL unhealthy=$UNHEALTHY"
-        
-        if [[ "$UNHEALTHY" -gt 0 ]]; then
-          exit 2
-        elif [[ "$TOTAL" -gt 0 && "$HEALTHY" -eq "$TOTAL" ]]; then
-          exit 0
-        else
-          exit 1
-        fi
-      args:
-        executable: /bin/bash
-      register: health_status
-      until: health_status.rc == 0
-      retries: 12
-      delay: 5
-      failed_when: health_status.rc == 2
-      changed_when: false
-      when:
-        - compose_exists.stat.exists
-        - healthcheck_services | int > 0
+        - name: Restore complete
+          ansible.builtin.debug:
+            msg: |
+              ========================================
+              ✅ RESTORE COMPLETED
+              ========================================
+              Application: {{ app_name }}
+              Restored from: {{ restore_timestamp }}
+              Volumes restored: {{ restore_files.files | length }}
+              ========================================
 
-    - name: Check for exited containers
-      ansible.builtin.shell: |
-        cd "{{ app_dir }}"
-        if command -v jq &>/dev/null; then
-          RESULT=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
-            jq -rs '[.[] | select(.State == "exited" or .State == "dead")] | .[].Service' 2>/dev/null)
-          if [[ $? -eq 0 ]]; then
-            echo "$RESULT"
-            exit 0
-          fi
-        fi
-        {{ docker_compose_cmd }} ps 2>/dev/null | grep -E "Exited|Dead" | awk '{print $1}' || true
-      args:
-        executable: /bin/bash
-      register: exited_containers
-      changed_when: false
-      when: compose_exists.stat.exists
+        # === SEND NOTIFICATION ===
+        - name: Get restored volume sizes
+          ansible.builtin.shell: |
+            for file in {{ restore_files.files | map(attribute='path') | map('quote') | join(' ') }}; do
+              filename="$(basename "$file")"
+              VOLUME_NAME="${filename%_{{ restore_timestamp }}.tar.gz}"
+              SIZE=$(du -h "$file" | cut -f1)
+              echo "${VOLUME_NAME}:${SIZE}"
+            done
+          args:
+            executable: /bin/bash
+          register: restore_sizes_raw
+          changed_when: false
 
-    - name: Fail if containers exited
-      ansible.builtin.fail:
-        msg: "Container(s) exited unexpectedly after restore: {{ exited_containers.stdout_lines | join(', ') }}"
-      when:
-        - compose_exists.stat.exists
-        - exited_containers.stdout | length > 0
+        - name: Build volume details for notification
+          ansible.builtin.set_fact:
+            restore_details: "{{ restore_sizes_raw.stdout_lines | default([]) }}"
+            restore_details_text: "{{ restore_sizes_raw.stdout_lines | default([]) | map('regex_replace', '^([^:]+):(.+)$', '  • \\1: \\2') | join('\n') }}"
+            health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
 
-    - name: Verify services are running
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} ps"
-        chdir: "{{ app_dir }}"
-      register: services_status
-      when: compose_exists.stat.exists
+        - name: Send success notification
+          ansible.builtin.uri:
+            url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              chat_id: "{{ telegram_chat_id }}"
+              text: "🔄 <b>Restore Completed</b>\n\n<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n<b>Volumes restored ({{ restore_files.files | length }}):</b>\n<pre>{{ restore_details_text }}</pre>\n\n{{ health_status_text }}"
+              parse_mode: "HTML"
+            status_code: [200]
+          delegate_to: localhost
+          when: telegram_enabled | bool
+          ignore_errors: true
+          no_log: true
 
-    - name: Display service status
-      ansible.builtin.debug:
-        msg: "{{ services_status.stdout_lines }}"
-      when: compose_exists.stat.exists
+      rescue:
+        - name: Attempt to restart services after restore failure
+          ansible.builtin.command:
+            cmd: "{{ docker_compose_cmd }} up -d"
+            chdir: "{{ app_dir }}"
+          when: compose_exists.stat.exists
+          ignore_errors: true
 
-    - name: Restore complete
-      ansible.builtin.debug:
-        msg: |
-          ========================================
-          ✅ RESTORE COMPLETED
-          ========================================
-          Application: {{ app_name }}
-          Restored from: {{ restore_timestamp }}
-          Volumes restored: {{ restore_files.files | length }}
-          ========================================
+        - name: Send failure notification
+          ansible.builtin.uri:
+            url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              chat_id: "{{ telegram_chat_id }}"
+              text: "❌ <b>Restore Failed</b>\n\n<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n⚠️ Services have been restarted"
+              parse_mode: "HTML"
+            status_code: [200]
+          delegate_to: localhost
+          when: telegram_enabled | bool
+          ignore_errors: true
+          no_log: true
 
-    # === SEND NOTIFICATION ===
-    - name: Get restored volume sizes
-      ansible.builtin.shell: |
-        for file in {{ restore_files.files | map(attribute='path') | join(' ') }}; do
-          VOLUME_NAME=$(basename "$file" | sed 's/_{{ restore_timestamp }}\.tar\.gz$//')
-          SIZE=$(du -h "$file" | cut -f1)
-          echo "${VOLUME_NAME}:${SIZE}"
-        done
-      args:
-        executable: /bin/bash
-      register: restore_sizes_raw
-      changed_when: false
-
-    - name: Build volume details for notification
-      ansible.builtin.set_fact:
-        restore_details: "{{ restore_sizes_raw.stdout_lines | default([]) }}"
-        restore_details_text: "{{ restore_sizes_raw.stdout_lines | default([]) | map('regex_replace', '^([^:]+):(.+)$', '  • \\1: \\2') | join('\n') }}"
-        health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
-
-    - name: Send success notification
-      ansible.builtin.uri:
-        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
-        method: POST
-        body_format: form-urlencoded
-        body:
-          chat_id: "{{ telegram_chat_id }}"
-          text: "🔄 <b>Restore Completed</b>\n\n<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n<b>Volumes restored ({{ restore_files.files | length }}):</b>\n<pre>{{ restore_details_text }}</pre>\n\n{{ health_status_text }}"
-          parse_mode: "HTML"
-        status_code: [200]
-      delegate_to: localhost
-      when: telegram_enabled | bool
-      ignore_errors: true
-      no_log: true
+        - name: Fail the restore task
+          ansible.builtin.fail:
+            msg: "Restore failed for {{ app_name }} on {{ inventory_hostname }}"
