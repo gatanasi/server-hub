@@ -19,7 +19,7 @@
 #
 # Required variables (set in inventory or via -e):
 #   - backup_destination: NFS/SMB mount path for backups (default: /mnt/backups)
-#   - backup_retention_days: How many days to keep backups (default: 7)
+#   - backup_keep_count: How many backups to keep per volume (default: 3)
 #
 # Features:
 #   - Graceful stop with timeout
@@ -39,8 +39,8 @@
     # Backup destination (should be an NFS/SMB mount)
     backup_destination: /mnt/backups
     
-    # How many days to retain backups
-    backup_retention_days: 7
+    # How many backups to keep per volume (oldest are deleted)
+    backup_keep_count: 3
     
     # Timestamp format for backup files
     backup_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
@@ -86,27 +86,51 @@
         (app_name == current_app)
 
   post_tasks:
-    - name: Cleanup old backups
+    - name: Find all app backup directories
       ansible.builtin.find:
         paths: "{{ backup_destination }}"
-        patterns: "*.tar.gz"
-        age: "{{ backup_retention_days }}d"
-        recurse: true
-      register: old_backups
-      run_once: true
+        file_type: directory
+      register: app_backup_dirs
 
-    - name: Remove old backup files
-      ansible.builtin.file:
-        path: "{{ item.path }}"
-        state: absent
-      loop: "{{ old_backups.files }}"
+    - name: Cleanup old backups per app (keep last {{ backup_keep_count }})
+      ansible.builtin.shell: |
+        APP_DIR="{{ item.path }}"
+        KEEP={{ backup_keep_count }}
+        DELETED=0
+        
+        # Get unique volume prefixes (everything before the timestamp)
+        # Format: volumename_YYYYMMDDTHHMMSS.tar.gz
+        for PREFIX in $(ls -1 "$APP_DIR"/*.tar.gz 2>/dev/null | sed 's/_[0-9]\{8\}T[0-9]\{6\}\.tar\.gz$//' | sort -u); do
+          # Get all backups for this volume, sorted by timestamp (oldest first)
+          BACKUPS=$(ls -1 "${PREFIX}"_*.tar.gz 2>/dev/null | sort)
+          COUNT=$(echo "$BACKUPS" | wc -l)
+          
+          # Delete oldest backups if we have more than KEEP
+          if [ "$COUNT" -gt "$KEEP" ]; then
+            DELETE_COUNT=$((COUNT - KEEP))
+            echo "$BACKUPS" | head -n "$DELETE_COUNT" | while read FILE; do
+              rm -f "$FILE"
+              echo "Deleted: $(basename "$FILE")"
+              DELETED=$((DELETED + 1))
+            done
+          fi
+        done
+      args:
+        executable: /bin/bash
+      loop: "{{ app_backup_dirs.files }}"
       loop_control:
         label: "{{ item.path | basename }}"
-      when: old_backups.files | length > 0
-      run_once: true
+      register: cleanup_results
+      changed_when: "'Deleted:' in cleanup_results.stdout"
 
     - name: Display cleanup summary
       ansible.builtin.debug:
-        msg: "Cleaned up {{ old_backups.files | length }} old backup(s) older than {{ backup_retention_days }} days"
-      when: old_backups.files | length > 0
-      run_once: true
+        msg: |
+          Backup retention: keeping last {{ backup_keep_count }} backups per volume
+          {% for result in cleanup_results.results %}
+          {% if result.stdout | default('') | length > 0 %}
+          {{ result.item.path | basename }}:
+          {{ result.stdout }}
+          {% endif %}
+          {% endfor %}
+      when: cleanup_results.results | selectattr('stdout', 'defined') | selectattr('stdout', 'search', 'Deleted') | list | length > 0

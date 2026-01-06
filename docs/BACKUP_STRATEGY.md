@@ -56,8 +56,8 @@ ansible-playbook playbooks/backup-docker-volumes.yml -l n8n.vm
 # Custom backup destination
 ansible-playbook playbooks/backup-docker-volumes.yml -e "backup_destination=/mnt/nas/backups"
 
-# Custom retention period (default: 7 days)
-ansible-playbook playbooks/backup-docker-volumes.yml -e "backup_retention_days=14"
+# Custom retention count (default: 3 backups per volume)
+ansible-playbook playbooks/backup-docker-volumes.yml -e "backup_keep_count=5"
 ```
 
 ### What Gets Backed Up
@@ -69,6 +69,12 @@ For each application:
 | Docker Volumes | All named volumes defined in docker-compose.yml |
 
 > **Note:** Configuration files (`docker-compose.yml` and `.env`) are **NOT** backed up by this playbook. They are stored in GitHub (with [SOPS](https://github.com/getsops/sops) encryption for `.env`). To restore config files, use the deploy playbook.
+
+### Retention Policy
+
+By default, only the **last 3 backups per volume** are retained. Older backups are automatically deleted after each backup run. This prevents disk space from filling up while maintaining recent restore points.
+
+To customize: `-e "backup_keep_count=5"`
 
 ### Backup Process
 
