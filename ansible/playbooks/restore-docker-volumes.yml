@@ -64,7 +64,7 @@
     app_name: "{{ restore_app_name }}"
     backup_source: /mnt/backups
     app_dir: "{{ app_base_dir }}/{{ app_name }}"
-    app_backup_dir: "{{ backup_source }}/{{ inventory_hostname }}/{{ app_name }}"
+    app_backup_dir: "{{ backup_source }}/{{ app_name }}"
     requested_timestamp: "{{ restore_backup_timestamp }}"
     list_only: "{{ restore_list_only | bool }}"
 
@@ -190,24 +190,9 @@
       loop_control:
         label: "{{ item.path | basename }}"
 
-    # === RESTORE COMPOSE FILE (if backed up) ===
-    - name: Check for backed up docker-compose.yml
-      ansible.builtin.stat:
-        path: "{{ app_backup_dir }}/docker-compose_{{ restore_timestamp }}.yml"
-      register: compose_backup
-
-    - name: Restore docker-compose.yml (optional)
-      ansible.builtin.copy:
-        src: "{{ app_backup_dir }}/docker-compose_{{ restore_timestamp }}.yml"
-        dest: "{{ app_dir }}/docker-compose.yml"
-        remote_src: true
-        mode: '0644'
-        backup: true
-      when: 
-        - compose_backup.stat.exists
-        - restore_compose | default(false) | bool
-
     # === START SERVICES ===
+    # Note: docker-compose.yml is NOT restored from backup as it's in GitHub.
+    # Use the deploy playbook to restore configuration files.
     - name: Start application stack
       ansible.builtin.command:
         cmd: "{{ docker_compose_cmd }} up -d"
