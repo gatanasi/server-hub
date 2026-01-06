@@ -174,7 +174,7 @@ ansible-playbook playbooks/restore-docker-volumes.yml \
 
 1. **List** available backups with timestamps
 2. **Confirm** restore action (unless auto_confirm=true)
-3. **Stop** the application stack
+3. **Stop and remove** the application stack (`docker compose down`)
 4. **Clear** existing volume data
 5. **Extract** backup archives to volumes
 6. **Start** the application stack

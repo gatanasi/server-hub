@@ -241,9 +241,9 @@
         - exited_containers.stdout | length > 0
 
     - name: "{{ current_app }} | Verify services are running"
-      ansible.builtin.shell: |
-        cd "{{ app_dir }}"
-        {{ docker_compose_cmd }} ps --format json 2>/dev/null | head -20
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} ps"
+        chdir: "{{ app_dir }}"
       register: services_status
       changed_when: false
       when: docker_volumes | length > 0
