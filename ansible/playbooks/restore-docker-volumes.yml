@@ -67,6 +67,34 @@
     app_backup_dir: "{{ backup_source }}/{{ app_name }}"
     requested_timestamp: "{{ restore_backup_timestamp }}"
     list_only: "{{ restore_list_only | bool }}"
+    
+    # Load telegram credentials from secrets file
+    secrets_file: "{{ lookup('env', 'HOME') }}/.deploy-secrets"
+
+  pre_tasks:
+    - name: Load Telegram credentials
+      ansible.builtin.shell: |
+        if [[ -f "{{ secrets_file }}" ]]; then
+          source "{{ secrets_file }}"
+          echo "{\"bot_token\": \"${TELEGRAM_BOT_TOKEN:-}\", \"chat_id\": \"${TELEGRAM_CHAT_ID:-}\"}"
+        else
+          echo "{\"bot_token\": \"\", \"chat_id\": \"\"}"
+        fi
+      args:
+        executable: /bin/bash
+      register: telegram_creds_raw
+      changed_when: false
+      delegate_to: localhost
+      run_once: true
+      no_log: true
+
+    - name: Parse Telegram credentials
+      ansible.builtin.set_fact:
+        telegram_bot_token: "{{ (telegram_creds_raw.stdout | from_json).bot_token }}"
+        telegram_chat_id: "{{ (telegram_creds_raw.stdout | from_json).chat_id }}"
+        telegram_enabled: "{{ (telegram_creds_raw.stdout | from_json).bot_token | length > 0 and (telegram_creds_raw.stdout | from_json).chat_id | length > 0 }}"
+      run_once: true
+      no_log: true
 
   tasks:
     - name: Verify backup source exists
@@ -225,3 +253,19 @@
           Restored from: {{ restore_timestamp }}
           Volumes restored: {{ restore_files.files | length }}
           ========================================
+
+    # === SEND NOTIFICATION ===
+    - name: Send success notification
+      ansible.builtin.uri:
+        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          chat_id: "{{ telegram_chat_id }}"
+          text: "🔄 <b>Restore Completed</b>\n\n<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n<b>Volumes:</b> {{ restore_files.files | length }}"
+          parse_mode: "HTML"
+        status_code: [200]
+      delegate_to: localhost
+      when: telegram_enabled | bool
+      ignore_errors: true
+      no_log: true
