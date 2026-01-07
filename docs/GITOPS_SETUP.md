@@ -429,7 +429,7 @@ services:
 
 2. **Health Check Phase**: After `docker compose up`, the playbook:
    - Extracts `start_period` values from docker-compose.yml
-   - **Dynamically calculates timeout**: `max(start_period) + 30s buffer`
+   - **Dynamically calculates timeout**: `max(max_start_period + 30s buffer, health_check_timeout_default)`
    - Waits for containers to initialize (5 seconds)
    - Checks for services with Docker healthchecks
    - Polls health status every 5 seconds until timeout

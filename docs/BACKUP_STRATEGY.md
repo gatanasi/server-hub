@@ -83,7 +83,7 @@ To customize: `-e "backup_keep_count=5"`
 3. **Start** the application stack
 4. **Verify** services are healthy:
    - Extracts `start_period` from docker-compose.yml healthchecks
-   - Dynamically calculates wait timeout (`max(start_period) + 30s`)
+   - Dynamically calculates wait timeout (`max(max_start_period + 30s, health_check_timeout_default)`)
    - Polls Docker health status until all services report `healthy`
 5. **Cleanup** backups older than retention period
 6. **Notify** via Telegram (using shared `load-telegram-credentials.yml` task)
