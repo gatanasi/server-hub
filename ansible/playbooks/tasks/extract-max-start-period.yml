@@ -1,0 +1,38 @@
+---
+- name: Extract max start_period from docker-compose.yml
+  ansible.builtin.shell: |
+    max_val=0
+    if [ -f "docker-compose.yml" ]; then
+      while IFS= read -r line || [ -n "$line" ]; do
+        # Strip comments
+        line=${line%%#*}
+        # Strip quotes (double and single)
+        line=${line//\"/}
+        line=${line//\'/}
+        # Extract value if line contains start_period
+        if [[ "$line" =~ ^[[:space:]]*start_period:[[:space:]]*([0-9]+)(s|m|h) ]]; then
+          val="${BASH_REMATCH[1]}"
+          unit="${BASH_REMATCH[2]}"
+          seconds=0
+          case "$unit" in
+            s) seconds=$val ;;
+            m) seconds=$((val * 60)) ;;
+            h) seconds=$((val * 3600)) ;;
+          esac
+          if [ "$seconds" -gt "$max_val" ]; then
+            max_val=$seconds
+          fi
+        fi
+      done < docker-compose.yml
+    fi
+    echo "$max_val"
+  args:
+    chdir: "{{ app_dir }}"
+    executable: /bin/bash
+  register: compose_max_start_period_result
+  changed_when: false
+  failed_when: false
+
+- name: Set max_start_period fact
+  ansible.builtin.set_fact:
+    compose_max_start_period: "{{ compose_max_start_period_result.stdout | default('0') | int }}"

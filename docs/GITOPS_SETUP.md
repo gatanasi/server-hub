@@ -386,7 +386,7 @@ The deployment playbook automatically verifies container health using Docker's n
 
 ### Docker Healthcheck Requirements
 
-Every service in `docker-compose.yml` **should** define a healthcheck block. The Ansible playbooks leverage these healthchecks to determine deployment success.
+Every service in `docker-compose.yml` is **strongly recommended** to define a healthcheck block. The Ansible playbooks leverage these healthchecks to determine deployment success and to compute per-service timeouts. If a service does **not** define a healthcheck, the playbooks fall back to a fixed default timeout and have less precise insight into that service's readiness and health during deployment and rollback.
 
 **Standard healthcheck configuration:**
 
@@ -450,7 +450,7 @@ docker_hosts:
   hosts:
     n8n.vm:
       # Health check settings (timeout is auto-calculated from start_period)
-      health_check_timeout_default: 90  # Fallback if no healthchecks defined
+      health_check_timeout_default: 90  # Minimum timeout / fallback if no start_period
       health_check_interval: 5          # Seconds between checks
       health_check_buffer: 30           # Added to max start_period
       
@@ -459,7 +459,7 @@ docker_hosts:
       cleanup_backups_on_success: false  # Keep backups for manual rollback
 ```
 
-> **Note**: The `health_check_timeout` is **automatically calculated** as `max(start_period) + buffer`. The `health_check_timeout_default` is only used when no healthchecks are defined in docker-compose.yml.
+> **Note**: The `health_check_timeout` is **automatically calculated** as `max(max_start_period + buffer, health_check_timeout_default)`. This ensures that `health_check_timeout_default` acts as a minimum wait time, even for fast-starting services or those without explicit `start_period`.
 
 ### Adding Healthchecks to Your Compose File
 

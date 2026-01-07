@@ -274,36 +274,17 @@
         seconds: 5
 
     - name: Extract max healthcheck start_period from docker-compose.yml
-      ansible.builtin.shell: |
-        cd "{{ app_target_dir }}"
-        # Parse start_period values from docker-compose.yml (handles formats: 30s, 1m, 120s, etc.)
-        MAX_SECONDS=0
-        while IFS= read -r period; do
-          [[ -z "$period" ]] && continue
-          # Convert to seconds
-          if [[ "$period" =~ ^([0-9]+)s$ ]]; then
-            SECONDS_VAL="${BASH_REMATCH[1]}"
-          elif [[ "$period" =~ ^([0-9]+)m$ ]]; then
-            SECONDS_VAL=$((${BASH_REMATCH[1]} * 60))
-          else
-            SECONDS_VAL=0
-          fi
-          [[ $SECONDS_VAL -gt $MAX_SECONDS ]] && MAX_SECONDS=$SECONDS_VAL
-        done < <(grep -E '^\s+start_period:' docker-compose.yml 2>/dev/null | sed 's/.*start_period:\s*//; s/["'\'']*//g')
-        echo "$MAX_SECONDS"
-      args:
-        executable: /bin/bash
-      register: max_start_period_raw
-      changed_when: false
-      failed_when: false
+      ansible.builtin.include_tasks: tasks/extract-max-start-period.yml
+      vars:
+        app_dir: "{{ app_target_dir }}"
 
     - name: Calculate health check timeout
       ansible.builtin.set_fact:
-        health_check_timeout: "{{ [((max_start_period_raw.stdout | default('0') | int) + (health_check_buffer | int)), (health_check_timeout_default | int)] | max }}"
+        health_check_timeout: "{{ [((compose_max_start_period | int) + (health_check_buffer | int)), (health_check_timeout_default | int)] | max }}"
 
     - name: Display health check configuration
       ansible.builtin.debug:
-        msg: "Health check timeout: {{ health_check_timeout }}s (max start_period: {{ max_start_period_raw.stdout | default('0') }}s + buffer: {{ health_check_buffer }}s)"
+        msg: "Health check timeout: {{ health_check_timeout }}s (max start_period: {{ compose_max_start_period }}s + buffer: {{ health_check_buffer }}s)"
 
     - name: Verify service health
       ansible.builtin.include_tasks: tasks/verify-service-health.yml

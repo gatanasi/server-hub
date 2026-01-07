@@ -20,7 +20,7 @@ services:
       - caddy_config:/config
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081"]
-      interval: 30s
+      interval: 2m
       timeout: 10s
       retries: 3
       start_period: 40s

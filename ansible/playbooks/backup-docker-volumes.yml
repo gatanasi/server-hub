@@ -47,6 +47,12 @@
     
     # Timeout for stopping containers (seconds)
     stop_timeout: 60
+
+    # Health check buffer (added to max start_period)
+    health_check_buffer: 30
+
+    # Default health check timeout (minimum valid timeout)
+    health_check_timeout_default: 90
     
     # Helper image for backup/restore operations (pinned for reproducibility)
     helper_image: alpine:3.20
