@@ -18,15 +18,15 @@
         # Strip quotes (double and single)
         line=${line//\"/}
         line=${line//\'/}
-        # Extract value if line contains start_period (requires unit: s, m, or h)
-        if [[ "$line" =~ ^[[:space:]]*start_period:[[:space:]]*([0-9]+)(s|m|h) ]]; then
+        # Extract value if line contains start_period (unit optional, defaults to s)
+        if [[ "$line" =~ ^[[:space:]]*start_period:[[:space:]]*([0-9]+)([smh])? ]]; then
           val="${BASH_REMATCH[1]}"
           unit="${BASH_REMATCH[2]}"
           seconds=0
           case "$unit" in
-            s) seconds=$val ;;
             m) seconds=$((val * 60)) ;;
             h) seconds=$((val * 3600)) ;;
+            *) seconds=$val ;; # Defaults to seconds (s) or raw number if unit missing
           esac
           if [ "$seconds" -gt "$max_val" ]; then
             max_val=$seconds
