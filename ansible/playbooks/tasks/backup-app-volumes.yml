@@ -145,7 +145,7 @@
 
     - name: "{{ current_app }} | Set health check timeout"
       ansible.builtin.set_fact:
-        health_check_timeout: "{{ [((compose_max_start_period | int) + (health_check_buffer | default(30) | int)), (health_check_timeout_default | default(90) | int)] | max }}"
+        health_check_timeout: "{{ [((compose_max_start_period | int) + (health_check_buffer | int)), (health_check_timeout_default | int)] | max }}"
       when: docker_volumes | length > 0
 
     - name: "{{ current_app }} | Verify service health"

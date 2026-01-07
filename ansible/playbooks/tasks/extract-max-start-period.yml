@@ -1,7 +1,16 @@
 ---
+# Extract max start_period from docker-compose.yml
+#
+# This task parses start_period values from healthcheck blocks.
+# Supported formats: 30s, 2m, 1h (units are required).
+# Note: Docker Compose also supports nanoseconds (unitless) and compound
+# formats like "1m30s", but these are uncommon for start_period and not
+# supported here. If needed, consider using yq or a Python script.
+#
 - name: Extract max start_period from docker-compose.yml
   ansible.builtin.shell: |
     max_val=0
+    seconds=0
     if [ -f "docker-compose.yml" ]; then
       while IFS= read -r line || [ -n "$line" ]; do
         # Strip comments
@@ -9,7 +18,7 @@
         # Strip quotes (double and single)
         line=${line//\"/}
         line=${line//\'/}
-        # Extract value if line contains start_period
+        # Extract value if line contains start_period (requires unit: s, m, or h)
         if [[ "$line" =~ ^[[:space:]]*start_period:[[:space:]]*([0-9]+)(s|m|h) ]]; then
           val="${BASH_REMATCH[1]}"
           unit="${BASH_REMATCH[2]}"

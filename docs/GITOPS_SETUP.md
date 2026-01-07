@@ -399,7 +399,7 @@ services:
       interval: 30s      # How often to run the check
       timeout: 10s       # Max time for a single check
       retries: 3         # Failures before marking unhealthy
-      start_period: 40s  # Grace period before checks count
+      start_period: 40s  # Grace period: failures don't count toward retries, but a pass marks healthy
 ```
 
 **Healthcheck tool selection by image base:**
