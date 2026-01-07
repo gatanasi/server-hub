@@ -19,6 +19,12 @@ services:
     restart: unless-stopped
     networks:
       - odoo_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8069/web/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
 
   db:
     image: postgres:16.11@sha256:056b54f00419b49289227ab12d09df508543883f407fe9935a2cec430ef8aa8d
@@ -33,6 +39,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 40s
     restart: unless-stopped
     networks:
       - odoo_net

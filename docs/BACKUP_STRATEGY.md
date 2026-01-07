@@ -81,7 +81,10 @@ To customize: `-e "backup_keep_count=5"`
 1. **Stop** the application stack gracefully
 2. **Create** tar.gz archives of each Docker volume using `alpine:3.20`
 3. **Start** the application stack
-4. **Verify** services are healthy (using shared `verify-service-health.yml` task)
+4. **Verify** services are healthy:
+   - Extracts `start_period` from docker-compose.yml healthchecks
+   - Dynamically calculates wait timeout (`max(max_start_period + 30s, health_check_timeout_default)`)
+   - Polls Docker health status until all services report `healthy`
 5. **Cleanup** backups older than retention period
 6. **Notify** via Telegram (using shared `load-telegram-credentials.yml` task)
 
@@ -187,7 +190,10 @@ ansible-playbook playbooks/restore-docker-volumes.yml \
 5. **Clear** existing volume data (using safe `find -exec rm` pattern)
 6. **Extract** backup archives to volumes using `alpine:3.20`
 7. **Start** the application stack
-8. **Verify** services are healthy (using shared `verify-service-health.yml` task)
+8. **Verify** services are healthy:
+   - Reads `start_period` from docker-compose.yml healthchecks
+   - Calculates appropriate wait timeout dynamically
+   - Validates all services reach `healthy` status
 
 > **Error Recovery:** The restore process is wrapped in a block/rescue structure. If restoration fails, it automatically attempts to restart services and notifies via Telegram.
 

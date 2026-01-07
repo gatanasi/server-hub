@@ -2,7 +2,20 @@
 # verify-service-health.yml - Reusable health check verification for Docker services
 #
 # This task file verifies that Docker Compose services are healthy after operations
-# like deploy, backup, or restore.
+# like deploy, backup, or restore. It leverages Docker's native healthcheck feature
+# defined in docker-compose.yml files.
+#
+# Docker Healthcheck Integration:
+#   Services should define healthchecks in their docker-compose.yml:
+#     healthcheck:
+#       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+#       interval: 30s
+#       timeout: 10s
+#       retries: 3
+#       start_period: 40s  # Grace period before checks count as failures
+#
+#   The calling playbook should set health_check_timeout >= max(start_period) + buffer
+#   to allow services enough time to become healthy.
 #
 # Required variables:
 #   - app_dir: Path to the docker-compose.yml directory
@@ -10,8 +23,10 @@
 #
 # Optional variables:
 #   - health_check_timeout: Total timeout in seconds (default: 60)
+#                           Should be >= max(start_period) + 30s buffer
 #   - health_check_interval: Interval between checks in seconds (default: 5)
 #   - skip_health_check: Skip health verification (default: false)
+#   - fail_on_unhealthy: Fail playbook if unhealthy (default: true)
 #
 # Sets facts:
 #   - healthcheck_services: Number of services with healthchecks

@@ -1,0 +1,44 @@
+---
+# Extract max start_period from docker-compose.yml
+#
+# This task parses start_period values from healthcheck blocks.
+# Supported formats: 30s, 2m, 1h (units optional, default is seconds).
+# Note: Docker Compose also supports nanoseconds (unitless) and compound
+# formats like "1m30s", but these are uncommon for start_period and not
+# supported here. If needed, consider using yq or a Python script.
+#
+- name: Extract max start_period from docker-compose.yml
+  ansible.builtin.shell: |
+    max_val=0
+    seconds=0
+    if [ -f "docker-compose.yml" ]; then
+      while IFS= read -r line || [ -n "$line" ]; do
+        # Strip comments
+        line=${line%%#*}
+        # Extract value if line contains start_period (unit optional, defaults to s)
+        # Handles optional quotes around value
+        if [[ "$line" =~ ^[[:space:]]*start_period:[[:space:]]*[\"\'\']?([0-9]+)([smh])?[\"\'\']?[[:space:]]*$ ]]; then
+          val="${BASH_REMATCH[1]}"
+          unit="${BASH_REMATCH[2]}"
+          case "$unit" in
+            m) seconds=$((val * 60)) ;;
+            h) seconds=$((val * 3600)) ;;
+            *) seconds=$val ;; # Defaults to seconds (s) or raw number if unit missing
+          esac
+          if [ "$seconds" -gt "$max_val" ]; then
+            max_val=$seconds
+          fi
+        fi
+      done < docker-compose.yml
+    fi
+    echo "$max_val"
+  args:
+    chdir: "{{ app_dir }}"
+    executable: /bin/bash
+  register: compose_max_start_period_result
+  changed_when: false
+  failed_when: false
+
+- name: Set max_start_period fact
+  ansible.builtin.set_fact:
+    compose_max_start_period: "{{ compose_max_start_period_result.stdout | default('0') | int }}"

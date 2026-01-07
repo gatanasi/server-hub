@@ -80,8 +80,12 @@
     app_source_dir: "{{ repo_dir }}/docker/{{ app_name }}"
     app_target_dir: "{{ app_base_dir }}/{{ app_name }}"
     backup_dir: "{{ app_target_dir }}/.backup"
-    health_check_timeout: 60
+    # Health check timeout is dynamically calculated from docker-compose healthcheck.start_period
+    # Falls back to this default if no healthchecks are defined or parsing fails
+    health_check_timeout_default: 90
     health_check_interval: 5
+    # Buffer time added to start_period for timeout calculation (accounts for check execution)
+    health_check_buffer: 30
     telegram_bot_token: "{{ deploy_telegram_bot_token }}"
     telegram_chat_id: "{{ deploy_telegram_chat_id }}"
     telegram_enabled: "{{ deploy_telegram_enabled }}"
@@ -268,6 +272,19 @@
     - name: Wait for containers to initialize
       ansible.builtin.pause:
         seconds: 5
+
+    - name: Extract max healthcheck start_period from docker-compose.yml
+      ansible.builtin.include_tasks: tasks/extract-max-start-period.yml
+      vars:
+        app_dir: "{{ app_target_dir }}"
+
+    - name: Calculate health check timeout
+      ansible.builtin.set_fact:
+        health_check_timeout: "{{ [((compose_max_start_period | int) + (health_check_buffer | int)), (health_check_timeout_default | int)] | max }}"
+
+    - name: Display health check configuration
+      ansible.builtin.debug:
+        msg: "Health check timeout: {{ health_check_timeout }}s (max start_period: {{ compose_max_start_period }}s + buffer: {{ health_check_buffer }}s)"
 
     - name: Verify service health
       ansible.builtin.include_tasks: tasks/verify-service-health.yml

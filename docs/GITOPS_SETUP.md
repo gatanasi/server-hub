@@ -382,7 +382,43 @@ Go to Actions → Deploy Docker Apps → Run workflow → Enter app name
 
 ## Health Checks and Rollback
 
-The deployment playbook automatically verifies container health and rolls back on failure.
+The deployment playbook automatically verifies container health using Docker's native healthcheck feature and rolls back on failure.
+
+### Docker Healthcheck Requirements
+
+Every service in `docker-compose.yml` is **strongly recommended** to define a healthcheck block. The Ansible playbooks leverage these healthchecks to determine deployment success and to compute per-service timeouts. If a service does **not** define a healthcheck, the playbooks fall back to a fixed default timeout and have less precise insight into that service's readiness and health during deployment and rollback.
+
+**Standard healthcheck configuration:**
+
+```yaml
+services:
+  app:
+    image: your-image
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s      # How often to run the check
+      timeout: 10s       # Max time for a single check
+      retries: 3         # Failures before marking unhealthy
+      start_period: 40s  # Grace period: failures don't count toward retries, but a pass marks healthy
+```
+
+**Healthcheck tool selection by image base:**
+
+| Image Base | Tool | Example |
+|------------|------|------|
+| Debian/Ubuntu | `curl` | `curl -f http://localhost:8080/health` |
+| Alpine | `wget` | `wget -q --spider http://localhost:3000/` |
+| Postgres | `pg_isready` | `pg_isready -U $USER -d $DB` |
+| Redis | `redis-cli` | `redis-cli ping` |
+
+**Recommended start_period values:**
+
+| Service Type | start_period | Reason |
+|--------------|--------------|--------|
+| Simple web app | 40s | Quick startup |
+| Java/JVM apps | 60s | JVM warmup |
+| Heavy apps (Odoo, ERPNext) | 120s | Database migrations, module loading |
+| Databases | 30-40s | Initial startup |
 
 ### How It Works
 
@@ -392,9 +428,11 @@ The deployment playbook automatically verifies container health and rolls back o
    - Current image information
 
 2. **Health Check Phase**: After `docker compose up`, the playbook:
+   - Extracts `start_period` values from docker-compose.yml
+   - **Dynamically calculates timeout**: `max(max_start_period + 30s buffer, health_check_timeout_default)`
    - Waits for containers to initialize (5 seconds)
    - Checks for services with Docker healthchecks
-   - Polls health status every 5 seconds for up to 120 seconds
+   - Polls health status every 5 seconds until timeout
    - Detects containers that exited unexpectedly
 
 3. **Rollback Phase**: If health check fails:
@@ -411,14 +449,17 @@ In `ansible/inventory/production.yml`, you can set per-host options:
 docker_hosts:
   hosts:
     n8n.vm:
-      # Health check settings
-      health_check_timeout: 60    # Max seconds to wait for healthy
-      health_check_interval: 5     # Seconds between checks
+      # Health check settings (timeout is auto-calculated from start_period)
+      health_check_timeout_default: 90  # Minimum timeout / fallback if no start_period
+      health_check_interval: 5          # Seconds between checks
+      health_check_buffer: 30           # Added to max start_period
       
       # Cleanup settings
       docker_prune_after_deploy: true    # Prune unused images
       cleanup_backups_on_success: false  # Keep backups for manual rollback
 ```
+
+> **Note**: The `health_check_timeout` is **automatically calculated** as `max(max_start_period + buffer, health_check_timeout_default)`. This ensures that `health_check_timeout_default` acts as a minimum wait time, even for fast-starting services or those without explicit `start_period`.
 
 ### Adding Healthchecks to Your Compose File
 

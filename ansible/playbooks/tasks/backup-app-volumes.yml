@@ -139,6 +139,17 @@
       when: docker_volumes | length > 0
 
     # === HEALTH CHECK PHASE ===
+    - name: "{{ current_app }} | Extract max healthcheck start_period"
+      ansible.builtin.include_tasks: tasks/extract-max-start-period.yml
+      vars:
+        app_dir: "{{ app_dir }}"
+      when: docker_volumes | length > 0
+
+    - name: "{{ current_app }} | Set health check timeout"
+      ansible.builtin.set_fact:
+        health_check_timeout: "{{ [((compose_max_start_period | int) + (health_check_buffer | int)), (health_check_timeout_default | int)] | max }}"
+      when: docker_volumes | length > 0
+
     - name: "{{ current_app }} | Verify service health"
       ansible.builtin.include_tasks: verify-service-health.yml
       vars:

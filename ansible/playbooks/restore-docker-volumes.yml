@@ -70,6 +70,12 @@
     
     # Helper image for backup/restore operations (pinned for reproducibility)
     helper_image: alpine:3.20
+
+    # Health check buffer
+    health_check_buffer: 30
+
+    # Default health check timeout
+    health_check_timeout_default: 90
     
     # Load telegram credentials from secrets file
     secrets_file: "{{ lookup('env', 'HOME') }}/.deploy-secrets"
@@ -240,6 +246,15 @@
             seconds: 5
 
         # === HEALTH CHECK PHASE ===
+        - name: Extract max healthcheck start_period
+          ansible.builtin.include_tasks: tasks/extract-max-start-period.yml
+          when: compose_exists.stat.exists
+
+        - name: Set health check timeout
+          ansible.builtin.set_fact:
+            health_check_timeout: "{{ [((compose_max_start_period | int) + (health_check_buffer | int)), (health_check_timeout_default | int)] | max }}"
+          when: compose_exists.stat.exists
+
         - name: Verify service health
           ansible.builtin.include_tasks: tasks/verify-service-health.yml
           vars:
