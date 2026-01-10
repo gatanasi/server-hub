@@ -104,38 +104,30 @@ jobs:
           echo "${{ secrets.DEPLOYER_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-      - name: Run backup playbook
+      - name: Run backup via deployer.vm
         id: backup
         run: |
           echo "::group::Running backup on deployer.vm"
           
-          # Build ansible-playbook command
           APP_NAME="${{ github.event.inputs.app_name }}"
           TARGET_HOST="${{ github.event.inputs.target_host }}"
           BACKUP_DEST="${{ github.event.inputs.backup_destination }}"
           
-          # Build extra vars - properly quoted for safety
-          EXTRA_VARS="-e backup_destination='${BACKUP_DEST}'"
+          # Build the backup command
+          # Format: backup <app> [--destination path] [--host hostname]
+          BACKUP_CMD="backup \"${APP_NAME}\" --destination \"${BACKUP_DEST}\""
           
-          if [[ "$APP_NAME" != "all" ]]; then
-            EXTRA_VARS="${EXTRA_VARS} -e app_name='${APP_NAME}'"
-          fi
-          
-          # Build limit if target host specified
-          LIMIT_ARG=""
           if [[ -n "$TARGET_HOST" ]]; then
-            LIMIT_ARG="-l '${TARGET_HOST}'"
+            BACKUP_CMD="${BACKUP_CMD} --host \"${TARGET_HOST}\""
           fi
           
-          # SSH to deployer.vm and run the backup playbook
-          # Build the full remote command for proper quoting
-          REMOTE_CMD="cd ~/git/server-hub/ansible && ansible-playbook playbooks/backup-docker-volumes.yml ${EXTRA_VARS} ${LIMIT_ARG}"
+          # SSH to deployer.vm - the forced command routes to trigger.sh
           ssh -i ~/.ssh/deploy_key \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
-              "${REMOTE_CMD}"
+              "${BACKUP_CMD}"
           
           BACKUP_EXIT=$?
           

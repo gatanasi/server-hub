@@ -141,7 +141,7 @@ Manual workflows are available to trigger backups and restores from GitHub Actio
 |-------|-------------|---------|
 | `app_name` | Application to restore | Required |
 | `operation` | list_backups, restore_latest, restore_specific | list_backups |
-| `backup_timestamp` | Timestamp for restore_specific (format: `YYYYMMDDTHHMMSS`) | - |
+| `backup_timestamp` | Timestamp for restore_specific (format: `YYYYMMDDThhmmss`, e.g., `20260106T143000`) | - |
 | `backup_source` | Backup source path | `/mnt/backups` |
 
 > **Security:** The restore workflow validates timestamp format with regex `^[0-9]{8}T[0-9]{6}$` and rejects paths containing `..` to prevent path traversal attacks.
