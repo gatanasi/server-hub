@@ -123,19 +123,11 @@
         old_version: "{{ old_version_raw.stdout | default('none') }}"
 
     - name: Send deployment started notification
-      ansible.builtin.uri:
-        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
-        method: POST
-        body_format: form-urlencoded
-        body:
-          chat_id: "{{ telegram_chat_id }}"
-          text: "🚀 <b>Deployment Started</b>\n\nApp: <code>{{ app_name }}</code>\nUpdate: <code>{{ old_version }}</code> → <code>{{ new_version }}</code>"
-          parse_mode: "HTML"
-        status_code: [200]
-      delegate_to: localhost
-      when: telegram_enabled | bool
-      ignore_errors: true
-      no_log: true
+      ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
+      vars:
+        notify_title: "Deployment Started"
+        notify_emoji: "🚀"
+        notify_message: "App: <code>{{ app_name }}</code>\nUpdate: <code>{{ old_version }}</code> → <code>{{ new_version }}</code>"
 
     - name: Ensure app directory exists
       ansible.builtin.file:
@@ -354,19 +346,11 @@
           when: backup_exists.stat.exists
 
         - name: Send rollback notification
-          ansible.builtin.uri:
-            url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
-            method: POST
-            body_format: form-urlencoded
-            body:
-              chat_id: "{{ telegram_chat_id }}"
-              text: "⚠️ <b>Deployment Rolled Back</b>\n\nApp: <code>{{ app_name }}</code>\nError: {{ failure_reason | default('Health check failed') }}\nCurrent: Restored to <code>{{ old_version }}</code>"
-              parse_mode: "HTML"
-            status_code: [200]
-          delegate_to: localhost
-          when: telegram_enabled | bool
-          ignore_errors: true
-          no_log: true
+          ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
+          vars:
+            notify_title: "Deployment Rolled Back"
+            notify_emoji: "⚠️"
+            notify_message: "App: <code>{{ app_name }}</code>\nError: {{ failure_reason | default('Health check failed') }}\nCurrent: Restored to <code>{{ old_version }}</code>"
 
         - name: Fail the playbook after rollback
           ansible.builtin.fail:
@@ -379,19 +363,11 @@
             msg: "WARNING: Rollback failed! Manual intervention required."
 
         - name: Send critical failure notification
-          ansible.builtin.uri:
-            url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
-            method: POST
-            body_format: form-urlencoded
-            body:
-              chat_id: "{{ telegram_chat_id }}"
-              text: "🔴 <b>CRITICAL: Rollback Failed</b>\n\nApp: <code>{{ app_name }}</code>\n\n⚠️ Manual intervention required!"
-              parse_mode: "HTML"
-            status_code: [200]
-          delegate_to: localhost
-          when: telegram_enabled | bool
-          ignore_errors: true
-          no_log: true
+          ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
+          vars:
+            notify_title: "CRITICAL: Rollback Failed"
+            notify_emoji: "🔴"
+            notify_message: "App: <code>{{ app_name }}</code>\n\n⚠️ Manual intervention required!"
 
         - name: Fail after rollback failure
           ansible.builtin.fail:
@@ -429,21 +405,12 @@
         - cleanup_backups_on_success | default(false)
 
     - name: Send success notification
-      ansible.builtin.uri:
-        url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
-        method: POST
-        body_format: form-urlencoded
-        body:
-          chat_id: "{{ telegram_chat_id }}"
-          text: "✅ <b>Deployment Successful</b>\n\nApp: <code>{{ app_name }}</code>\nVersion: <code>{{ new_version }}</code>\nStatus: {{ 'Running (no healthchecks)' if no_healthchecks_defined | default(false) else 'Healthy' }}{{ '\n\n' + healthcheck_warning if healthcheck_warning | default('') | length > 0 else '' }}"
-          parse_mode: "HTML"
-        status_code: [200]
-      delegate_to: localhost
-      when: 
-        - telegram_enabled | bool
-        - not deployment_failed | default(false)
-      ignore_errors: true
-      no_log: true
+      ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
+      vars:
+        notify_title: "Deployment Successful"
+        notify_emoji: "✅"
+        notify_message: "App: <code>{{ app_name }}</code>\nVersion: <code>{{ new_version }}</code>\nStatus: {{ 'Running (no healthchecks)' if no_healthchecks_defined | default(false) else 'Healthy' }}{{ '\n\n' + healthcheck_warning if healthcheck_warning | default('') | length > 0 else '' }}"
+      when: not deployment_failed | default(false)
 
 
 - name: Deployment summary
