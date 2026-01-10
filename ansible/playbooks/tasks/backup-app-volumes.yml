@@ -141,8 +141,7 @@
     # === HEALTH CHECK PHASE ===
     - name: "{{ current_app }} | Extract max healthcheck start_period"
       ansible.builtin.include_tasks: tasks/extract-max-start-period.yml
-      vars:
-        app_dir: "{{ app_dir }}"
+      # app_dir is already defined in this scope and will be inherited by the included tasks
       when: docker_volumes | length > 0
 
     - name: "{{ current_app }} | Set health check timeout"
