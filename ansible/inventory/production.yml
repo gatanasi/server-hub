@@ -35,6 +35,12 @@ all:
           ansible_host: openspeedtest.vm
           managed_apps:
             - openspeedtest
+
+        video-converter.vm:
+          ansible_user: converter
+          ansible_host: video-converter.vm
+          managed_apps:
+            - video-converter
         # Add more hosts as needed:
         #
         # odoo.vm:
