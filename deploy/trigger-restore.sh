@@ -28,46 +28,20 @@ set -euo pipefail
 # Configuration
 # ============================================================================
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="/home/deployer/git/server-hub"
 ANSIBLE_DIR="${REPO_DIR}/ansible"
 LOG_DIR="/home/deployer/logs/restores"
 LOG_FILE="${LOG_DIR}/restore-$(date +%Y%m%d-%H%M%S).log"
-SECRETS_FILE="/home/deployer/.deploy-secrets"
+OPERATION_TYPE="Restore"
+
+# Source common functions
+# shellcheck source=common.sh
+source "${SCRIPT_DIR}/common.sh"
 
 # ============================================================================
 # Functions
 # ============================================================================
-
-log() {
-    local timestamp
-    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[${timestamp}] $*" | tee -a "${LOG_FILE}"
-}
-
-error() {
-    local msg="$*"
-    log "ERROR: ${msg}"
-    send_notification "❌ Restore FAILED" "${msg}"
-    exit 1
-}
-
-send_notification() {
-    local title="$1"
-    local message="$2"
-    
-    if [[ -f "${SECRETS_FILE}" ]]; then
-        # shellcheck source=/dev/null
-        source "${SECRETS_FILE}"
-    fi
-    
-    if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then
-        local text="${title}%0A%0A${message}"
-        curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_CHAT_ID}" \
-            -d "text=${text}" \
-            -d "parse_mode=HTML" > /dev/null 2>&1 || true
-    fi
-}
 
 show_help() {
     echo "Usage: $0 <app-name> <operation> [options]"
@@ -87,33 +61,6 @@ show_help() {
     echo "  $0 n8n list_backups"
     echo "  $0 n8n restore_latest"
     echo "  $0 n8n restore_specific --timestamp 20260106T143000"
-}
-
-validate_app_name() {
-    local app="$1"
-    
-    # Security: Only allow alphanumeric, dash, and underscore
-    if [[ ! "${app}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        error "Invalid app name: ${app}. Only alphanumeric, dash, and underscore allowed."
-    fi
-    
-    # Check if docker-compose.yml exists for this app
-    if [[ ! -f "${REPO_DIR}/docker/${app}/docker-compose.yml" ]]; then
-        error "No docker-compose.yml found for app: ${app}"
-    fi
-}
-
-pull_latest_repo() {
-    log "Pulling latest changes from git..."
-    
-    (
-        cd "${REPO_DIR}"
-        git fetch origin main
-        git reset --hard origin/main
-        chmod +x "${REPO_DIR}/deploy/"*.sh 2>/dev/null || true
-    )
-    
-    log "Git pull complete. Current commit: $(cd "${REPO_DIR}" && git rev-parse --short HEAD)"
 }
 
 run_restore_playbook() {
@@ -205,6 +152,10 @@ main() {
                     app_name="$1"
                 elif [[ -z "${restore_op}" ]]; then
                     restore_op="$1"
+                else
+                    echo "Error: Unexpected argument: $1" >&2
+                    show_help >&2
+                    exit 1
                 fi
                 shift
                 ;;
@@ -232,22 +183,16 @@ main() {
     log "Operation: ${restore_op}"
     log "=========================================="
     
-    # Validate inputs
-    validate_app_name "${app_name}"
+    # Validate inputs using common functions
+    validate_app_name "${app_name}"  # 'all' not allowed for restore
     
     # Validate restore operation
     if [[ ! "${restore_op}" =~ ^(list_backups|restore_latest|restore_specific)$ ]]; then
         error "Invalid restore operation: ${restore_op}. Must be list_backups, restore_latest, or restore_specific."
     fi
     
-    # Validate backup source (security check)
-    if [[ ! "${backup_src}" =~ ^/[a-zA-Z0-9/_.-]+$ ]]; then
-        error "Invalid backup source: ${backup_src}. Must be an absolute path without special characters."
-    fi
-    # Check for path traversal: reject if contains '/..' or '../' anywhere
-    if [[ "${backup_src}" == *".."* ]]; then
-        error "Backup source cannot contain path traversal components ('..')"
-    fi
+    # Validate backup source path
+    validate_path "${backup_src}" "backup source"
     
     # Validate timestamp if restore_specific
     if [[ "${restore_op}" == "restore_specific" ]]; then
