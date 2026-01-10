@@ -193,3 +193,22 @@ jobs:
               -d "text=$MESSAGE" \
               -d "parse_mode=HTML" || true
           fi
+
+  notify-failure:
+    name: Notify Failure
+    needs: [detect-changes, deploy]
+    if: failure() && needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: self-hosted
+    
+    steps:
+      - name: Send failure notification
+        run: |
+          if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
+            APPS='${{ needs.detect-changes.outputs.apps }}'
+            MESSAGE="❌ <b>Deployment Failed</b>%0A%0AApps: ${APPS}%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
+            
+            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+              -d "text=$MESSAGE" \
+              -d "parse_mode=HTML" || true
+          fi
