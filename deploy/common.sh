@@ -39,7 +39,8 @@ log() {
 error() {
     local msg="$*"
     log "ERROR: ${msg}"
-    send_notification "❌ ${OPERATION_TYPE} FAILED" "${msg}"
+    # Wrap the message in <pre> tags to prevent HTML injection
+    send_notification "❌ ${OPERATION_TYPE} FAILED" "<pre>${msg}</pre>"
     exit 1
 }
 

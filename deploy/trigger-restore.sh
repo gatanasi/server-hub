@@ -199,8 +199,9 @@ main() {
         if [[ -z "${timestamp}" ]]; then
             error "Timestamp is required for restore_specific operation. Use --timestamp YYYYMMDDThhmmss (e.g., 20260106T143000)"
         fi
-        if [[ ! "${timestamp}" =~ ^[0-9]{8}T[0-9]{6}$ ]]; then
-            error "Invalid timestamp format: ${timestamp}. Expected: YYYYMMDDTHHMMSS (e.g., 20260106T143000)"
+        # Accept both uppercase and lowercase 'T' separator for user convenience
+        if [[ ! "${timestamp}" =~ ^[0-9]{8}[Tt][0-9]{6}$ ]]; then
+            error "Invalid timestamp format: ${timestamp}. Expected: YYYYMMDDThhmmss (e.g., 20260106T143000)"
         fi
     fi
     
