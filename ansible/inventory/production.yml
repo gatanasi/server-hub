@@ -24,14 +24,17 @@ all:
     # Group for all Docker Compose hosts
     docker_hosts:
       hosts:
-        # n8n automation platform
         n8n.vm:
           ansible_user: n8n
           ansible_host: n8n.vm
-          # Map app name to this host
           managed_apps:
             - n8n
-        
+
+        openspeedtest.vm:
+          ansible_user: speed
+          ansible_host: openspeedtest.vm
+          managed_apps:
+            - openspeedtest
         # Add more hosts as needed:
         #
         # odoo.vm:
