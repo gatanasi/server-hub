@@ -14,7 +14,7 @@
 #
 # Options:
 #   --source <path>           Backup source path (default: /mnt/backups)
-#   --timestamp <TIMESTAMP>   Backup timestamp for restore_specific (format: YYYYMMDDTHHMMSS)
+#   --timestamp <TIMESTAMP>   Backup timestamp for restore_specific (format: YYYYMMDDThhmmss, e.g., 20260106T143000)
 #
 # Examples:
 #   ./trigger-restore.sh n8n list_backups
@@ -54,7 +54,7 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  --source <path>         Backup source path (default: /mnt/backups)"
-    echo "  --timestamp <TS>        Backup timestamp for restore_specific (YYYYMMDDTHHMMSS)"
+    echo "  --timestamp <TS>        Backup timestamp for restore_specific (YYYYMMDDThhmmss, e.g., 20260106T143000)"
     echo "  --help                  Show this help message"
     echo ""
     echo "Examples:"
@@ -135,7 +135,7 @@ main() {
                 ;;
             --timestamp)
                 if [[ -z "${2:-}" || "$2" == -* ]]; then
-                    echo "Error: --timestamp requires a timestamp argument (YYYYMMDDTHHMMSS)"
+                    echo "Error: --timestamp requires a timestamp argument (YYYYMMDDThhmmss, e.g., 20260106T143000)"
                     show_help
                     exit 1
                 fi
@@ -197,7 +197,7 @@ main() {
     # Validate timestamp if restore_specific
     if [[ "${restore_op}" == "restore_specific" ]]; then
         if [[ -z "${timestamp}" ]]; then
-            error "Timestamp is required for restore_specific operation. Use --timestamp YYYYMMDDTHHMMSS"
+            error "Timestamp is required for restore_specific operation. Use --timestamp YYYYMMDDThhmmss (e.g., 20260106T143000)"
         fi
         if [[ ! "${timestamp}" =~ ^[0-9]{8}T[0-9]{6}$ ]]; then
             error "Invalid timestamp format: ${timestamp}. Expected: YYYYMMDDTHHMMSS (e.g., 20260106T143000)"
