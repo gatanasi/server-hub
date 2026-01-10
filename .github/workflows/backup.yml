@@ -115,10 +115,10 @@ jobs:
           
           # Build the backup command
           # Format: backup <app> [--destination path] [--host hostname]
-          BACKUP_CMD="backup ${APP_NAME} --destination ${BACKUP_DEST}"
+          BACKUP_CMD="backup \"${APP_NAME}\" --destination \"${BACKUP_DEST}\""
           
           if [[ -n "$TARGET_HOST" ]]; then
-            BACKUP_CMD="${BACKUP_CMD} --host ${TARGET_HOST}"
+            BACKUP_CMD="${BACKUP_CMD} --host \"${TARGET_HOST}\""
           fi
           
           # SSH to deployer.vm - the forced command routes to trigger.sh

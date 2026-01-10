@@ -26,8 +26,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Handle arguments from SSH_ORIGINAL_COMMAND or direct invocation
 if [[ -n "${SSH_ORIGINAL_COMMAND:-}" ]]; then
     # Called via forced SSH command
-    # shellcheck disable=SC2086
-    set -- ${SSH_ORIGINAL_COMMAND}
+    # Use read -ra to safely split the command without glob expansion
+    declare -a args
+    read -ra args <<< "${SSH_ORIGINAL_COMMAND}"
+    set -- "${args[@]}"
 fi
 
 # Get the operation (first argument)

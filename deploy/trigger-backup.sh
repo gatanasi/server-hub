@@ -40,8 +40,9 @@ log() {
 }
 
 error() {
-    log "ERROR: $*"
-    send_notification "❌ Backup FAILED" "$*"
+    local msg="$*"
+    log "ERROR: ${msg}"
+    send_notification "❌ Backup FAILED" "${msg}"
     exit 1
 }
 
@@ -103,14 +104,15 @@ validate_app_name() {
 
 pull_latest_repo() {
     log "Pulling latest changes from git..."
-    cd "${REPO_DIR}"
     
-    git fetch origin main
-    git reset --hard origin/main
+    (
+        cd "${REPO_DIR}"
+        git fetch origin main
+        git reset --hard origin/main
+        chmod +x "${REPO_DIR}/deploy/"*.sh 2>/dev/null || true
+    )
     
-    chmod +x "${REPO_DIR}/deploy/"*.sh 2>/dev/null || true
-    
-    log "Git pull complete. Current commit: $(git rev-parse --short HEAD)"
+    log "Git pull complete. Current commit: $(cd "${REPO_DIR}" && git rev-parse --short HEAD)"
 }
 
 run_backup_playbook() {
@@ -119,8 +121,6 @@ run_backup_playbook() {
     local target_host="$3"
     
     log "Running backup playbook for app: ${app}"
-    
-    cd "${ANSIBLE_DIR}"
     
     # Build ansible command arguments
     local ansible_args=("-i" "inventory/production.yml" "playbooks/backup-docker-volumes.yml")
@@ -134,10 +134,13 @@ run_backup_playbook() {
         ansible_args+=("-l" "${target_host}")
     fi
     
-    # Run the backup playbook
-    # Note: We use || true to prevent set -e from killing the script before we can send notifications
+    # Run the backup playbook in a subshell to avoid cd side effects
+    # Note: We use || exit_code=$? to prevent set -e from killing the script before we can send notifications
     local exit_code=0
-    ansible-playbook "${ansible_args[@]}" 2>&1 | tee -a "${LOG_FILE}" || exit_code=$?
+    (
+        cd "${ANSIBLE_DIR}"
+        ansible-playbook "${ansible_args[@]}" 2>&1
+    ) | tee -a "${LOG_FILE}" || exit_code=$?
     
     if [[ ${exit_code} -ne 0 ]]; then
         error "Backup playbook failed with exit code: ${exit_code}"
@@ -163,11 +166,21 @@ main() {
                 exit 0
                 ;;
             --destination)
-                backup_dest="${2:-/mnt/backups}"
+                if [[ -z "${2:-}" || "$2" == -* ]]; then
+                    echo "Error: --destination requires a path argument"
+                    show_help
+                    exit 1
+                fi
+                backup_dest="$2"
                 shift 2
                 ;;
             --host)
-                target_host="${2:-}"
+                if [[ -z "${2:-}" || "$2" == -* ]]; then
+                    echo "Error: --host requires a hostname argument"
+                    show_help
+                    exit 1
+                fi
+                target_host="$2"
                 shift 2
                 ;;
             -*)
@@ -205,7 +218,8 @@ main() {
     if [[ ! "${backup_dest}" =~ ^/[a-zA-Z0-9/_.-]+$ ]]; then
         error "Invalid backup destination: ${backup_dest}. Must be an absolute path without special characters."
     fi
-    if [[ "${backup_dest}" =~ (^|/)\.\./|/\.\.$|(^|/)\.\. ]]; then
+    # Check for path traversal: reject if contains '/..' or '../' anywhere
+    if [[ "${backup_dest}" == *".."* ]]; then
         error "Backup destination cannot contain path traversal components ('..')"
     fi
     

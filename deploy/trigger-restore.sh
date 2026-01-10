@@ -45,8 +45,9 @@ log() {
 }
 
 error() {
-    log "ERROR: $*"
-    send_notification "❌ Restore FAILED" "$*"
+    local msg="$*"
+    log "ERROR: ${msg}"
+    send_notification "❌ Restore FAILED" "${msg}"
     exit 1
 }
 
@@ -104,14 +105,15 @@ validate_app_name() {
 
 pull_latest_repo() {
     log "Pulling latest changes from git..."
-    cd "${REPO_DIR}"
     
-    git fetch origin main
-    git reset --hard origin/main
+    (
+        cd "${REPO_DIR}"
+        git fetch origin main
+        git reset --hard origin/main
+        chmod +x "${REPO_DIR}/deploy/"*.sh 2>/dev/null || true
+    )
     
-    chmod +x "${REPO_DIR}/deploy/"*.sh 2>/dev/null || true
-    
-    log "Git pull complete. Current commit: $(git rev-parse --short HEAD)"
+    log "Git pull complete. Current commit: $(cd "${REPO_DIR}" && git rev-parse --short HEAD)"
 }
 
 run_restore_playbook() {
@@ -121,8 +123,6 @@ run_restore_playbook() {
     local timestamp="$4"
     
     log "Running restore playbook for app: ${app}, operation: ${restore_op}"
-    
-    cd "${ANSIBLE_DIR}"
     
     # Build ansible command arguments
     local ansible_args=("-i" "inventory/production.yml" "playbooks/restore-docker-volumes.yml")
@@ -145,10 +145,13 @@ run_restore_playbook() {
             ;;
     esac
     
-    # Run the restore playbook
+    # Run the restore playbook in a subshell to avoid cd side effects
     # Note: We use || exit_code=$? to prevent set -e from killing the script before we can send notifications
     local exit_code=0
-    ansible-playbook "${ansible_args[@]}" 2>&1 | tee -a "${LOG_FILE}" || exit_code=$?
+    (
+        cd "${ANSIBLE_DIR}"
+        ansible-playbook "${ansible_args[@]}" 2>&1
+    ) | tee -a "${LOG_FILE}" || exit_code=$?
     
     if [[ ${exit_code} -ne 0 ]]; then
         error "Restore playbook failed with exit code: ${exit_code}"
@@ -175,11 +178,21 @@ main() {
                 exit 0
                 ;;
             --source)
-                backup_src="${2:-/mnt/backups}"
+                if [[ -z "${2:-}" || "$2" == -* ]]; then
+                    echo "Error: --source requires a path argument"
+                    show_help
+                    exit 1
+                fi
+                backup_src="$2"
                 shift 2
                 ;;
             --timestamp)
-                timestamp="${2:-}"
+                if [[ -z "${2:-}" || "$2" == -* ]]; then
+                    echo "Error: --timestamp requires a timestamp argument (YYYYMMDDTHHMMSS)"
+                    show_help
+                    exit 1
+                fi
+                timestamp="$2"
                 shift 2
                 ;;
             -*)
@@ -231,7 +244,8 @@ main() {
     if [[ ! "${backup_src}" =~ ^/[a-zA-Z0-9/_.-]+$ ]]; then
         error "Invalid backup source: ${backup_src}. Must be an absolute path without special characters."
     fi
-    if [[ "${backup_src}" =~ (^|/)\.\./|/\.\.$|(^|/)\.\. ]]; then
+    # Check for path traversal: reject if contains '/..' or '../' anywhere
+    if [[ "${backup_src}" == *".."* ]]; then
         error "Backup source cannot contain path traversal components ('..')"
     fi
     

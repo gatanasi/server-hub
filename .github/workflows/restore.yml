@@ -133,10 +133,10 @@ jobs:
           
           # Build the restore command
           # Format: restore <app> <operation> [--source path] [--timestamp TIMESTAMP]
-          RESTORE_CMD="restore ${APP_NAME} ${OPERATION} --source ${BACKUP_SRC}"
+          RESTORE_CMD="restore \"${APP_NAME}\" \"${OPERATION}\" --source \"${BACKUP_SRC}\""
           
           if [[ "$OPERATION" == "restore_specific" && -n "$TIMESTAMP" ]]; then
-            RESTORE_CMD="${RESTORE_CMD} --timestamp ${TIMESTAMP}"
+            RESTORE_CMD="${RESTORE_CMD} --timestamp \"${TIMESTAMP}\""
           fi
           
           # SSH to deployer.vm - the forced command routes to trigger.sh
@@ -167,6 +167,7 @@ jobs:
             echo "::error::Operation failed"
             echo "status=failed" >> $GITHUB_OUTPUT
             exit $RESTORE_EXIT
+          fi
           fi
 
       - name: Cleanup SSH keys
