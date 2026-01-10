@@ -1,19 +1,31 @@
 #!/usr/bin/env bash
 #
-# trigger-deploy.sh - Main deployment trigger script
+# trigger-deploy.sh - Main deployment/backup/restore trigger script
 #
 # This script is executed on deployer.vm when triggered by the GitHub Actions runner.
 # It is called via SSH forced command, so arguments come from SSH_ORIGINAL_COMMAND.
 #
 # Usage (when called directly for testing):
-#   ./trigger-deploy.sh <app-name>
+#   ./trigger-deploy.sh deploy <app-name>
+#   ./trigger-deploy.sh backup <app-name> [--destination /mnt/backups] [--host hostname]
+#   ./trigger-deploy.sh restore <app-name> <operation> [--source /mnt/backups] [--timestamp YYYYMMDDTHHMMSS]
 #
 # Usage (when called via forced SSH command):
+#   ssh deployer@deployer.vm deploy <app-name>
+#   ssh deployer@deployer.vm backup <app-name> [--destination /mnt/backups] [--host hostname]
+#   ssh deployer@deployer.vm restore <app-name> <operation> [--source /mnt/backups] [--timestamp YYYYMMDDTHHMMSS]
+#
+# Legacy usage (deploy only - for backward compatibility):
 #   ssh deployer@deployer.vm <app-name>
 #
-# Example:
-#   ./trigger-deploy.sh n8n
-#   ssh deployer@deployer.vm n8n
+# Examples:
+#   ./trigger-deploy.sh deploy n8n
+#   ./trigger-deploy.sh backup n8n
+#   ./trigger-deploy.sh backup all --destination /mnt/backups
+#   ./trigger-deploy.sh backup odoo --host odoo.vm
+#   ./trigger-deploy.sh restore n8n list_backups
+#   ./trigger-deploy.sh restore n8n restore_latest
+#   ./trigger-deploy.sh restore n8n restore_specific --timestamp 20260106T143000
 #
 
 set -euo pipefail
@@ -45,7 +57,7 @@ log() {
 
 error() {
     log "ERROR: $*"
-    send_notification "❌ Deployment FAILED" "$*"
+    send_notification "❌ ${OPERATION:-Operation} FAILED" "$*"
     exit 1
 }
 
@@ -141,29 +153,208 @@ run_ansible_playbook() {
     log "Ansible playbook completed successfully"
 }
 
+run_backup_playbook() {
+    local app="$1"
+    local backup_dest="$2"
+    local target_host="$3"
+    
+    log "Running backup playbook for app: ${app}"
+    
+    cd "${ANSIBLE_DIR}"
+    
+    # Build extra vars
+    local extra_vars="-e backup_destination='${backup_dest}'"
+    
+    if [[ "${app}" != "all" ]]; then
+        extra_vars="${extra_vars} -e app_name='${app}'"
+    fi
+    
+    # Build limit if target host specified
+    local limit_arg=""
+    if [[ -n "${target_host}" ]]; then
+        limit_arg="-l '${target_host}'"
+    fi
+    
+    # Run the backup playbook
+    # shellcheck disable=SC2086
+    ansible-playbook \
+        -i inventory/production.yml \
+        playbooks/backup-docker-volumes.yml \
+        ${extra_vars} \
+        ${limit_arg} \
+        2>&1 | tee -a "${LOG_FILE}"
+    
+    local exit_code=${PIPESTATUS[0]}
+    
+    if [[ ${exit_code} -ne 0 ]]; then
+        error "Backup playbook failed with exit code: ${exit_code}"
+    fi
+    
+    log "Backup playbook completed successfully"
+}
+
+run_restore_playbook() {
+    local app="$1"
+    local restore_op="$2"
+    local backup_src="$3"
+    local timestamp="$4"
+    
+    log "Running restore playbook for app: ${app}, operation: ${restore_op}"
+    
+    cd "${ANSIBLE_DIR}"
+    
+    # Build extra vars
+    local extra_vars="-e app_name='${app}' -e backup_source='${backup_src}'"
+    
+    case "${restore_op}" in
+        list_backups)
+            extra_vars="${extra_vars} -e list_only=true"
+            ;;
+        restore_latest)
+            extra_vars="${extra_vars} -e auto_confirm=true"
+            ;;
+        restore_specific)
+            extra_vars="${extra_vars} -e auto_confirm=true -e backup_timestamp='${timestamp}'"
+            ;;
+        *)
+            error "Unknown restore operation: ${restore_op}"
+            ;;
+    esac
+    
+    # Run the restore playbook
+    # shellcheck disable=SC2086
+    ansible-playbook \
+        -i inventory/production.yml \
+        playbooks/restore-docker-volumes.yml \
+        ${extra_vars} \
+        2>&1 | tee -a "${LOG_FILE}"
+    
+    local exit_code=${PIPESTATUS[0]}
+    
+    if [[ ${exit_code} -ne 0 ]]; then
+        error "Restore playbook failed with exit code: ${exit_code}"
+    fi
+    
+    log "Restore playbook completed successfully"
+}
+
 # ============================================================================
 # Main
 # ============================================================================
 
 main() {
+    local operation=""
     local app_name=""
+    local backup_dest="/mnt/backups"
+    local backup_src="/mnt/backups"
+    local target_host=""
+    local restore_op=""
+    local timestamp=""
     
     # Handle arguments: either direct args or SSH_ORIGINAL_COMMAND
     if [[ -n "${SSH_ORIGINAL_COMMAND:-}" ]]; then
         # Called via forced SSH command
         # shellcheck disable=SC2086
         set -- ${SSH_ORIGINAL_COMMAND}
-        app_name="${1:-}"
-    else
-        # Called directly (for testing)
-        app_name="${1:-}"
     fi
+    
+    # Parse arguments
+    local first_arg="${1:-}"
+    
+    # Detect operation: 'deploy', 'backup', 'restore', or legacy mode (app name only)
+    case "${first_arg}" in
+        deploy)
+            operation="Deployment"
+            shift
+            app_name="${1:-}"
+            ;;
+        backup)
+            operation="Backup"
+            shift
+            app_name="${1:-}"
+            shift || true
+            # Parse optional arguments
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --destination)
+                        backup_dest="${2:-/mnt/backups}"
+                        shift 2
+                        ;;
+                    --host)
+                        target_host="${2:-}"
+                        shift 2
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+            ;;
+        restore)
+            operation="Restore"
+            shift
+            app_name="${1:-}"
+            shift || true
+            restore_op="${1:-list_backups}"
+            shift || true
+            # Parse optional arguments
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    --source)
+                        backup_src="${2:-/mnt/backups}"
+                        shift 2
+                        ;;
+                    --timestamp)
+                        timestamp="${2:-}"
+                        shift 2
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+            ;;
+        "")
+            echo "Usage: $0 <operation> <app-name> [options]"
+            echo ""
+            echo "Operations:"
+            echo "  deploy <app-name>                    Deploy an application"
+            echo "  backup <app-name> [options]          Backup application volumes"
+            echo "  restore <app-name> <op> [options]    Restore application volumes"
+            echo ""
+            echo "Backup options:"
+            echo "  --destination <path>                 Backup destination (default: /mnt/backups)"
+            echo "  --host <hostname>                    Target specific host"
+            echo ""
+            echo "Restore operations:"
+            echo "  list_backups                         List available backups"
+            echo "  restore_latest                       Restore from latest backup"
+            echo "  restore_specific                     Restore from specific backup"
+            echo ""
+            echo "Restore options:"
+            echo "  --source <path>                      Backup source (default: /mnt/backups)"
+            echo "  --timestamp <YYYYMMDDTHHMMSS>        Timestamp for restore_specific"
+            echo ""
+            echo "Available apps:"
+            ls -1 "${REPO_DIR}/docker/" 2>/dev/null | grep -v '^$' || echo "  (none found)"
+            exit 1
+            ;;
+        *)
+            # Legacy mode: first arg is app name (for backward compatibility)
+            operation="Deployment"
+            app_name="${first_arg}"
+            ;;
+    esac
+    
+    # Export operation for error messages
+    export OPERATION="${operation}"
     
     # Validate we have an app name
     if [[ -z "${app_name}" ]]; then
-        echo "Usage: $0 <app-name>"
-        echo "Available apps:"
-        ls -1 "${REPO_DIR}/docker/" 2>/dev/null | grep -v '^$' || echo "  (none found)"
+        echo "Error: App name is required"
+        echo "Usage: $0 deploy <app-name>"
+        echo "       $0 backup <app-name> [--destination /path] [--host hostname]"
+        echo "       $0 restore <app-name> <operation> [--source /path] [--timestamp TIMESTAMP]"
         exit 1
     fi
     
@@ -171,39 +362,113 @@ main() {
     mkdir -p "${LOG_DIR}" 2>/dev/null || true
     
     log "=========================================="
-    log "Starting deployment for app: ${app_name}"
+    log "Starting ${operation,,} for app: ${app_name}"
     log "=========================================="
     
-    # Step 1: Validate app name (security check)
-    validate_app_name "${app_name}"
-    
-    # Step 2: Capture current version before pulling new code
-    local compose_file="${REPO_DIR}/docker/${app_name}/docker-compose.yml"
-    local old_version
-    old_version=$(extract_version "${compose_file}")
-    
-    # Step 3: Pull latest code from git
-    pull_latest_repo
-    
-    # Step 4: Get new version after pull
-    local new_version
-    new_version=$(extract_version "${compose_file}")
-    
-    # Step 5: Run Ansible playbook
-    run_ansible_playbook "${app_name}"
-    
-    # Step 6: Send success notification with version info
-    local version_info
-    if [[ "${old_version}" != "${new_version}" && "${old_version}" != "unknown" ]]; then
-        version_info="Version: <code>${old_version}</code> → <code>${new_version}</code>"
-    else
-        version_info="Version: <code>${new_version}</code>"
+    # Validate app name (security check) - skip for 'all' in backup mode
+    if [[ "${app_name}" != "all" ]]; then
+        validate_app_name "${app_name}"
     fi
     
-    send_notification "✅ Deployment SUCCESS" "App: <code>${app_name}</code>%0A${version_info}"
+    if [[ "${operation}" == "Backup" ]]; then
+        # Validate backup destination (security check)
+        if [[ ! "${backup_dest}" =~ ^/[a-zA-Z0-9/_.-]+$ ]]; then
+            error "Invalid backup destination: ${backup_dest}. Must be an absolute path without special characters."
+        fi
+        if [[ "${backup_dest}" =~ (^|/)\.\./|/\.\.$|(^|/)\.\. ]]; then
+            error "backup destination cannot contain path traversal components ('..')"
+        fi
+        
+        # Validate target host if provided
+        if [[ -n "${target_host}" && ! "${target_host}" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+            error "Invalid target host: ${target_host}"
+        fi
+        
+        # Pull latest code
+        pull_latest_repo
+        
+        # Run backup
+        run_backup_playbook "${app_name}" "${backup_dest}" "${target_host}"
+        
+        # Send success notification
+        local target_info=""
+        if [[ -n "${target_host}" ]]; then
+            target_info="%0AHost: <code>${target_host}</code>"
+        fi
+        send_notification "💾 Backup SUCCESS" "App: <code>${app_name}</code>${target_info}%0ADestination: <code>${backup_dest}</code>"
+        
+    elif [[ "${operation}" == "Restore" ]]; then
+        # Validate backup source (security check)
+        if [[ ! "${backup_src}" =~ ^/[a-zA-Z0-9/_.-]+$ ]]; then
+            error "Invalid backup source: ${backup_src}. Must be an absolute path without special characters."
+        fi
+        if [[ "${backup_src}" =~ (^|/)\.\./|/\.\.$|(^|/)\.\. ]]; then
+            error "backup source cannot contain path traversal components ('..')"
+        fi
+        
+        # Validate restore operation
+        if [[ ! "${restore_op}" =~ ^(list_backups|restore_latest|restore_specific)$ ]]; then
+            error "Invalid restore operation: ${restore_op}. Must be list_backups, restore_latest, or restore_specific."
+        fi
+        
+        # Validate timestamp if restore_specific
+        if [[ "${restore_op}" == "restore_specific" ]]; then
+            if [[ -z "${timestamp}" ]]; then
+                error "Timestamp is required for restore_specific operation"
+            fi
+            if [[ ! "${timestamp}" =~ ^[0-9]{8}T[0-9]{6}$ ]]; then
+                error "Invalid timestamp format: ${timestamp}. Expected: YYYYMMDDTHHMMSS"
+            fi
+        fi
+        
+        # Pull latest code
+        pull_latest_repo
+        
+        # Run restore
+        run_restore_playbook "${app_name}" "${restore_op}" "${backup_src}" "${timestamp}"
+        
+        # Send success notification (skip for list_backups)
+        if [[ "${restore_op}" != "list_backups" ]]; then
+            local restore_info=""
+            if [[ "${restore_op}" == "restore_latest" ]]; then
+                restore_info="latest backup"
+            else
+                restore_info="backup ${timestamp}"
+            fi
+            send_notification "🔄 Restore SUCCESS" "App: <code>${app_name}</code>%0ARestored: ${restore_info}"
+        fi
+        
+    else
+        # Deploy operation
+        
+        # Capture current version before pulling new code
+        local compose_file="${REPO_DIR}/docker/${app_name}/docker-compose.yml"
+        local old_version
+        old_version=$(extract_version "${compose_file}")
+        
+        # Pull latest code from git
+        pull_latest_repo
+        
+        # Get new version after pull
+        local new_version
+        new_version=$(extract_version "${compose_file}")
+        
+        # Run Ansible playbook
+        run_ansible_playbook "${app_name}"
+        
+        # Send success notification with version info
+        local version_info
+        if [[ "${old_version}" != "${new_version}" && "${old_version}" != "unknown" ]]; then
+            version_info="Version: <code>${old_version}</code> → <code>${new_version}</code>"
+        else
+            version_info="Version: <code>${new_version}</code>"
+        fi
+        
+        send_notification "✅ Deployment SUCCESS" "App: <code>${app_name}</code>%0A${version_info}"
+    fi
     
     log "=========================================="
-    log "Deployment completed successfully!"
+    log "${operation} completed successfully!"
     log "=========================================="
 }
 
