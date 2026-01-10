@@ -175,37 +175,30 @@ jobs:
               -d "parse_mode=HTML" || true
           fi
 
-  notify-success:
-    name: Notify Success
+  notify:
+    name: Send Notification
     needs: [detect-changes, deploy]
-    if: success() && needs.detect-changes.outputs.has_changes == 'true'
+    if: always() && needs.detect-changes.outputs.has_changes == 'true' && needs.detect-changes.result == 'success'
     runs-on: self-hosted
     
     steps:
-      - name: Send success notification
+      - name: Send Telegram notification
         run: |
           if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
             APPS='${{ needs.detect-changes.outputs.apps }}'
-            MESSAGE="✅ <b>Deployment Successful</b>%0A%0AApps: ${APPS}%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}"
+            DEPLOY_RESULT="${{ needs.deploy.result }}"
             
-            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-              -d "text=$MESSAGE" \
-              -d "parse_mode=HTML" || true
-          fi
-
-  notify-failure:
-    name: Notify Failure
-    needs: [detect-changes, deploy]
-    if: failure() && needs.detect-changes.outputs.has_changes == 'true'
-    runs-on: self-hosted
-    
-    steps:
-      - name: Send failure notification
-        run: |
-          if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
-            APPS='${{ needs.detect-changes.outputs.apps }}'
-            MESSAGE="❌ <b>Deployment Failed</b>%0A%0AApps: ${APPS}%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
+            if [[ "$DEPLOY_RESULT" == "success" ]]; then
+              EMOJI="✅"
+              STATUS="Successful"
+              EXTRA_INFO=""
+            else
+              EMOJI="❌"
+              STATUS="Failed"
+              EXTRA_INFO="%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
+            fi
+            
+            MESSAGE="${EMOJI} <b>Deployment ${STATUS}</b>%0A%0AApps: ${APPS}%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}${EXTRA_INFO}"
             
             curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
               -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
