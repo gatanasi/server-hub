@@ -155,8 +155,8 @@ jobs:
         run: |
           rm -f ~/.ssh/deploy_key
 
-      - name: Send success notification
-        if: success()
+      - name: Send Telegram notification
+        if: always()
         run: |
           if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
             TARGET="${{ github.event.inputs.target_host }}"
@@ -164,24 +164,15 @@ jobs:
               TARGET="all hosts"
             fi
             
-            MESSAGE="💾 <b>Backup Completed</b>%0A%0AApp: <code>${{ github.event.inputs.app_name }}</code>%0ATarget: <code>${TARGET}</code>%0ADestination: <code>${{ github.event.inputs.backup_destination }}</code>%0ATriggered by: ${{ github.actor }}%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
-            
-            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-              -d "text=$MESSAGE" \
-              -d "parse_mode=HTML" || true
-          fi
-
-      - name: Send failure notification
-        if: failure()
-        run: |
-          if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
-            TARGET="${{ github.event.inputs.target_host }}"
-            if [[ -z "$TARGET" ]]; then
-              TARGET="all hosts"
+            if [[ "${{ job.status }}" == "success" ]]; then
+              EMOJI="💾"
+              STATUS="Completed"
+            else
+              EMOJI="❌"
+              STATUS="Failed"
             fi
             
-            MESSAGE="❌ <b>Backup Failed</b>%0A%0AApp: <code>${{ github.event.inputs.app_name }}</code>%0ATarget: <code>${TARGET}</code>%0ATriggered by: ${{ github.actor }}%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
+            MESSAGE="${EMOJI} <b>Backup ${STATUS}</b>%0A%0AApp: <code>${{ github.event.inputs.app_name }}</code>%0ATarget: <code>${TARGET}</code>%0ADestination: <code>${{ github.event.inputs.backup_destination }}</code>%0ATriggered by: ${{ github.actor }}%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
             
             curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
               -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
