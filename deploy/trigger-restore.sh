@@ -146,9 +146,9 @@ run_restore_playbook() {
     esac
     
     # Run the restore playbook
-    ansible-playbook "${ansible_args[@]}" 2>&1 | tee -a "${LOG_FILE}"
-    
-    local exit_code=${PIPESTATUS[0]}
+    # Note: We use || exit_code=$? to prevent set -e from killing the script before we can send notifications
+    local exit_code=0
+    ansible-playbook "${ansible_args[@]}" 2>&1 | tee -a "${LOG_FILE}" || exit_code=$?
     
     if [[ ${exit_code} -ne 0 ]]; then
         error "Restore playbook failed with exit code: ${exit_code}"
