@@ -170,17 +170,24 @@ Add the public key to `authorized_keys` with security restrictions:
 PUBKEY=$(cat ~/deploy-keys/runner-key.pub)
 
 # Add with forced command restriction
-echo "command=\"/home/deployer/git/server-hub/deploy/trigger-deploy.sh\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ${PUBKEY}" >> ~/.ssh/authorized_keys
+# Note: trigger.sh is the dispatcher that routes to trigger-deploy.sh, trigger-backup.sh, or trigger-restore.sh
+echo "command=\"/home/deployer/git/server-hub/deploy/trigger.sh\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ${PUBKEY}" >> ~/.ssh/authorized_keys
 ```
 
 ### Step 2.3: Test the Forced Command
 
 ```bash
-# This should show the script usage (not a shell)
+# This should show the dispatcher usage (not a shell)
 ssh -i ~/deploy-keys/runner-key deployer@localhost
 
 # This should trigger a deployment (or show errors if target not set up)
-ssh -i ~/deploy-keys/runner-key deployer@localhost n8n
+ssh -i ~/deploy-keys/runner-key deployer@localhost deploy n8n
+
+# Test backup command
+ssh -i ~/deploy-keys/runner-key deployer@localhost backup n8n
+
+# Test restore command (list backups)
+ssh -i ~/deploy-keys/runner-key deployer@localhost restore n8n list_backups
 ```
 
 ### Step 2.4: Get Values for GitHub Secrets
@@ -366,17 +373,31 @@ The deployment workflow triggers on:
 
 ---
 
-## Manual Deployment
+## Manual Operations
 
 ### From deployer.vm
 
 ```bash
+# Deploy an application
+~/git/server-hub/deploy/trigger.sh deploy <app-name>
+
+# Backup an application
+~/git/server-hub/deploy/trigger.sh backup <app-name>
+
+# Restore an application (list available backups)
+~/git/server-hub/deploy/trigger.sh restore <app-name> list_backups
+
+# Or call the handler scripts directly:
 ~/git/server-hub/deploy/trigger-deploy.sh <app-name>
+~/git/server-hub/deploy/trigger-backup.sh <app-name>
+~/git/server-hub/deploy/trigger-restore.sh <app-name> <operation>
 ```
 
 ### From GitHub Actions
 
-Go to Actions → Deploy Docker Apps → Run workflow → Enter app name
+- **Deploy:** Actions → Deploy Docker Apps → Run workflow
+- **Backup:** Actions → Backup Docker Volumes → Run workflow
+- **Restore:** Actions → Restore Docker Volumes → Run workflow
 
 ---
 
@@ -635,7 +656,11 @@ ssh <user>@<target>.vm echo "OK"
 │           ├── verify-service-health.yml   # Shared health check logic
 │           └── load-telegram-credentials.yml # Shared credential loading
 ├── deploy/
-│   ├── trigger-deploy.sh           # Main trigger script (forced command)
+│   ├── trigger.sh                  # SSH forced command dispatcher
+│   ├── trigger-deploy.sh           # Deploy handler script
+│   ├── trigger-backup.sh           # Backup handler script
+│   ├── trigger-restore.sh          # Restore handler script
+│   ├── common.sh                   # Shared functions (logging, validation, notifications)
 │   └── setup-deployer-vm.sh        # One-time setup script
 ├── docs/
 │   ├── GITOPS_SETUP.md             # This file
