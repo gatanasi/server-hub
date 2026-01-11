@@ -85,13 +85,6 @@
         msg: |
           Backup destination {{ backup_destination }} does not exist on {{ inventory_hostname }}!
           Please ensure the NFS/SMB share is mounted.
-          
-          Example mount commands:
-            # NFS
-            mount -t nfs nas.local:/backups {{ backup_destination }}
-            
-            # SMB/CIFS
-            mount -t cifs //nas.local/backups {{ backup_destination }} -o username=backup,password=xxx
       when:
         - host_will_backup | bool
         - backup_dest_stat.stat is defined
