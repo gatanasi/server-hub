@@ -39,12 +39,16 @@ runs:
 
     - name: Configure SSH known_hosts
       shell: bash
+      env:
+        SSH_KNOWN_HOSTS: ${{ inputs.ssh-known-hosts }}
       run: |
-        echo "${{ inputs.ssh-known-hosts }}" >> ~/.ssh/known_hosts
+        echo "${SSH_KNOWN_HOSTS}" >> ~/.ssh/known_hosts
         chmod 644 ~/.ssh/known_hosts
 
     - name: Write SSH private key
       shell: bash
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
       run: |
-        echo "${{ inputs.ssh-private-key }}" > ~/.ssh/deploy_key
+        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/deploy_key
         chmod 600 ~/.ssh/deploy_key

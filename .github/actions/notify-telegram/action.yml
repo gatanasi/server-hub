@@ -10,10 +10,9 @@
 #     with:
 #       bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
 #       chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-#       status: 'success'  # or 'failure'
 #       emoji: '✅'
 #       title: 'Deployment Successful'
-#       message: 'App: myapp\nBranch: main'
+#       message: 'App: myapp%0ABranch: main'
 #       run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 #
 
@@ -29,10 +28,6 @@ inputs:
     description: 'Telegram chat ID'
     required: false
     default: ''
-  status:
-    description: 'Status of the operation (success/failure/warning)'
-    required: false
-    default: 'success'
   emoji:
     description: 'Emoji to prefix the title'
     required: false
@@ -41,7 +36,7 @@ inputs:
     description: 'Notification title'
     required: true
   message:
-    description: 'Notification message body (supports %0A for newlines)'
+    description: 'Notification message body (use %0A for newlines)'
     required: true
   run-url:
     description: 'URL to the GitHub Actions run (optional)'
@@ -57,30 +52,35 @@ runs:
   steps:
     - name: Send Telegram notification
       shell: bash
+      env:
+        BOT_TOKEN: ${{ inputs.bot-token }}
+        CHAT_ID: ${{ inputs.chat-id }}
+        EMOJI: ${{ inputs.emoji }}
+        TITLE: ${{ inputs.title }}
+        MESSAGE: ${{ inputs.message }}
+        RUN_URL: ${{ inputs.run-url }}
+        INCLUDE_LINK: ${{ inputs.include-run-link }}
       run: |
         # Only send if both token and chat_id are provided
-        if [[ -z "${{ inputs.bot-token }}" || -z "${{ inputs.chat-id }}" ]]; then
+        if [[ -z "${BOT_TOKEN}" || -z "${CHAT_ID}" ]]; then
           echo "Telegram credentials not configured, skipping notification"
           exit 0
         fi
         
-        # Build the message
-        EMOJI="${{ inputs.emoji }}"
-        TITLE="${{ inputs.title }}"
-        MESSAGE="${{ inputs.message }}"
-        RUN_URL="${{ inputs.run-url }}"
-        INCLUDE_LINK="${{ inputs.include-run-link }}"
+        # The message body supports %0A for newlines. We convert them to actual
+        # newlines for `curl --data-urlencode` to process them correctly.
+        MESSAGE_WITH_NEWLINES=$(printf '%b' "${MESSAGE//%0A/\\n}")
         
-        # Construct the full message
-        FULL_MESSAGE="${EMOJI} <b>${TITLE}</b>%0A%0A${MESSAGE}"
+        # Construct the full message with proper newlines
+        FULL_MESSAGE="${EMOJI} <b>${TITLE}</b>"$'\n\n'"${MESSAGE_WITH_NEWLINES}"
         
         # Append run URL if provided and requested
-        if [[ -n "$RUN_URL" && "$INCLUDE_LINK" == "true" ]]; then
-          FULL_MESSAGE="${FULL_MESSAGE}%0A%0A<a href=\"${RUN_URL}\">View Run</a>"
+        if [[ -n "${RUN_URL}" && "${INCLUDE_LINK}" == "true" ]]; then
+          FULL_MESSAGE="${FULL_MESSAGE}"$'\n\n'"<a href=\"${RUN_URL}\">View Run</a>"
         fi
         
-        # Send the notification
-        curl -s -X POST "https://api.telegram.org/bot${{ inputs.bot-token }}/sendMessage" \
-          -d "chat_id=${{ inputs.chat-id }}" \
-          -d "text=${FULL_MESSAGE}" \
+        # Send the notification using --data-urlencode for proper encoding
+        curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+          -d "chat_id=${CHAT_ID}" \
+          --data-urlencode "text=${FULL_MESSAGE}" \
           -d "parse_mode=HTML" || true
