@@ -135,22 +135,22 @@ jobs:
             RESTORE_CMD="${RESTORE_CMD} --timestamp ${TIMESTAMP}"
           fi
           
-          # SSH to deployer.vm - the forced command routes to trigger.sh
-          OUTPUT=$(ssh -i ~/.ssh/deploy_key \
+          # SSH to deployer.vm - capture output for error reporting
+          OUTPUT_FILE=$(mktemp)
+          trap 'rm -f "$OUTPUT_FILE"' EXIT
+          RESTORE_EXIT=0
+          ssh -i ~/.ssh/deploy_key \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
-              "${RESTORE_CMD}" 2>&1)
+              "${RESTORE_CMD}" 2>&1 | tee "$OUTPUT_FILE" || RESTORE_EXIT=$?
           
-          RESTORE_EXIT=$?
-          
-          echo "$OUTPUT"
           echo "::endgroup::"
           
           # Extract available backups for list operation
           if [[ "$OPERATION" == "list_backups" ]]; then
-            BACKUPS=$(echo "$OUTPUT" | grep -A 20 "Available backups" | head -20)
+            BACKUPS=$(grep -A 20 "Available backups" "$OUTPUT_FILE" | head -20 || true)
             echo "backups<<EOF" >> $GITHUB_OUTPUT
             echo "$BACKUPS" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
@@ -162,6 +162,37 @@ jobs:
           else
             echo "::error::Operation failed"
             echo "status=failed" >> $GITHUB_OUTPUT
+            
+            # Extract error details from output for notification
+            ERROR_DETAILS=""
+            
+            # Extract failed hosts and their error messages
+            FAILED_HOSTS=$(grep -E "^fatal:|FAILED!" "$OUTPUT_FILE" | head -5 || true)
+            if [[ -n "$FAILED_HOSTS" ]]; then
+              ERROR_DETAILS="$FAILED_HOSTS"
+            fi
+            
+            # Check for common error patterns
+            if grep -q "No backups found\|not found\|does not exist" "$OUTPUT_FILE"; then
+              NOT_FOUND=$(grep -E "No backups found|not found|does not exist" "$OUTPUT_FILE" | head -3 || true)
+              if [[ -n "$NOT_FOUND" ]]; then
+                if [[ -n "$ERROR_DETAILS" ]]; then
+                  ERROR_DETAILS="${ERROR_DETAILS}"$'\n'"${NOT_FOUND}"
+                else
+                  ERROR_DETAILS="${NOT_FOUND}"
+                fi
+              fi
+            fi
+            
+            # Truncate if too long
+            if [[ ${#ERROR_DETAILS} -gt 500 ]]; then
+              ERROR_DETAILS="${ERROR_DETAILS:0:500}..."
+            fi
+            
+            echo "error_details<<EOF" >> $GITHUB_OUTPUT
+            echo "$ERROR_DETAILS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            
             exit $RESTORE_EXIT
           fi
 
@@ -185,10 +216,19 @@ jobs:
             else
               echo "details=<b>Restored:</b> backup ${TIMESTAMP}" >> $GITHUB_OUTPUT
             fi
+            echo "error_summary=" >> $GITHUB_OUTPUT
           else
             echo "emoji=❌" >> $GITHUB_OUTPUT
             echo "title=Restore Failed" >> $GITHUB_OUTPUT
             echo "details=<b>Operation:</b> ${OP}" >> $GITHUB_OUTPUT
+            # Include error details if available
+            ERROR_DETAILS='${{ steps.restore.outputs.error_details }}'
+            if [[ -n "$ERROR_DETAILS" ]]; then
+              ERROR_SUMMARY=$(echo "$ERROR_DETAILS" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' | tr '\n' ' ' | sed 's/  */ /g')
+              echo "error_summary=<b>Error:</b> <pre>${ERROR_SUMMARY}</pre>" >> $GITHUB_OUTPUT
+            else
+              echo "error_summary=<b>Error:</b> Check workflow logs for details" >> $GITHUB_OUTPUT
+            fi
           fi
 
       - name: Send Telegram notification
@@ -199,5 +239,5 @@ jobs:
           chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
           emoji: ${{ steps.notify-params.outputs.emoji }}
           title: ${{ steps.notify-params.outputs.title }}
-          message: "<b>App:</b> <code>${{ github.event.inputs.app_name }}</code>%0A${{ steps.notify-params.outputs.details }}%0A<b>Triggered by:</b> ${{ github.actor }}"
+          message: "<b>App:</b> <code>${{ github.event.inputs.app_name }}</code>%0A${{ steps.notify-params.outputs.details }}%0A<b>Triggered by:</b> ${{ github.actor }}${{ steps.notify-params.outputs.error_summary != '' && format('%0A%0A{0}', steps.notify-params.outputs.error_summary) || '' }}"
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

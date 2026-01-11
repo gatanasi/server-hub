@@ -93,15 +93,24 @@ run_restore_playbook() {
     esac
     
     # Run the restore playbook in a subshell to avoid cd side effects
-    # Note: We use || exit_code=$? to prevent set -e from killing the script before we can send notifications
+    # Capture output to file for error analysis
+    local output_file
+    output_file=$(mktemp)
+    trap 'rm -f -- "${output_file}"' EXIT
     local exit_code=0
     (
         cd "${ANSIBLE_DIR}"
         ansible-playbook "${ansible_args[@]}" 2>&1
-    ) | tee -a "${LOG_FILE}" || exit_code=$?
+    ) | tee -a "${LOG_FILE}" | tee "${output_file}" || exit_code=$?
     
     if [[ ${exit_code} -ne 0 ]]; then
-        error "Restore playbook failed with exit code: ${exit_code}"
+        # Extract meaningful error details from Ansible output
+        local error_details
+        error_details=$(extract_ansible_errors "${output_file}" "No backups found|not found|does not exist")
+        
+        local error_message
+        printf -v error_message "Restore playbook failed with exit code: %s\n\nDetails:\n%s" "${exit_code}" "${error_details}"
+        error "${error_message}"
     fi
     
     log "Restore playbook completed successfully"

@@ -117,15 +117,17 @@ jobs:
             BACKUP_CMD="${BACKUP_CMD} --host ${TARGET_HOST}"
           fi
           
-          # SSH to deployer.vm - the forced command routes to trigger.sh
+          # SSH to deployer.vm - capture output for error reporting
+          # Use a temporary file to capture both stdout and stderr while preserving exit code
+          OUTPUT_FILE=$(mktemp)
+          trap 'rm -f "$OUTPUT_FILE"' EXIT
+          BACKUP_EXIT=0
           ssh -i ~/.ssh/deploy_key \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
-              "${BACKUP_CMD}"
-          
-          BACKUP_EXIT=$?
+              "${BACKUP_CMD}" 2>&1 | tee "$OUTPUT_FILE" || BACKUP_EXIT=$?
           
           echo "::endgroup::"
           
@@ -135,6 +137,40 @@ jobs:
           else
             echo "::error::Backup failed for ${{ github.event.inputs.app_name }}"
             echo "status=failed" >> $GITHUB_OUTPUT
+            
+            # Extract error details from Ansible output for notification
+            # Look for FAILED tasks or error messages
+            ERROR_DETAILS=""
+            
+            # Extract failed hosts and their error messages
+            FAILED_HOSTS=$(grep -E "^fatal:|FAILED!" "$OUTPUT_FILE" | head -5 || true)
+            if [[ -n "$FAILED_HOSTS" ]]; then
+              ERROR_DETAILS="$FAILED_HOSTS"
+            fi
+            
+            # Also check for common error patterns
+            if grep -q "does not exist" "$OUTPUT_FILE"; then
+              MOUNT_ERROR=$(grep -A 2 "does not exist" "$OUTPUT_FILE" | head -3 || true)
+              if [[ -n "$MOUNT_ERROR" ]]; then
+                if [[ -n "$ERROR_DETAILS" ]]; then
+                  ERROR_DETAILS="${ERROR_DETAILS}"$'\n'"${MOUNT_ERROR}"
+                else
+                  ERROR_DETAILS="${MOUNT_ERROR}"
+                fi
+              fi
+            fi
+            
+            # Truncate if too long (Telegram has message limits)
+            if [[ ${#ERROR_DETAILS} -gt 500 ]]; then
+              ERROR_DETAILS="${ERROR_DETAILS:0:500}..."
+            fi
+            
+            # Store error details for notification step
+            # Use delimiter to handle multiline
+            echo "error_details<<EOF" >> $GITHUB_OUTPUT
+            echo "$ERROR_DETAILS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            
             exit $BACKUP_EXIT
           fi
 
@@ -155,9 +191,19 @@ jobs:
           if [[ "${{ job.status }}" == "success" ]]; then
             echo "emoji=💾" >> $GITHUB_OUTPUT
             echo "title=Backup Completed" >> $GITHUB_OUTPUT
+            echo "error_summary=" >> $GITHUB_OUTPUT
           else
             echo "emoji=❌" >> $GITHUB_OUTPUT
             echo "title=Backup Failed" >> $GITHUB_OUTPUT
+            # Include error details if available
+            ERROR_DETAILS='${{ steps.backup.outputs.error_details }}'
+            if [[ -n "$ERROR_DETAILS" ]]; then
+              # Escape for Telegram HTML and use %0A for newlines
+              ERROR_SUMMARY=$(echo "$ERROR_DETAILS" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' | tr '\n' ' ' | sed 's/  */ /g')
+              echo "error_summary=<b>Error:</b> <pre>${ERROR_SUMMARY}</pre>" >> $GITHUB_OUTPUT
+            else
+              echo "error_summary=<b>Error:</b> Check workflow logs for details" >> $GITHUB_OUTPUT
+            fi
           fi
           
           echo "target=$TARGET" >> $GITHUB_OUTPUT
@@ -170,5 +216,5 @@ jobs:
           chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
           emoji: ${{ steps.notify-params.outputs.emoji }}
           title: ${{ steps.notify-params.outputs.title }}
-          message: "App: <code>${{ github.event.inputs.app_name }}</code>%0ATarget: <code>${{ steps.notify-params.outputs.target }}</code>%0ADestination: <code>${{ github.event.inputs.backup_destination }}</code>%0ATriggered by: ${{ github.actor }}"
+          message: "App: <code>${{ github.event.inputs.app_name }}</code>%0ATarget: <code>${{ steps.notify-params.outputs.target }}</code>%0ADestination: <code>${{ github.event.inputs.backup_destination }}</code>%0ATriggered by: ${{ github.actor }}${{ steps.notify-params.outputs.error_summary != '' && format('%0A%0A{0}', steps.notify-params.outputs.error_summary) || '' }}"
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
