@@ -289,26 +289,21 @@
 
         # === SEND NOTIFICATION ===
         - name: Get restored volume sizes
-          ansible.builtin.shell: |
-            set -euo pipefail
-            while IFS= read -r file; do
-              [ -z "$file" ] && continue
-              filename="$(basename "$file")"
-              VOLUME_NAME="${filename%_{{ restore_timestamp }}.tar.gz}"
-              SIZE="$(du -h "$file" | cut -f1)"
-              echo "${VOLUME_NAME}:${SIZE}"
-            done <<'EOF'
-            {{ restore_files.files | map(attribute='path') | join('\n') }}
-            EOF
-          args:
-            executable: /bin/bash
-          register: restore_sizes_raw
+          ansible.builtin.command:
+            cmd: "du -h {{ item.path }}"
+          loop: "{{ restore_files.files }}"
+          register: restore_sizes_result
           changed_when: false
 
         - name: Build volume details for notification
           ansible.builtin.set_fact:
-            restore_details: "{{ restore_sizes_raw.stdout_lines | default([]) }}"
-            restore_details_text: "{{ restore_sizes_raw.stdout_lines | default([]) | map('regex_replace', '^([^:]+):(.+)$', '  • \\1: \\2') | join('\n') }}"
+            restore_details_text: |
+              {% for result in restore_sizes_result.results %}
+              {% set filename = result.item.path | basename %}
+              {% set vol_name = filename | replace('_' + restore_timestamp + '.tar.gz', '') %}
+              {% set size = result.stdout.split() | first %}
+                • {{ vol_name }}: {{ size }}
+              {% endfor %}
             health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
 
         - name: Send success notification
