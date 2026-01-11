@@ -217,6 +217,13 @@ main() {
     # Pull latest code
     pull_latest_repo
     
+    # Restart script to pick up changes
+    if [[ "${RESTARTED:-}" != "true" ]]; then
+        log "Restarting script to apply updates..."
+        export RESTARTED="true"
+        exec "$0" "$@"
+    fi
+    
     # Run restore
     run_restore_playbook "${app_name}" "${restore_op}" "${backup_src}" "${timestamp}"
     

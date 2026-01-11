@@ -185,6 +185,13 @@ main() {
     # Step 3: Pull latest code from git
     pull_latest_repo
     
+    # Restart script to pick up changes
+    if [[ "${RESTARTED:-}" != "true" ]]; then
+        log "Restarting script to apply updates..."
+        export RESTARTED="true"
+        exec "$0" "$@"
+    fi
+    
     # Step 4: Get new version after pull
     local new_version
     new_version=$(extract_version "${compose_file}")
