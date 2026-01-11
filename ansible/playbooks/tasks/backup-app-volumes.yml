@@ -175,11 +175,11 @@
     - name: "{{ current_app }} | Parse backup sizes"
       ansible.builtin.set_fact:
         backup_details: >-
-          {%- set res = [] -%}
+          {%- set ns = namespace(details=[]) -%}
           {%- for result in backup_sizes_result.results if result.rc == 0 -%}
-            {%- set _ = res.append(result.item ~ ':' ~ (result.stdout.split() | first)) -%}
+            {%- set ns.details = ns.details + [result.item ~ ':' ~ (result.stdout.split() | first)] -%}
           {%- endfor -%}
-          {{ res }}
+          {{ ns.details }}
       when: docker_volumes | length > 0
 
     - name: "{{ current_app }} | Display backup summary"
