@@ -70,6 +70,12 @@ all:
           ansible_host: video-converter.vm
           managed_apps:
             - video-converter
+
+        stirling-pdf.vm:
+          ansible_user: stirling
+          ansible_host: stirling-pdf.vm
+          managed_apps:
+            - stirling-pdf
         # Add more hosts as needed:
         #
         # odoo.vm:
