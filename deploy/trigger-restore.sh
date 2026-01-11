@@ -96,6 +96,7 @@ run_restore_playbook() {
     # Capture output to file for error analysis
     local output_file
     output_file=$(mktemp)
+    trap 'rm -f -- "${output_file}"' EXIT
     local exit_code=0
     (
         cd "${ANSIBLE_DIR}"
@@ -117,10 +118,12 @@ run_restore_playbook() {
         if grep -q "No backups found\|not found\|does not exist" "${output_file}"; then
             local not_found
             not_found=$(grep -E "No backups found|not found|does not exist" "${output_file}" | head -3 || true)
-            error_details="${error_details}\n${not_found}"
+            if [[ -n "${error_details}" ]]; then
+                error_details+=$'\n'"${not_found}"
+            else
+                error_details="${not_found}"
+            fi
         fi
-        
-        rm -f "${output_file}"
         
         # Truncate for notification
         if [[ ${#error_details} -gt 400 ]]; then
@@ -130,7 +133,6 @@ run_restore_playbook() {
         error "Restore playbook failed with exit code: ${exit_code}\n\nDetails:\n${error_details}"
     fi
     
-    rm -f "${output_file}"
     log "Restore playbook completed successfully"
 }
 

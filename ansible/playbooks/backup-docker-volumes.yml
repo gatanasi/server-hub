@@ -145,11 +145,8 @@
       loop_control:
         label: "{{ item.path | basename }}"
       register: cleanup_results
-      changed_when: "'Deleted:' in cleanup_results.stdout"
-      when:
-        - host_will_backup | bool
-        - app_backup_dirs.files is defined
-        - app_backup_dirs.files | length > 0
+      changed_when: "'Deleted:' in (item.stdout | default(''))"
+      when: host_will_backup | bool and (app_backup_dirs.files | default([]) | length > 0)
 
     - name: Display cleanup summary
       ansible.builtin.debug:
@@ -161,7 +158,4 @@
           {{ result.stdout }}
           {% endif %}
           {% endfor %}
-      when:
-        - host_will_backup | bool
-        - cleanup_results.results is defined
-        - cleanup_results.results | selectattr('stdout', 'defined') | selectattr('stdout', 'search', 'Deleted') | list | length > 0
+      when: host_will_backup | bool and (cleanup_results.results | default([]) | selectattr('stdout', 'defined') | selectattr('stdout', 'search', 'Deleted') | list | length > 0)

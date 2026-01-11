@@ -80,6 +80,7 @@ run_backup_playbook() {
     # Capture output to file for error analysis
     local output_file
     output_file=$(mktemp)
+    trap 'rm -f -- "${output_file}"' EXIT
     local exit_code=0
     (
         cd "${ANSIBLE_DIR}"
@@ -101,10 +102,14 @@ run_backup_playbook() {
         if grep -q "does not exist" "${output_file}"; then
             local mount_error
             mount_error=$(grep -B 1 -A 2 "does not exist" "${output_file}" | head -5 || true)
-            error_details="${error_details}\n${mount_error}"
+            if [[ -n "${mount_error}" ]]; then
+                if [[ -n "${error_details}" ]]; then
+                    error_details="${error_details}"$'\n'"${mount_error}"
+                else
+                    error_details="${mount_error}"
+                fi
+            fi
         fi
-        
-        rm -f "${output_file}"
         
         # Truncate for notification
         if [[ ${#error_details} -gt 400 ]]; then
@@ -114,7 +119,6 @@ run_backup_playbook() {
         error "Backup playbook failed with exit code: ${exit_code}\n\nDetails:\n${error_details}"
     fi
     
-    rm -f "${output_file}"
     log "Backup playbook completed successfully"
 }
 
