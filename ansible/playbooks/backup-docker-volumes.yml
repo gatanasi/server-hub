@@ -62,18 +62,28 @@
           Required variables missing. Ensure 'docker_compose_cmd' and 'app_base_dir' are defined
           in the inventory (e.g., group_vars/docker_hosts.yml).
 
+    - name: Determine if host will perform backup
+      ansible.builtin.set_fact:
+        host_will_backup: >-
+          {{
+            (app_name is not defined) or
+            (app_name in (managed_apps | default([])))
+          }}
+
     - name: Load Telegram credentials
       ansible.builtin.include_tasks: tasks/load-telegram-credentials.yml
+      when: host_will_backup | bool
 
     - name: Verify backup destination exists
       ansible.builtin.stat:
         path: "{{ backup_destination }}"
       register: backup_dest_stat
+      when: host_will_backup | bool
 
     - name: Fail if backup destination is not mounted
       ansible.builtin.fail:
         msg: |
-          Backup destination {{ backup_destination }} does not exist!
+          Backup destination {{ backup_destination }} does not exist on {{ inventory_hostname }}!
           Please ensure the NFS/SMB share is mounted.
           
           Example mount commands:
@@ -82,7 +92,10 @@
             
             # SMB/CIFS
             mount -t cifs //nas.local/backups {{ backup_destination }} -o username=backup,password=xxx
-      when: not backup_dest_stat.stat.exists
+      when:
+        - host_will_backup | bool
+        - backup_dest_stat.stat is defined
+        - not backup_dest_stat.stat.exists
 
   tasks:
     # === ITERATE OVER EACH MANAGED APP ===
@@ -101,6 +114,7 @@
         paths: "{{ backup_destination }}"
         file_type: directory
       register: app_backup_dirs
+      when: host_will_backup | bool
 
     - name: Cleanup old backups per app (keep last {{ backup_keep_count }})
       ansible.builtin.shell: |
@@ -127,11 +141,15 @@
         done
       args:
         executable: /bin/bash
-      loop: "{{ app_backup_dirs.files }}"
+      loop: "{{ app_backup_dirs.files | default([]) }}"
       loop_control:
         label: "{{ item.path | basename }}"
       register: cleanup_results
       changed_when: "'Deleted:' in cleanup_results.stdout"
+      when:
+        - host_will_backup | bool
+        - app_backup_dirs.files is defined
+        - app_backup_dirs.files | length > 0
 
     - name: Display cleanup summary
       ansible.builtin.debug:
@@ -143,4 +161,7 @@
           {{ result.stdout }}
           {% endif %}
           {% endfor %}
-      when: cleanup_results.results | selectattr('stdout', 'defined') | selectattr('stdout', 'search', 'Deleted') | list | length > 0
+      when:
+        - host_will_backup | bool
+        - cleanup_results.results is defined
+        - cleanup_results.results | selectattr('stdout', 'defined') | selectattr('stdout', 'search', 'Deleted') | list | length > 0

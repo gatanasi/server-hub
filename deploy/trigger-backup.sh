@@ -77,17 +77,44 @@ run_backup_playbook() {
     fi
     
     # Run the backup playbook in a subshell to avoid cd side effects
-    # Note: We use || exit_code=$? to prevent set -e from killing the script before we can send notifications
+    # Capture output to file for error analysis
+    local output_file
+    output_file=$(mktemp)
     local exit_code=0
     (
         cd "${ANSIBLE_DIR}"
         ansible-playbook "${ansible_args[@]}" 2>&1
-    ) | tee -a "${LOG_FILE}" || exit_code=$?
+    ) | tee -a "${LOG_FILE}" | tee "${output_file}" || exit_code=$?
     
     if [[ ${exit_code} -ne 0 ]]; then
-        error "Backup playbook failed with exit code: ${exit_code}"
+        # Extract meaningful error details from Ansible output
+        local error_details=""
+        
+        # Look for failed tasks
+        local failed_tasks
+        failed_tasks=$(grep -E "^fatal:|FAILED!" "${output_file}" | head -5 || true)
+        if [[ -n "${failed_tasks}" ]]; then
+            error_details="${failed_tasks}"
+        fi
+        
+        # Look for specific error patterns
+        if grep -q "does not exist" "${output_file}"; then
+            local mount_error
+            mount_error=$(grep -B 1 -A 2 "does not exist" "${output_file}" | head -5 || true)
+            error_details="${error_details}\n${mount_error}"
+        fi
+        
+        rm -f "${output_file}"
+        
+        # Truncate for notification
+        if [[ ${#error_details} -gt 400 ]]; then
+            error_details="${error_details:0:400}..."
+        fi
+        
+        error "Backup playbook failed with exit code: ${exit_code}\n\nDetails:\n${error_details}"
     fi
     
+    rm -f "${output_file}"
     log "Backup playbook completed successfully"
 }
 
