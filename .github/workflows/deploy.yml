@@ -110,6 +110,9 @@ jobs:
       fail-fast: false  # Continue deploying other apps if one fails
     
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Validate app name
         run: |
           APP="${{ matrix.app }}"
@@ -120,17 +123,10 @@ jobs:
           echo "Deploying app: $APP"
 
       - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          
-          # Add deployer host to known_hosts
-          echo "${{ secrets.DEPLOYER_SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-          
-          # Write SSH private key
-          echo "${{ secrets.DEPLOYER_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key: ${{ secrets.DEPLOYER_SSH_KEY }}
+          ssh-known-hosts: ${{ secrets.DEPLOYER_SSH_KNOWN_HOSTS }}
 
       - name: Trigger deployment
         id: deploy
@@ -165,15 +161,14 @@ jobs:
 
       - name: Send failure notification
         if: failure()
-        run: |
-          if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
-            MESSAGE="❌ <b>Deployment Failed</b>%0A%0AApp: ${{ matrix.app }}%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
-            
-            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-              -d "text=$MESSAGE" \
-              -d "parse_mode=HTML" || true
-          fi
+        uses: ./.github/actions/notify-telegram
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          emoji: '❌'
+          title: 'Deployment Failed'
+          message: "App: <code>${{ matrix.app }}</code>%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}"
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   notify:
     name: Send Notification
@@ -182,26 +177,31 @@ jobs:
     runs-on: self-hosted
     
     steps:
-      - name: Send Telegram notification
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Determine notification parameters
+        id: prep
         run: |
-          if [[ -n "${{ secrets.TELEGRAM_BOT_TOKEN }}" && -n "${{ secrets.TELEGRAM_CHAT_ID }}" ]]; then
-            APPS='${{ needs.detect-changes.outputs.apps }}'
-            DEPLOY_RESULT="${{ needs.deploy.result }}"
-            
-            if [[ "$DEPLOY_RESULT" == "success" ]]; then
-              EMOJI="✅"
-              STATUS="Successful"
-              EXTRA_INFO=""
-            else
-              EMOJI="❌"
-              STATUS="Failed"
-              EXTRA_INFO="%0A%0A<a href=\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\">View Run</a>"
-            fi
-            
-            MESSAGE="${EMOJI} <b>Deployment ${STATUS}</b>%0A%0AApps: ${APPS}%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}${EXTRA_INFO}"
-            
-            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-              -d "text=$MESSAGE" \
-              -d "parse_mode=HTML" || true
+          DEPLOY_RESULT="${{ needs.deploy.result }}"
+          
+          if [[ "$DEPLOY_RESULT" == "success" ]]; then
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+            echo "title=Deployment Successful" >> $GITHUB_OUTPUT
+            echo "include_link=false" >> $GITHUB_OUTPUT
+          else
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+            echo "title=Deployment Failed" >> $GITHUB_OUTPUT
+            echo "include_link=true" >> $GITHUB_OUTPUT
           fi
+
+      - name: Send Telegram notification
+        uses: ./.github/actions/notify-telegram
+        with:
+          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
+          emoji: ${{ steps.prep.outputs.emoji }}
+          title: ${{ steps.prep.outputs.title }}
+          message: "Apps: ${{ needs.detect-changes.outputs.apps }}%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}"
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          include-run-link: ${{ steps.prep.outputs.include_link }}

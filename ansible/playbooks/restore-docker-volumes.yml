@@ -200,6 +200,12 @@
     # === RESTORE VOLUMES (with error handling) ===
     - name: Restore volumes block
       block:
+        - name: Verify backup integrity
+          ansible.builtin.command:
+            cmd: "tar -tzf {{ item.path }}"
+          loop: "{{ restore_files.files }}"
+          changed_when: false
+
         - name: Restore each volume
           ansible.builtin.shell: |
             set -euo pipefail
@@ -306,19 +312,11 @@
             health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
 
         - name: Send success notification
-          ansible.builtin.uri:
-            url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
-            method: POST
-            body_format: form-urlencoded
-            body:
-              chat_id: "{{ telegram_chat_id }}"
-              text: "🔄 <b>Restore Completed</b>\n\n<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n<b>Volumes restored ({{ restore_files.files | length }}):</b>\n<pre>{{ restore_details_text }}</pre>\n\n{{ health_status_text }}"
-              parse_mode: "HTML"
-            status_code: [200]
-          delegate_to: localhost
-          when: telegram_enabled | bool
-          ignore_errors: true
-          no_log: true
+          ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
+          vars:
+            notify_title: "Restore Completed"
+            notify_emoji: "🔄"
+            notify_message: "<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n<b>Volumes restored ({{ restore_files.files | length }}):</b>\n<pre>{{ restore_details_text }}</pre>\n\n{{ health_status_text }}"
 
       rescue:
         - name: Attempt to restart services after restore failure
@@ -329,19 +327,11 @@
           ignore_errors: true
 
         - name: Send failure notification
-          ansible.builtin.uri:
-            url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
-            method: POST
-            body_format: form-urlencoded
-            body:
-              chat_id: "{{ telegram_chat_id }}"
-              text: "❌ <b>Restore Failed</b>\n\n<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n⚠️ Services have been restarted"
-              parse_mode: "HTML"
-            status_code: [200]
-          delegate_to: localhost
-          when: telegram_enabled | bool
-          ignore_errors: true
-          no_log: true
+          ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
+          vars:
+            notify_title: "Restore Failed"
+            notify_emoji: "❌"
+            notify_message: "<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n⚠️ Services have been restarted"
 
         - name: Fail the restore task
           ansible.builtin.fail:
