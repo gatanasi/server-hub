@@ -1,0 +1,54 @@
+# Composite Action: Setup SSH for Deployer VM
+#
+# This action sets up SSH configuration for connecting to the deployer VM.
+# It creates the ~/.ssh directory, configures known_hosts, and writes the
+# private key with proper permissions.
+#
+# Security Model:
+# - The SSH key is scoped to deployer.vm with a forced command
+# - The runner cannot get a shell on deployer.vm
+# - Key is cleaned up automatically after the job completes
+#
+# Usage:
+#   - name: Setup SSH
+#     uses: ./.github/actions/setup-ssh
+#     with:
+#       ssh-private-key: ${{ secrets.DEPLOYER_SSH_KEY }}
+#       ssh-known-hosts: ${{ secrets.DEPLOYER_SSH_KNOWN_HOSTS }}
+#
+
+name: 'Setup SSH'
+description: 'Configure SSH for deployer.vm access with forced command security model'
+
+inputs:
+  ssh-private-key:
+    description: 'Private SSH key for github-runner -> deployer.vm'
+    required: true
+  ssh-known-hosts:
+    description: 'SSH known_hosts entry for deployer.vm'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Create SSH directory
+      shell: bash
+      run: |
+        mkdir -p ~/.ssh
+        chmod 700 ~/.ssh
+
+    - name: Configure SSH known_hosts
+      shell: bash
+      env:
+        SSH_KNOWN_HOSTS: ${{ inputs.ssh-known-hosts }}
+      run: |
+        echo "${SSH_KNOWN_HOSTS}" >> ~/.ssh/known_hosts
+        chmod 644 ~/.ssh/known_hosts
+
+    - name: Write SSH private key
+      shell: bash
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+      run: |
+        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key

@@ -19,6 +19,35 @@ all:
     
     # Whether to prune old images after deployment
     docker_prune_after_deploy: true
+    
+    # ===========================================
+    # Backup/Restore Configuration
+    # ===========================================
+    
+    # Backup destination (should be an NFS/SMB mount)
+    backup_destination: /mnt/backups
+    
+    # Backup source for restore operations (typically same as destination)
+    backup_source: /mnt/backups
+    
+    # How many backups to keep per volume (oldest are deleted)
+    backup_keep_count: 3
+    
+    # Helper image for backup/restore operations (pinned for reproducibility)
+    helper_image: alpine:3.20
+    
+    # Timeout for stopping containers during backup/restore (seconds)
+    stop_timeout: 60
+    
+    # ===========================================
+    # Health Check Configuration
+    # ===========================================
+    
+    # Buffer time added to start_period for timeout calculation
+    health_check_buffer: 30
+    
+    # Default health check timeout (minimum valid timeout)
+    health_check_timeout_default: 90
 
   children:
     # Group for all Docker Compose hosts

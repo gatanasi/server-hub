@@ -62,23 +62,19 @@
   
   vars:
     app_name: "{{ restore_app_name }}"
-    backup_source: /mnt/backups
     app_dir: "{{ app_base_dir }}/{{ app_name }}"
     app_backup_dir: "{{ backup_source }}/{{ app_name }}"
     requested_timestamp: "{{ restore_backup_timestamp }}"
     list_only: "{{ restore_list_only | bool }}"
     
-    # Helper image for backup/restore operations (pinned for reproducibility)
-    helper_image: alpine:3.20
-
-    # Health check buffer
-    health_check_buffer: 30
-
-    # Default health check timeout
-    health_check_timeout_default: 90
-    
     # Load telegram credentials from secrets file
     secrets_file: "{{ lookup('env', 'HOME') }}/.deploy-secrets"
+    
+    # Note: The following variables are now defined in inventory/production.yml:
+    # - backup_source: Backup source path for restore operations
+    # - helper_image: Alpine image for restore operations
+    # - health_check_buffer: Buffer time for health checks
+    # - health_check_timeout_default: Default health check timeout
 
   pre_tasks:
     - name: Validate required variables

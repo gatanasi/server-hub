@@ -1,0 +1,63 @@
+---
+# send-telegram-notification.yml - Shared Telegram notification task
+#
+# This task file sends a notification to Telegram. It handles the API call
+# and safely manages the bot token secret.
+#
+# Usage:
+#   - name: Send deployment notification
+#     ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
+#     vars:
+#       notify_title: "Deployment Successful"
+#       notify_message: "App: {{ app_name }}\nVersion: {{ version }}"
+#       notify_emoji: "✅"
+#
+# Required variables (must be set before calling):
+#   - telegram_bot_token: Bot API token (loaded via load-telegram-credentials.yml)
+#   - telegram_chat_id: Target chat ID (loaded via load-telegram-credentials.yml)
+#   - telegram_enabled: Whether notifications are enabled (loaded via load-telegram-credentials.yml)
+#
+# Input variables:
+#   - notify_title: Title of the notification (required)
+#   - notify_message: Message body (required, supports \n for newlines)
+#   - notify_emoji: Emoji prefix for the title (optional, default: "ℹ️")
+#   - notify_silent: Send without sound (optional, default: false)
+#
+
+- name: Validate notification variables
+  ansible.builtin.assert:
+    that:
+      - notify_title is defined
+      - notify_message is defined
+      - telegram_bot_token is defined
+      - telegram_chat_id is defined
+      - telegram_enabled is defined
+    fail_msg: >
+      Missing required variables for Telegram notification.
+      Ensure 'load-telegram-credentials.yml' is included before this task
+      and 'notify_title' and 'notify_message' are provided.
+    quiet: true
+
+- name: Set notification emoji default
+  ansible.builtin.set_fact:
+    _notify_emoji: "{{ notify_emoji | default('ℹ️') }}"
+
+- name: Build notification text
+  ansible.builtin.set_fact:
+    _notification_text: "{{ _notify_emoji }} <b>{{ notify_title }}</b>\n\n{{ notify_message }}"
+
+- name: Send Telegram notification
+  ansible.builtin.uri:
+    url: "https://api.telegram.org/bot{{ telegram_bot_token }}/sendMessage"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      chat_id: "{{ telegram_chat_id }}"
+      text: "{{ _notification_text }}"
+      parse_mode: "HTML"
+      disable_notification: "{{ notify_silent | default(false) | bool | lower }}"
+    status_code: [200]
+  delegate_to: localhost
+  when: telegram_enabled | bool
+  ignore_errors: true
+  no_log: true

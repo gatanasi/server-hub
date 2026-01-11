@@ -36,29 +36,19 @@
   # Use become only for specific tasks that require root (e.g., creating backup dirs)
   
   vars:
-    # Backup destination (should be an NFS/SMB mount)
-    backup_destination: /mnt/backups
-    
-    # How many backups to keep per volume (oldest are deleted)
-    backup_keep_count: 3
-    
     # Timestamp format for backup files
     backup_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
     
-    # Timeout for stopping containers (seconds)
-    stop_timeout: 60
-
-    # Health check buffer (added to max start_period)
-    health_check_buffer: 30
-
-    # Default health check timeout (minimum valid timeout)
-    health_check_timeout_default: 90
-    
-    # Helper image for backup/restore operations (pinned for reproducibility)
-    helper_image: alpine:3.20
-    
     # Load telegram credentials from secrets file
     secrets_file: "{{ lookup('env', 'HOME') }}/.deploy-secrets"
+    
+    # Note: The following variables are now defined in inventory/production.yml:
+    # - backup_destination: Backup destination path (NFS/SMB mount)
+    # - backup_keep_count: Number of backups to keep per volume
+    # - helper_image: Alpine image for backup operations
+    # - stop_timeout: Timeout for stopping containers
+    # - health_check_buffer: Buffer time for health checks
+    # - health_check_timeout_default: Default health check timeout
 
   pre_tasks:
     - name: Validate required variables
