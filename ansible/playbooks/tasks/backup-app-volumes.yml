@@ -164,24 +164,22 @@
       when: docker_volumes | length > 0
 
     - name: "{{ current_app }} | Get backup sizes"
-      ansible.builtin.shell: |
-        set -euo pipefail
-        for vol in {{ docker_volumes | map('quote') | join(' ') }}; do
-          FILE="{{ app_backup_dir }}/${vol}_{{ backup_timestamp }}.tar.gz"
-          if [ -f "$FILE" ]; then
-            SIZE="$(du -h "$FILE" | cut -f1)"
-            echo "${vol}:${SIZE}"
-          fi
-        done
-      args:
-        executable: /bin/bash
-      register: backup_sizes_raw
+      ansible.builtin.command:
+        cmd: "du -h {{ app_backup_dir }}/{{ item }}_{{ backup_timestamp }}.tar.gz"
+      loop: "{{ docker_volumes }}"
+      register: backup_sizes_result
       changed_when: false
+      failed_when: false
       when: docker_volumes | length > 0
 
     - name: "{{ current_app }} | Parse backup sizes"
       ansible.builtin.set_fact:
-        backup_details: "{{ backup_sizes_raw.stdout_lines | default([]) }}"
+        backup_details: >-
+          [{% for result in backup_sizes_result.results %}
+          {% if result.rc == 0 %}
+          "{{ result.item }}:{{ result.stdout.split() | first }}"{{ "," if not loop.last else "" }}
+          {% endif %}
+          {% endfor %}]
       when: docker_volumes | length > 0
 
     - name: "{{ current_app }} | Display backup summary"
