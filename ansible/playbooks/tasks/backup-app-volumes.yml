@@ -176,10 +176,8 @@
       ansible.builtin.set_fact:
         backup_details: >-
           {%- set res = [] -%}
-          {%- for result in backup_sizes_result.results -%}
-            {%- if result.rc == 0 -%}
-              {%- set _ = res.append(result.item ~ ':' ~ (result.stdout.split() | first)) -%}
-            {%- endif -%}
+          {%- for result in backup_sizes_result.results if result.rc == 0 -%}
+            {%- set _ = res.append(result.item ~ ':' ~ (result.stdout.split() | first)) -%}
           {%- endfor -%}
           {{ res }}
       when: docker_volumes | length > 0
