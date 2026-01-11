@@ -301,7 +301,7 @@
             restore_details_text: |
               {%- for result in restore_sizes_result.results %}
               {%- if result.rc == 0 %}
-                • {{ result.item.path | basename | replace('_' + restore_timestamp + '.tar.gz', '') }}: {{ result.stdout.split() | first }}
+                • {{ result.item.path | basename | regex_replace('_' + restore_timestamp + '\\.tar\\.gz$', '') }}: {{ result.stdout.split() | first }}
               {%- endif %}
               {%- endfor %}
             health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
