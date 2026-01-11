@@ -294,12 +294,15 @@
           loop: "{{ restore_files.files }}"
           register: restore_sizes_result
           changed_when: false
+          failed_when: false
 
         - name: Build volume details for notification
           ansible.builtin.set_fact:
             restore_details_text: |
               {%- for result in restore_sizes_result.results %}
+              {%- if result.rc == 0 %}
                 • {{ result.item.path | basename | replace('_' + restore_timestamp + '.tar.gz', '') }}: {{ result.stdout.split() | first }}
+              {%- endif %}
               {%- endfor %}
             health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
 

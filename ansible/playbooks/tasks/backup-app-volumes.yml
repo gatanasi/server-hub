@@ -174,12 +174,14 @@
 
     - name: "{{ current_app }} | Parse backup sizes"
       ansible.builtin.set_fact:
-        backup_details:
-          {%- for result in backup_sizes_result.results %}
-          {%- if result.rc == 0 %}
-          - "{{ result.item }}:{{ result.stdout.split() | first }}"
-          {%- endif %}
-          {%- endfor %}
+        backup_details: >-
+          {{
+            [
+              result.item ~ ':' ~ (result.stdout.split() | first)
+              for result in backup_sizes_result.results
+              if result.rc == 0
+            ]
+          }}
       when: docker_volumes | length > 0
 
     - name: "{{ current_app }} | Display backup summary"
