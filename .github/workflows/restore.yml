@@ -68,6 +68,10 @@ jobs:
   restore:
     name: ${{ github.event.inputs.operation }} - ${{ github.event.inputs.app_name }}
     runs-on: self-hosted
+    outputs:
+      status: ${{ steps.restore.outputs.status }}
+      error_details: ${{ steps.restore.outputs.error_details }}
+      backups: ${{ steps.restore.outputs.backups }}
     
     steps:
       - name: Validate inputs
@@ -201,14 +205,24 @@ jobs:
         run: |
           rm -f ~/.ssh/deploy_key
 
+  notify:
+    name: Send Notification
+    needs: restore
+    if: always() && (github.event.inputs.operation != 'list_backups' || needs.restore.result == 'failure')
+    runs-on: self-hosted
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Determine notification parameters
-        if: always() && (github.event.inputs.operation != 'list_backups' || job.status == 'failure')
         id: notify-params
         run: |
           OP="${{ github.event.inputs.operation }}"
           TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
+          RESTORE_RESULT="${{ needs.restore.result }}"
           
-          if [[ "${{ job.status }}" == "success" ]]; then
+          if [[ "$RESTORE_RESULT" == "success" ]]; then
             echo "emoji=🔄" >> $GITHUB_OUTPUT
             echo "title=Restore Completed" >> $GITHUB_OUTPUT
             if [[ "$OP" == "restore_latest" ]]; then
@@ -217,12 +231,14 @@ jobs:
               echo "details=<b>Restored:</b> backup ${TIMESTAMP}" >> $GITHUB_OUTPUT
             fi
             echo "error_summary=" >> $GITHUB_OUTPUT
+            echo "include_link=false" >> $GITHUB_OUTPUT
           else
             echo "emoji=❌" >> $GITHUB_OUTPUT
             echo "title=Restore Failed" >> $GITHUB_OUTPUT
             echo "details=<b>Operation:</b> ${OP}" >> $GITHUB_OUTPUT
+            echo "include_link=true" >> $GITHUB_OUTPUT
             # Include error details if available
-            ERROR_DETAILS='${{ steps.restore.outputs.error_details }}'
+            ERROR_DETAILS='${{ needs.restore.outputs.error_details }}'
             if [[ -n "$ERROR_DETAILS" ]]; then
               ERROR_SUMMARY=$(echo "$ERROR_DETAILS" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' | tr '\n' ' ' | sed 's/  */ /g')
               echo "error_summary=<b>Error:</b> <pre>${ERROR_SUMMARY}</pre>" >> $GITHUB_OUTPUT
@@ -232,7 +248,6 @@ jobs:
           fi
 
       - name: Send Telegram notification
-        if: always() && (github.event.inputs.operation != 'list_backups' || job.status == 'failure')
         uses: ./.github/actions/notify-telegram
         with:
           bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -241,3 +256,4 @@ jobs:
           title: ${{ steps.notify-params.outputs.title }}
           message: "<b>App:</b> <code>${{ github.event.inputs.app_name }}</code>%0A${{ steps.notify-params.outputs.details }}%0A<b>Triggered by:</b> ${{ github.actor }}${{ steps.notify-params.outputs.error_summary != '' && format('%0A%0A{0}', steps.notify-params.outputs.error_summary) || '' }}"
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          include-run-link: ${{ steps.notify-params.outputs.include_link }}
