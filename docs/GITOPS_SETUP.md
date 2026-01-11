@@ -218,12 +218,8 @@ Go to: **Repository → Settings → Secrets and variables → Actions → New r
 | `DEPLOYER_USER` | `deployer` |
 | `DEPLOYER_SSH_KNOWN_HOSTS` | Output of `ssh-keyscan -t ed25519 deployer.vm` |
 
-### Optional Secrets (Telegram Notifications)
-
-| Secret Name | How to Get Value |
-|-------------|------------------|
-| `TELEGRAM_BOT_TOKEN` | Create bot with @BotFather, get token |
-| `TELEGRAM_CHAT_ID` | Message @userinfobot to get your chat ID |
+> **Note:** Telegram notifications are handled by the deployer VM, not GitHub Actions.
+> Configure Telegram credentials in `~/.deploy-secrets` on deployer.vm (see Part 1).
 
 ⚠️ **NEVER commit private keys or tokens to the repository!**
 

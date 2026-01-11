@@ -15,9 +15,8 @@
 # - DEPLOYER_USER: Username on deployer.vm (usually 'deployer')
 # - DEPLOYER_SSH_KNOWN_HOSTS: SSH known_hosts entry for deployer.vm
 #
-# Optional Secrets:
-# - TELEGRAM_BOT_TOKEN: Telegram bot token for notifications
-# - TELEGRAM_CHAT_ID: Telegram chat ID for notifications
+# Note: Telegram notifications are sent by the deployer VM scripts/Ansible,
+# not by this workflow. Configure credentials in ~/.deploy-secrets on deployer.vm.
 #
 
 name: Restore Docker Volumes
@@ -68,10 +67,6 @@ jobs:
   restore:
     name: ${{ github.event.inputs.operation }} - ${{ github.event.inputs.app_name }}
     runs-on: self-hosted
-    outputs:
-      status: ${{ steps.restore.outputs.status }}
-      error_details: ${{ steps.restore.outputs.error_details }}
-      backups: ${{ steps.restore.outputs.backups }}
     
     steps:
       - name: Validate inputs
@@ -139,64 +134,23 @@ jobs:
             RESTORE_CMD="${RESTORE_CMD} --timestamp ${TIMESTAMP}"
           fi
           
-          # SSH to deployer.vm - capture output for error reporting
-          OUTPUT_FILE=$(mktemp)
-          trap 'rm -f "$OUTPUT_FILE"' EXIT
-          RESTORE_EXIT=0
+          # SSH to deployer.vm
+          # Notifications are handled by the deployer VM scripts
           ssh -i ~/.ssh/deploy_key \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
-              "${RESTORE_CMD}" 2>&1 | tee "$OUTPUT_FILE" || RESTORE_EXIT=$?
+              "${RESTORE_CMD}"
+          
+          RESTORE_EXIT=$?
           
           echo "::endgroup::"
           
-          # Extract available backups for list operation
-          if [[ "$OPERATION" == "list_backups" ]]; then
-            BACKUPS=$(grep -A 20 "Available backups" "$OUTPUT_FILE" | head -20 || true)
-            echo "backups<<EOF" >> $GITHUB_OUTPUT
-            echo "$BACKUPS" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          fi
-          
           if [[ $RESTORE_EXIT -eq 0 ]]; then
             echo "✅ Operation successful"
-            echo "status=success" >> $GITHUB_OUTPUT
           else
             echo "::error::Operation failed"
-            echo "status=failed" >> $GITHUB_OUTPUT
-            
-            # Extract error details from output for notification
-            ERROR_DETAILS=""
-            
-            # Extract failed hosts and their error messages
-            FAILED_HOSTS=$(grep -E "^fatal:|FAILED!" "$OUTPUT_FILE" | head -5 || true)
-            if [[ -n "$FAILED_HOSTS" ]]; then
-              ERROR_DETAILS="$FAILED_HOSTS"
-            fi
-            
-            # Check for common error patterns
-            if grep -q "No backups found\|not found\|does not exist" "$OUTPUT_FILE"; then
-              NOT_FOUND=$(grep -E "No backups found|not found|does not exist" "$OUTPUT_FILE" | head -3 || true)
-              if [[ -n "$NOT_FOUND" ]]; then
-                if [[ -n "$ERROR_DETAILS" ]]; then
-                  ERROR_DETAILS="${ERROR_DETAILS}"$'\n'"${NOT_FOUND}"
-                else
-                  ERROR_DETAILS="${NOT_FOUND}"
-                fi
-              fi
-            fi
-            
-            # Truncate if too long
-            if [[ ${#ERROR_DETAILS} -gt 500 ]]; then
-              ERROR_DETAILS="${ERROR_DETAILS:0:500}..."
-            fi
-            
-            echo "error_details<<EOF" >> $GITHUB_OUTPUT
-            echo "$ERROR_DETAILS" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            
             exit $RESTORE_EXIT
           fi
 
@@ -204,56 +158,3 @@ jobs:
         if: always()
         run: |
           rm -f ~/.ssh/deploy_key
-
-  notify:
-    name: Send Notification
-    needs: restore
-    if: always() && (github.event.inputs.operation != 'list_backups' || needs.restore.result == 'failure')
-    runs-on: self-hosted
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - name: Determine notification parameters
-        id: notify-params
-        run: |
-          OP="${{ github.event.inputs.operation }}"
-          TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
-          RESTORE_RESULT="${{ needs.restore.result }}"
-          
-          if [[ "$RESTORE_RESULT" == "success" ]]; then
-            echo "emoji=🔄" >> $GITHUB_OUTPUT
-            echo "title=Restore Completed" >> $GITHUB_OUTPUT
-            if [[ "$OP" == "restore_latest" ]]; then
-              echo "details=<b>Restored:</b> latest backup" >> $GITHUB_OUTPUT
-            else
-              echo "details=<b>Restored:</b> backup ${TIMESTAMP}" >> $GITHUB_OUTPUT
-            fi
-            echo "error_summary=" >> $GITHUB_OUTPUT
-            echo "include_link=false" >> $GITHUB_OUTPUT
-          else
-            echo "emoji=❌" >> $GITHUB_OUTPUT
-            echo "title=Restore Failed" >> $GITHUB_OUTPUT
-            echo "details=<b>Operation:</b> ${OP}" >> $GITHUB_OUTPUT
-            echo "include_link=true" >> $GITHUB_OUTPUT
-            # Include error details if available
-            ERROR_DETAILS='${{ needs.restore.outputs.error_details }}'
-            if [[ -n "$ERROR_DETAILS" ]]; then
-              ERROR_SUMMARY=$(echo "$ERROR_DETAILS" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' | tr '\n' ' ' | sed 's/  */ /g')
-              echo "error_summary=<b>Error:</b> <pre>${ERROR_SUMMARY}</pre>" >> $GITHUB_OUTPUT
-            else
-              echo "error_summary=<b>Error:</b> Check workflow logs for details" >> $GITHUB_OUTPUT
-            fi
-          fi
-
-      - name: Send Telegram notification
-        uses: ./.github/actions/notify-telegram
-        with:
-          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          emoji: ${{ steps.notify-params.outputs.emoji }}
-          title: ${{ steps.notify-params.outputs.title }}
-          message: "<b>App:</b> <code>${{ github.event.inputs.app_name }}</code>%0A${{ steps.notify-params.outputs.details }}%0A<b>Triggered by:</b> ${{ github.actor }}${{ steps.notify-params.outputs.error_summary != '' && format('%0A%0A{0}', steps.notify-params.outputs.error_summary) || '' }}"
-          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          include-run-link: ${{ steps.notify-params.outputs.include_link }}

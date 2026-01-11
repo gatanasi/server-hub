@@ -14,9 +14,8 @@
 # - DEPLOYER_USER: Username on deployer.vm (usually 'deployer')
 # - DEPLOYER_SSH_KNOWN_HOSTS: SSH known_hosts entry for deployer.vm
 #
-# Optional Secrets:
-# - TELEGRAM_BOT_TOKEN: Telegram bot token for notifications
-# - TELEGRAM_CHAT_ID: Telegram chat ID for notifications
+# Note: Telegram notifications are sent by the deployer VM scripts/Ansible,
+# not by this workflow. Configure credentials in ~/.deploy-secrets on deployer.vm.
 #
 
 name: Deploy Docker Apps
@@ -135,6 +134,7 @@ jobs:
           
           # SSH to deployer.vm - the forced command will execute trigger-deploy.sh
           # We pass the app name as part of the SSH command
+          # Notifications are handled by the deployer VM scripts
           ssh -i ~/.ssh/deploy_key \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
@@ -158,50 +158,3 @@ jobs:
         run: |
           rm -f ~/.ssh/deploy_key
           # Keep known_hosts for future runs
-
-      - name: Send failure notification
-        if: failure()
-        uses: ./.github/actions/notify-telegram
-        with:
-          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          emoji: '❌'
-          title: 'Deployment Failed'
-          message: "App: <code>${{ matrix.app }}</code>%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}"
-          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-  notify:
-    name: Send Notification
-    needs: [detect-changes, deploy]
-    if: always() && needs.detect-changes.outputs.has_changes == 'true' && needs.detect-changes.result == 'success'
-    runs-on: self-hosted
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - name: Determine notification parameters
-        id: prep
-        run: |
-          DEPLOY_RESULT="${{ needs.deploy.result }}"
-          
-          if [[ "$DEPLOY_RESULT" == "success" ]]; then
-            echo "emoji=✅" >> $GITHUB_OUTPUT
-            echo "title=Deployment Successful" >> $GITHUB_OUTPUT
-            echo "include_link=false" >> $GITHUB_OUTPUT
-          else
-            echo "emoji=❌" >> $GITHUB_OUTPUT
-            echo "title=Deployment Failed" >> $GITHUB_OUTPUT
-            echo "include_link=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Send Telegram notification
-        uses: ./.github/actions/notify-telegram
-        with:
-          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          emoji: ${{ steps.prep.outputs.emoji }}
-          title: ${{ steps.prep.outputs.title }}
-          message: "Apps: ${{ needs.detect-changes.outputs.apps }}%0ABranch: ${{ github.ref_name }}%0ACommit: ${{ github.sha }}%0ATriggered by: ${{ github.actor }}"
-          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          include-run-link: ${{ steps.prep.outputs.include_link }}

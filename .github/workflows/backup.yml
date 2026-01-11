@@ -13,9 +13,8 @@
 # - DEPLOYER_USER: Username on deployer.vm (usually 'deployer')
 # - DEPLOYER_SSH_KNOWN_HOSTS: SSH known_hosts entry for deployer.vm
 #
-# Optional Secrets:
-# - TELEGRAM_BOT_TOKEN: Telegram bot token for notifications
-# - TELEGRAM_CHAT_ID: Telegram chat ID for notifications
+# Note: Telegram notifications are sent by the deployer VM scripts/Ansible,
+# not by this workflow. Configure credentials in ~/.deploy-secrets on deployer.vm.
 #
 
 name: Backup Docker Volumes
@@ -58,10 +57,6 @@ jobs:
   backup:
     name: Backup ${{ github.event.inputs.app_name }}
     runs-on: self-hosted
-    outputs:
-      status: ${{ steps.backup.outputs.status }}
-      error_details: ${{ steps.backup.outputs.error_details }}
-      target: ${{ steps.set-outputs.outputs.target }}
     
     steps:
       - name: Checkout repository
@@ -121,60 +116,23 @@ jobs:
             BACKUP_CMD="${BACKUP_CMD} --host ${TARGET_HOST}"
           fi
           
-          # SSH to deployer.vm - capture output for error reporting
-          # Use a temporary file to capture both stdout and stderr while preserving exit code
-          OUTPUT_FILE=$(mktemp)
-          trap 'rm -f "$OUTPUT_FILE"' EXIT
-          BACKUP_EXIT=0
+          # SSH to deployer.vm
+          # Notifications are handled by the deployer VM scripts
           ssh -i ~/.ssh/deploy_key \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
-              "${BACKUP_CMD}" 2>&1 | tee "$OUTPUT_FILE" || BACKUP_EXIT=$?
+              "${BACKUP_CMD}"
+          
+          BACKUP_EXIT=$?
           
           echo "::endgroup::"
           
           if [[ $BACKUP_EXIT -eq 0 ]]; then
             echo "✅ Backup successful for ${{ github.event.inputs.app_name }}"
-            echo "status=success" >> $GITHUB_OUTPUT
           else
             echo "::error::Backup failed for ${{ github.event.inputs.app_name }}"
-            echo "status=failed" >> $GITHUB_OUTPUT
-            
-            # Extract error details from Ansible output for notification
-            # Look for FAILED tasks or error messages
-            ERROR_DETAILS=""
-            
-            # Extract failed hosts and their error messages
-            FAILED_HOSTS=$(grep -E "^fatal:|FAILED!" "$OUTPUT_FILE" | head -5 || true)
-            if [[ -n "$FAILED_HOSTS" ]]; then
-              ERROR_DETAILS="$FAILED_HOSTS"
-            fi
-            
-            # Also check for common error patterns
-            if grep -q "does not exist" "$OUTPUT_FILE"; then
-              MOUNT_ERROR=$(grep -A 2 "does not exist" "$OUTPUT_FILE" | head -3 || true)
-              if [[ -n "$MOUNT_ERROR" ]]; then
-                if [[ -n "$ERROR_DETAILS" ]]; then
-                  ERROR_DETAILS="${ERROR_DETAILS}"$'\n'"${MOUNT_ERROR}"
-                else
-                  ERROR_DETAILS="${MOUNT_ERROR}"
-                fi
-              fi
-            fi
-            
-            # Truncate if too long (Telegram has message limits)
-            if [[ ${#ERROR_DETAILS} -gt 500 ]]; then
-              ERROR_DETAILS="${ERROR_DETAILS:0:500}..."
-            fi
-            
-            # Store error details for notification step
-            # Use delimiter to handle multiline
-            echo "error_details<<EOF" >> $GITHUB_OUTPUT
-            echo "$ERROR_DETAILS" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-            
             exit $BACKUP_EXIT
           fi
 
@@ -182,59 +140,3 @@ jobs:
         if: always()
         run: |
           rm -f ~/.ssh/deploy_key
-
-      - name: Set job outputs
-        if: always()
-        id: set-outputs
-        run: |
-          TARGET="${{ github.event.inputs.target_host }}"
-          if [[ -z "$TARGET" ]]; then
-            TARGET="all hosts"
-          fi
-          echo "target=$TARGET" >> $GITHUB_OUTPUT
-
-  notify:
-    name: Send Notification
-    needs: backup
-    if: always()
-    runs-on: self-hosted
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - name: Determine notification parameters
-        id: notify-params
-        run: |
-          BACKUP_RESULT="${{ needs.backup.result }}"
-          
-          if [[ "$BACKUP_RESULT" == "success" ]]; then
-            echo "emoji=💾" >> $GITHUB_OUTPUT
-            echo "title=Backup Completed" >> $GITHUB_OUTPUT
-            echo "error_summary=" >> $GITHUB_OUTPUT
-            echo "include_link=false" >> $GITHUB_OUTPUT
-          else
-            echo "emoji=❌" >> $GITHUB_OUTPUT
-            echo "title=Backup Failed" >> $GITHUB_OUTPUT
-            echo "include_link=true" >> $GITHUB_OUTPUT
-            # Include error details if available
-            ERROR_DETAILS='${{ needs.backup.outputs.error_details }}'
-            if [[ -n "$ERROR_DETAILS" ]]; then
-              # Escape for Telegram HTML and use %0A for newlines
-              ERROR_SUMMARY=$(echo "$ERROR_DETAILS" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' | tr '\n' ' ' | sed 's/  */ /g')
-              echo "error_summary=<b>Error:</b> <pre>${ERROR_SUMMARY}</pre>" >> $GITHUB_OUTPUT
-            else
-              echo "error_summary=<b>Error:</b> Check workflow logs for details" >> $GITHUB_OUTPUT
-            fi
-          fi
-
-      - name: Send Telegram notification
-        uses: ./.github/actions/notify-telegram
-        with:
-          bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
-          emoji: ${{ steps.notify-params.outputs.emoji }}
-          title: ${{ steps.notify-params.outputs.title }}
-          message: "App: <code>${{ github.event.inputs.app_name }}</code>%0ATarget: <code>${{ needs.backup.outputs.target }}</code>%0ADestination: <code>${{ github.event.inputs.backup_destination }}</code>%0ATriggered by: ${{ github.actor }}${{ steps.notify-params.outputs.error_summary != '' && format('%0A%0A{0}', steps.notify-params.outputs.error_summary) || '' }}"
-          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          include-run-link: ${{ steps.notify-params.outputs.include_link }}
