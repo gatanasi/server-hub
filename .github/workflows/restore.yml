@@ -137,6 +137,7 @@ jobs:
           
           # SSH to deployer.vm - capture output for error reporting
           OUTPUT_FILE=$(mktemp)
+          trap 'rm -f "$OUTPUT_FILE"' EXIT
           RESTORE_EXIT=0
           ssh -i ~/.ssh/deploy_key \
               -o BatchMode=yes \
@@ -190,11 +191,8 @@ jobs:
             echo "$ERROR_DETAILS" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
             
-            rm -f "$OUTPUT_FILE"
             exit $RESTORE_EXIT
           fi
-          
-          rm -f "$OUTPUT_FILE"
 
       - name: Cleanup SSH keys
         if: always()

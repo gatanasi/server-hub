@@ -118,16 +118,18 @@ run_restore_playbook() {
         if grep -q "No backups found\|not found\|does not exist" "${output_file}"; then
             local not_found
             not_found=$(grep -E "No backups found|not found|does not exist" "${output_file}" | head -3 || true)
-            if [[ -n "${error_details}" ]]; then
-                error_details+=$'\n'"${not_found}"
-            else
-                error_details="${not_found}"
+            if [[ -n "${not_found}" ]]; then
+                if [[ -n "${error_details}" ]]; then
+                    error_details+=$'\n'"${not_found}"
+                else
+                    error_details="${not_found}"
+                fi
             fi
         fi
         
         # Truncate for notification
-        if [[ ${#error_details} -gt 400 ]]; then
-            error_details="${error_details:0:400}..."
+        if [[ ${#error_details} -gt 500 ]]; then
+            error_details="${error_details:0:500}..."
         fi
         
         error "Restore playbook failed with exit code: ${exit_code}\n\nDetails:\n${error_details}"

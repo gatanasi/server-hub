@@ -104,7 +104,7 @@ run_backup_playbook() {
             mount_error=$(grep -B 1 -A 2 "does not exist" "${output_file}" | head -5 || true)
             if [[ -n "${mount_error}" ]]; then
                 if [[ -n "${error_details}" ]]; then
-                    error_details="${error_details}"$'\n'"${mount_error}"
+                    error_details+=$'\n'"${mount_error}"
                 else
                     error_details="${mount_error}"
                 fi
@@ -112,8 +112,8 @@ run_backup_playbook() {
         fi
         
         # Truncate for notification
-        if [[ ${#error_details} -gt 400 ]]; then
-            error_details="${error_details:0:400}..."
+        if [[ ${#error_details} -gt 500 ]]; then
+            error_details="${error_details:0:500}..."
         fi
         
         error "Backup playbook failed with exit code: ${exit_code}\n\nDetails:\n${error_details}"
