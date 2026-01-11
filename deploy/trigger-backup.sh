@@ -92,7 +92,9 @@ run_backup_playbook() {
         local error_details
         error_details=$(extract_ansible_errors "${output_file}" "does not exist" "-B 1 -A 2")
         
-        error "Backup playbook failed with exit code: ${exit_code}\n\nDetails:\n${error_details}"
+        local error_message
+        printf -v error_message "Backup playbook failed with exit code: %s\n\nDetails:\n%s" "${exit_code}" "${error_details}"
+        error "${error_message}"
     fi
     
     log "Backup playbook completed successfully"

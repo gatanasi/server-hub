@@ -108,7 +108,9 @@ run_restore_playbook() {
         local error_details
         error_details=$(extract_ansible_errors "${output_file}" "No backups found|not found|does not exist")
         
-        error "Restore playbook failed with exit code: ${exit_code}\n\nDetails:\n${error_details}"
+        local error_message
+        printf -v error_message "Restore playbook failed with exit code: %s\n\nDetails:\n%s" "${exit_code}" "${error_details}"
+        error "${error_message}"
     fi
     
     log "Restore playbook completed successfully"
