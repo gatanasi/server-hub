@@ -89,32 +89,8 @@ run_backup_playbook() {
     
     if [[ ${exit_code} -ne 0 ]]; then
         # Extract meaningful error details from Ansible output
-        local error_details=""
-        
-        # Look for failed tasks
-        local failed_tasks
-        failed_tasks=$(grep -E "^fatal:|FAILED!" "${output_file}" | head -5 || true)
-        if [[ -n "${failed_tasks}" ]]; then
-            error_details="${failed_tasks}"
-        fi
-        
-        # Look for specific error patterns
-        if grep -q "does not exist" "${output_file}"; then
-            local mount_error
-            mount_error=$(grep -B 1 -A 2 "does not exist" "${output_file}" | head -5 || true)
-            if [[ -n "${mount_error}" ]]; then
-                if [[ -n "${error_details}" ]]; then
-                    error_details+=$'\n'"${mount_error}"
-                else
-                    error_details="${mount_error}"
-                fi
-            fi
-        fi
-        
-        # Truncate for notification
-        if [[ ${#error_details} -gt 500 ]]; then
-            error_details="${error_details:0:500}..."
-        fi
+        local error_details
+        error_details=$(extract_ansible_errors "${output_file}" "does not exist" "-B 1 -A 2")
         
         error "Backup playbook failed with exit code: ${exit_code}\n\nDetails:\n${error_details}"
     fi

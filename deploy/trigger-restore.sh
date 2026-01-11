@@ -105,32 +105,8 @@ run_restore_playbook() {
     
     if [[ ${exit_code} -ne 0 ]]; then
         # Extract meaningful error details from Ansible output
-        local error_details=""
-        
-        # Look for failed tasks
-        local failed_tasks
-        failed_tasks=$(grep -E "^fatal:|FAILED!" "${output_file}" | head -5 || true)
-        if [[ -n "${failed_tasks}" ]]; then
-            error_details="${failed_tasks}"
-        fi
-        
-        # Look for specific error patterns
-        if grep -q "No backups found\|not found\|does not exist" "${output_file}"; then
-            local not_found
-            not_found=$(grep -E "No backups found|not found|does not exist" "${output_file}" | head -3 || true)
-            if [[ -n "${not_found}" ]]; then
-                if [[ -n "${error_details}" ]]; then
-                    error_details+=$'\n'"${not_found}"
-                else
-                    error_details="${not_found}"
-                fi
-            fi
-        fi
-        
-        # Truncate for notification
-        if [[ ${#error_details} -gt 500 ]]; then
-            error_details="${error_details:0:500}..."
-        fi
+        local error_details
+        error_details=$(extract_ansible_errors "${output_file}" "No backups found|not found|does not exist")
         
         error "Restore playbook failed with exit code: ${exit_code}\n\nDetails:\n${error_details}"
     fi

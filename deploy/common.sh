@@ -118,6 +118,58 @@ validate_hostname() {
 }
 
 # ============================================================================
+# Error Extraction Functions
+# ============================================================================
+
+# Extract error details from Ansible output file for notifications
+# Usage: extract_ansible_errors <output_file> [additional_pattern] [context_lines]
+#   output_file: Path to the file containing Ansible output
+#   additional_pattern: Optional grep -E pattern to search for (e.g., "does not exist")
+#   context_lines: Optional context lines for additional pattern (e.g., "-B 1 -A 2")
+# Returns: Error details string (truncated to 500 chars)
+extract_ansible_errors() {
+    local output_file="$1"
+    local additional_pattern="${2:-}"
+    local context_lines="${3:-}"
+    local error_details=""
+    
+    # Look for failed tasks (always check this)
+    local failed_tasks
+    failed_tasks=$(grep -E "^fatal:|FAILED!" "${output_file}" | head -5 || true)
+    if [[ -n "${failed_tasks}" ]]; then
+        error_details="${failed_tasks}"
+    fi
+    
+    # Look for additional pattern if provided
+    if [[ -n "${additional_pattern}" ]]; then
+        if grep -qE "${additional_pattern}" "${output_file}"; then
+            local matched
+            if [[ -n "${context_lines}" ]]; then
+                # Use context lines (e.g., -B 1 -A 2)
+                # shellcheck disable=SC2086
+                matched=$(grep ${context_lines} -E "${additional_pattern}" "${output_file}" | head -5 || true)
+            else
+                matched=$(grep -E "${additional_pattern}" "${output_file}" | head -3 || true)
+            fi
+            if [[ -n "${matched}" ]]; then
+                if [[ -n "${error_details}" ]]; then
+                    error_details+=$'\n'"${matched}"
+                else
+                    error_details="${matched}"
+                fi
+            fi
+        fi
+    fi
+    
+    # Truncate for notification (Telegram has message limits)
+    if [[ ${#error_details} -gt 500 ]]; then
+        error_details="${error_details:0:500}..."
+    fi
+    
+    echo "${error_details}"
+}
+
+# ============================================================================
 # Git Functions
 # ============================================================================
 
