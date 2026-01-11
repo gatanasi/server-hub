@@ -96,7 +96,7 @@ run_restore_playbook() {
     # Capture output to file for error analysis
     local output_file
     output_file=$(mktemp)
-    trap 'rm -f -- "${output_file}"' EXIT
+    trap 'rm -f -- "${output_file}"' RETURN
     local exit_code=0
     (
         cd "${ANSIBLE_DIR}"
