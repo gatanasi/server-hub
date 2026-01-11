@@ -290,7 +290,7 @@
         # === SEND NOTIFICATION ===
         - name: Get restored volume sizes
           ansible.builtin.command:
-            cmd: "du -h {{ item.path }}"
+            cmd: ["du", "-h", "{{ item.path }}"]
           loop: "{{ restore_files.files }}"
           register: restore_sizes_result
           changed_when: false
@@ -298,12 +298,9 @@
         - name: Build volume details for notification
           ansible.builtin.set_fact:
             restore_details_text: |
-              {% for result in restore_sizes_result.results %}
-              {% set filename = result.item.path | basename %}
-              {% set vol_name = filename | replace('_' + restore_timestamp + '.tar.gz', '') %}
-              {% set size = result.stdout.split() | first %}
-                • {{ vol_name }}: {{ size }}
-              {% endfor %}
+              {%- for result in restore_sizes_result.results %}
+                • {{ result.item.path | basename | replace('_' + restore_timestamp + '.tar.gz', '') }}: {{ result.stdout.split() | first }}
+              {%- endfor %}
             health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
 
         - name: Send success notification
