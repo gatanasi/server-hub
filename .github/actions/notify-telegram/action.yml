@@ -79,8 +79,12 @@ runs:
           FULL_MESSAGE="${FULL_MESSAGE}"$'\n\n'"<a href=\"${RUN_URL}\">View Run</a>"
         fi
         
-        # Send the notification using --data-urlencode for proper encoding
-        curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+        # Send the notification and check for success
+        output=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
           -d "chat_id=${CHAT_ID}" \
           --data-urlencode "text=${FULL_MESSAGE}" \
-          -d "parse_mode=HTML" || true
+          -d "parse_mode=HTML")
+        
+        if ! echo "$output" | grep -q '"ok":true'; then
+          echo "::warning::Telegram notification failed. Response: $output"
+        fi
