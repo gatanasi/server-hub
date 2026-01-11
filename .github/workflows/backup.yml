@@ -151,10 +151,12 @@ jobs:
             # Also check for common error patterns
             if grep -q "does not exist" "$OUTPUT_FILE"; then
               MOUNT_ERROR=$(grep -A 2 "does not exist" "$OUTPUT_FILE" | head -3 || true)
-              if [[ -n "$ERROR_DETAILS" ]]; then
-                ERROR_DETAILS="${ERROR_DETAILS}"$'\n'"${MOUNT_ERROR}"
-              else
-                ERROR_DETAILS="${MOUNT_ERROR}"
+              if [[ -n "$MOUNT_ERROR" ]]; then
+                if [[ -n "$ERROR_DETAILS" ]]; then
+                  ERROR_DETAILS="${ERROR_DETAILS}"$'\n'"${MOUNT_ERROR}"
+                else
+                  ERROR_DETAILS="${MOUNT_ERROR}"
+                fi
               fi
             fi
             

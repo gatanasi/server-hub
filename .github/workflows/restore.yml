@@ -175,10 +175,12 @@ jobs:
             # Check for common error patterns
             if grep -q "No backups found\|not found\|does not exist" "$OUTPUT_FILE"; then
               NOT_FOUND=$(grep -E "No backups found|not found|does not exist" "$OUTPUT_FILE" | head -3 || true)
-              if [[ -n "$ERROR_DETAILS" ]]; then
-                ERROR_DETAILS="${ERROR_DETAILS}"$'\n'"${NOT_FOUND}"
-              else
-                ERROR_DETAILS="${NOT_FOUND}"
+              if [[ -n "$NOT_FOUND" ]]; then
+                if [[ -n "$ERROR_DETAILS" ]]; then
+                  ERROR_DETAILS="${ERROR_DETAILS}"$'\n'"${NOT_FOUND}"
+                else
+                  ERROR_DETAILS="${NOT_FOUND}"
+                fi
               fi
             fi
             
