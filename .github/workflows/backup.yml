@@ -58,6 +58,10 @@ jobs:
   backup:
     name: Backup ${{ github.event.inputs.app_name }}
     runs-on: self-hosted
+    outputs:
+      status: ${{ steps.backup.outputs.status }}
+      error_details: ${{ steps.backup.outputs.error_details }}
+      target: ${{ steps.set-outputs.outputs.target }}
     
     steps:
       - name: Checkout repository
@@ -179,24 +183,42 @@ jobs:
         run: |
           rm -f ~/.ssh/deploy_key
 
-      - name: Determine notification parameters
+      - name: Set job outputs
         if: always()
-        id: notify-params
+        id: set-outputs
         run: |
           TARGET="${{ github.event.inputs.target_host }}"
           if [[ -z "$TARGET" ]]; then
             TARGET="all hosts"
           fi
+          echo "target=$TARGET" >> $GITHUB_OUTPUT
+
+  notify:
+    name: Send Notification
+    needs: backup
+    if: always()
+    runs-on: self-hosted
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Determine notification parameters
+        id: notify-params
+        run: |
+          BACKUP_RESULT="${{ needs.backup.result }}"
           
-          if [[ "${{ job.status }}" == "success" ]]; then
+          if [[ "$BACKUP_RESULT" == "success" ]]; then
             echo "emoji=💾" >> $GITHUB_OUTPUT
             echo "title=Backup Completed" >> $GITHUB_OUTPUT
             echo "error_summary=" >> $GITHUB_OUTPUT
+            echo "include_link=false" >> $GITHUB_OUTPUT
           else
             echo "emoji=❌" >> $GITHUB_OUTPUT
             echo "title=Backup Failed" >> $GITHUB_OUTPUT
+            echo "include_link=true" >> $GITHUB_OUTPUT
             # Include error details if available
-            ERROR_DETAILS='${{ steps.backup.outputs.error_details }}'
+            ERROR_DETAILS='${{ needs.backup.outputs.error_details }}'
             if [[ -n "$ERROR_DETAILS" ]]; then
               # Escape for Telegram HTML and use %0A for newlines
               ERROR_SUMMARY=$(echo "$ERROR_DETAILS" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g' | tr '\n' ' ' | sed 's/  */ /g')
@@ -205,16 +227,14 @@ jobs:
               echo "error_summary=<b>Error:</b> Check workflow logs for details" >> $GITHUB_OUTPUT
             fi
           fi
-          
-          echo "target=$TARGET" >> $GITHUB_OUTPUT
 
       - name: Send Telegram notification
-        if: always()
         uses: ./.github/actions/notify-telegram
         with:
           bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           chat-id: ${{ secrets.TELEGRAM_CHAT_ID }}
           emoji: ${{ steps.notify-params.outputs.emoji }}
           title: ${{ steps.notify-params.outputs.title }}
-          message: "App: <code>${{ github.event.inputs.app_name }}</code>%0ATarget: <code>${{ steps.notify-params.outputs.target }}</code>%0ADestination: <code>${{ github.event.inputs.backup_destination }}</code>%0ATriggered by: ${{ github.actor }}${{ steps.notify-params.outputs.error_summary != '' && format('%0A%0A{0}', steps.notify-params.outputs.error_summary) || '' }}"
+          message: "App: <code>${{ github.event.inputs.app_name }}</code>%0ATarget: <code>${{ needs.backup.outputs.target }}</code>%0ADestination: <code>${{ github.event.inputs.backup_destination }}</code>%0ATriggered by: ${{ github.actor }}${{ steps.notify-params.outputs.error_summary != '' && format('%0A%0A{0}', steps.notify-params.outputs.error_summary) || '' }}"
           run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          include-run-link: ${{ steps.notify-params.outputs.include_link }}
