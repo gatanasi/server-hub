@@ -88,20 +88,13 @@ all:
           ansible_host: convertx.vm
           managed_apps:
             - convertx
+
+        caddy.vm:
+          ansible_user: caddy
+          ansible_host: caddy.vm
+          managed_apps:
+            - caddy
         # Add more hosts as needed:
-        #
-        # odoo.vm:
-        #   ansible_user: odoo
-        #   ansible_host: odoo.vm
-        #   managed_apps:
-        #     - odoo
-        #
-        # pdf.vm:
-        #   ansible_user: pdf
-        #   ansible_host: pdf.vm
-        #   managed_apps:
-        #     - stirling-pdf
-        #
         # multi-app.vm:
         #   ansible_user: apps
         #   ansible_host: multi-app.vm
