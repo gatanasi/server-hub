@@ -27,59 +27,20 @@ REPO_DIR="/home/deployer/git/server-hub"
 ANSIBLE_DIR="${REPO_DIR}/ansible"
 LOG_DIR="/home/deployer/logs/deployments"
 LOG_FILE="${LOG_DIR}/deploy-$(date +%Y%m%d-%H%M%S).log"
+OPERATION_TYPE="Deployment"
 
 # Telegram configuration (set these in /home/deployer/.deploy-secrets)
 # TELEGRAM_BOT_TOKEN="your-bot-token"
 # TELEGRAM_CHAT_ID="your-chat-id"
 SECRETS_FILE="/home/deployer/.deploy-secrets"
 
+# Source common functions
+# shellcheck source=common.sh
+source "${SCRIPT_DIR}/common.sh"
+
 # ============================================================================
 # Functions
 # ============================================================================
-
-log() {
-    local timestamp
-    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "[${timestamp}] $*" | tee -a "${LOG_FILE}"
-}
-
-error() {
-    log "ERROR: $*"
-    send_notification "❌ Deployment FAILED" "$*"
-    exit 1
-}
-
-send_notification() {
-    local title="$1"
-    local message="$2"
-    
-    if [[ -f "${SECRETS_FILE}" ]]; then
-        # shellcheck source=/dev/null
-        source "${SECRETS_FILE}"
-    fi
-    
-    if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then
-        local text="${title}%0A%0A${message}"
-        curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_CHAT_ID}" \
-            -d "text=${text}" \
-            -d "parse_mode=HTML" > /dev/null 2>&1 || true
-    fi
-}
-
-validate_app_name() {
-    local app="$1"
-    
-    # Security: Only allow alphanumeric, dash, and underscore
-    if [[ ! "${app}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        error "Invalid app name: ${app}. Only alphanumeric, dash, and underscore allowed."
-    fi
-    
-    # Check if docker-compose.yml exists for this app
-    if [[ ! -f "${REPO_DIR}/docker/${app}/docker-compose.yml" ]]; then
-        error "No docker-compose.yml found for app: ${app}"
-    fi
-}
 
 # Extract version from a docker-compose.yml file
 # Looks for the main service image and extracts the tag
@@ -92,29 +53,15 @@ extract_version() {
         # - image: nginx:1.25
         # - image: "docker.io/n8nio/n8n:2.1.4"
         # - image: postgres:16.11@sha256:...
-        version=$(grep -E "^\s*image:" "${compose_file}" 2>/dev/null | \
-            grep -v "x-shared" | \
-            head -1 | \
-            sed "s/.*image:\s*//; s/[\"']//g" | \
-            cut -d@ -f1 | \
+        version=$(grep -E "^\s*image:" "${compose_file}" 2>/dev/null |
+            grep -v "x-shared" |
+            head -1 |
+            sed "s/.*image:\s*//; s/[\"']//g" |
+            cut -d@ -f1 |
             xargs 2>/dev/null || echo "")
     fi
     
     echo "${version:-unknown}"
-}
-
-pull_latest_repo() {
-    log "Pulling latest changes from git..."
-    cd "${REPO_DIR}"
-    
-    # Fetch and reset to origin/main to ensure clean state
-    git fetch origin main
-    git reset --hard origin/main
-    
-    # Ensure deploy scripts are executable (git doesn't preserve permissions)
-    chmod +x "${REPO_DIR}/deploy/"*.sh 2>/dev/null || true
-    
-    log "Git pull complete. Current commit: $(git rev-parse --short HEAD)"
 }
 
 run_ansible_playbook() {
@@ -122,21 +69,38 @@ run_ansible_playbook() {
     
     log "Running Ansible playbook for app: ${app}"
     
-    cd "${ANSIBLE_DIR}"
+    # Run the deployment playbook in a subshell to avoid cd side effects
+    # Capture output to file for error analysis
+    local output_file
+    output_file=$(mktemp)
     
-    # Run the deployment playbook
-    # Note: We use || exit_code=$? to prevent set -e from killing the script before we can send notifications
+    # Use a robust trap that catches multiple signals and is cleaned up later
+    trap "rm -f -- '${output_file}'" EXIT HUP INT QUIT TERM
+
     local exit_code=0
-    ansible-playbook \
-        -i inventory/production.yml \
-        playbooks/deploy-docker-app.yml \
-        -e "app_name=${app}" \
-        -e "repo_dir=${REPO_DIR}" \
-        2>&1 | tee -a "${LOG_FILE}" || exit_code=$?
+    (
+        cd "${ANSIBLE_DIR}"
+        ansible-playbook \
+            -i inventory/production.yml \
+            playbooks/deploy-docker-app.yml \
+            -e "app_name=${app}" \
+            -e "repo_dir=${REPO_DIR}" \
+            2>&1
+    ) | tee -a "${LOG_FILE}" | tee "${output_file}" || exit_code=$?
     
     if [[ ${exit_code} -ne 0 ]]; then
-        error "Ansible playbook failed with exit code: ${exit_code}"
+        # Extract meaningful error details from Ansible output
+        local error_details
+        error_details=$(extract_ansible_errors "${output_file}" "does not exist" "-B 1 -A 2")
+        
+        local error_message
+        printf -v error_message "Ansible playbook failed with exit code: %s\n\nDetails:\n%s" "${exit_code}" "${error_details}"
+        error "${error_message}"
     fi
+
+    # On success, clean up the temp file and disarm the trap
+    rm -f -- "${output_file}"
+    trap - EXIT HUP INT QUIT TERM
     
     log "Ansible playbook completed successfully"
 }
