@@ -122,7 +122,7 @@ main() {
             --help|-h)
                 show_help
                 exit 0
-                ;; 
+                ;;
             --destination)
                 if [[ -z "${2:-}" || "$2" == -* ]]; then
                     echo "Error: --destination requires a path argument"
@@ -131,7 +131,7 @@ main() {
                 fi
                 backup_dest="$2"
                 shift 2
-                ;; 
+                ;;
             --host)
                 if [[ -z "${2:-}" || "$2" == -* ]]; then
                     echo "Error: --host requires a hostname argument"
@@ -140,12 +140,12 @@ main() {
                 fi
                 target_host="$2"
                 shift 2
-                ;; 
+                ;;
             -*)
                 echo "Unknown option: $1"
                 show_help
                 exit 1
-                ;; 
+                ;;
             *)
                 if [[ -z "${app_name}" ]]; then
                     app_name="$1"
@@ -155,7 +155,7 @@ main() {
                     exit 1
                 fi
                 shift
-                ;; 
+                ;;
         esac
     done
     
