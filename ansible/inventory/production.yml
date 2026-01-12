@@ -94,6 +94,12 @@ all:
           ansible_host: caddy.vm
           managed_apps:
             - caddy
+
+        wireguard.vm:
+          ansible_user: wireguard
+          ansible_host: wireguard.vm
+          managed_apps:
+            - wg-easy
         # Add more hosts as needed:
         # multi-app.vm:
         #   ansible_user: apps
