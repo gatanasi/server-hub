@@ -94,6 +94,13 @@
 		}
 	}
 
+	@convertx expression {host}.startsWith("convertx")
+	handle @convertx {
+		reverse_proxy http://convertx.vm:8080 {
+			import common_proxy_headers
+		}
+	}
+
 	handle {
 		respond "Not Found" 404
 	}
