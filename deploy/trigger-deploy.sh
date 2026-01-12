@@ -18,9 +18,9 @@
 
 set -euo pipefail
 
-# ============================================================================ 
+# ============================================================================
 # Configuration
-# ============================================================================ 
+# ============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="/home/deployer/git/server-hub"
@@ -38,9 +38,9 @@ SECRETS_FILE="/home/deployer/.deploy-secrets"
 # shellcheck source=common.sh
 source "${SCRIPT_DIR}/common.sh"
 
-# ============================================================================ 
+# ============================================================================
 # Functions
-# ============================================================================ 
+# ============================================================================
 
 # Extract version from a docker-compose.yml file
 # Looks for the main service image and extracts the tag
@@ -53,11 +53,11 @@ extract_version() {
         # - image: nginx:1.25
         # - image: "docker.io/n8nio/n8n:2.1.4"
         # - image: postgres:16.11@sha256:...
-        version=$(grep -E "^\s*image:" "${compose_file}" 2>/dev/null | \
-            grep -v "x-shared" | \
-            head -1 | \
-            sed "s/.*image:\s*//; s/["']//g" | \
-            cut -d@ -f1 | \
+        version=$(grep -E "^\s*image:" "${compose_file}" 2>/dev/null |
+            grep -v "x-shared" |
+            head -1 |
+            sed "s/.*image:\s*//; s/["']//g" |
+            cut -d@ -f1 |
             xargs 2>/dev/null || echo "")
     fi
     
@@ -73,7 +73,9 @@ run_ansible_playbook() {
     # Capture output to file for error analysis
     local output_file
     output_file=$(mktemp)
-    trap "rm -f -- '${output_file}'" EXIT
+    
+    # Use a robust trap that catches multiple signals and is cleaned up later
+    trap "rm -f -- '${output_file}'" EXIT HUP INT QUIT TERM
 
     local exit_code=0
     (
@@ -87,7 +89,7 @@ run_ansible_playbook() {
     ) | tee -a "${LOG_FILE}" | tee "${output_file}" || exit_code=$?
     
     if [[ ${exit_code} -ne 0 ]]; then
-         # Extract meaningful error details from Ansible output
+        # Extract meaningful error details from Ansible output
         local error_details
         error_details=$(extract_ansible_errors "${output_file}" "does not exist" "-B 1 -A 2")
         
@@ -95,13 +97,17 @@ run_ansible_playbook() {
         printf -v error_message "Ansible playbook failed with exit code: %s\n\nDetails:\n%s" "${exit_code}" "${error_details}"
         error "${error_message}"
     fi
+
+    # On success, clean up the temp file and disarm the trap
+    rm -f -- "${output_file}"
+    trap - EXIT HUP INT QUIT TERM
     
     log "Ansible playbook completed successfully"
 }
 
-# ============================================================================ 
+# ============================================================================
 # Main
-# ============================================================================ 
+# ============================================================================
 
 main() {
     local app_name=""

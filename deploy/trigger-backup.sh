@@ -80,7 +80,10 @@ run_backup_playbook() {
     # Capture output to file for error analysis
     local output_file
     output_file=$(mktemp)
-    trap "rm -f -- '${output_file}'" EXIT
+    
+    # Use a robust trap that catches multiple signals and is cleaned up later
+    trap "rm -f -- '${output_file}'" EXIT HUP INT QUIT TERM
+
     local exit_code=0
     (
         cd "${ANSIBLE_DIR}"
@@ -96,6 +99,10 @@ run_backup_playbook() {
         printf -v error_message "Backup playbook failed with exit code: %s\n\nDetails:\n%s" "${exit_code}" "${error_details}"
         error "${error_message}"
     fi
+
+    # On success, clean up the temp file and disarm the trap
+    rm -f -- "${output_file}"
+    trap - EXIT HUP INT QUIT TERM
     
     log "Backup playbook completed successfully"
 }
@@ -115,7 +122,7 @@ main() {
             --help|-h)
                 show_help
                 exit 0
-                ;;
+                ;; 
             --destination)
                 if [[ -z "${2:-}" || "$2" == -* ]]; then
                     echo "Error: --destination requires a path argument"
@@ -124,7 +131,7 @@ main() {
                 fi
                 backup_dest="$2"
                 shift 2
-                ;;
+                ;; 
             --host)
                 if [[ -z "${2:-}" || "$2" == -* ]]; then
                     echo "Error: --host requires a hostname argument"
@@ -133,12 +140,12 @@ main() {
                 fi
                 target_host="$2"
                 shift 2
-                ;;
+                ;; 
             -*)
                 echo "Unknown option: $1"
                 show_help
                 exit 1
-                ;;
+                ;; 
             *)
                 if [[ -z "${app_name}" ]]; then
                     app_name="$1"
@@ -148,7 +155,7 @@ main() {
                     exit 1
                 fi
                 shift
-                ;;
+                ;; 
         esac
     done
     
@@ -184,9 +191,9 @@ main() {
     fi
     send_notification "💾 Backup SUCCESS" "App: <code>${app_name}</code>${target_info}%0ADestination: <code>${backup_dest}</code>"
     
-    log "=========================================="
+    log "========================================="
     log "Backup completed successfully!"
-    log "=========================================="
+    log "========================================="
 }
 
 main "$@"
