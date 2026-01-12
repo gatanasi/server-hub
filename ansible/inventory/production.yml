@@ -82,6 +82,12 @@ all:
           ansible_host: odoo.vm
           managed_apps:
             - odoo
+
+        convertx.vm:
+          ansible_user: convertx
+          ansible_host: convertx.vm
+          managed_apps:
+            - convertx
         # Add more hosts as needed:
         #
         # odoo.vm:
