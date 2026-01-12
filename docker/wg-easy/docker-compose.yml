@@ -8,7 +8,7 @@ services:
       - WG_PORT=${WG_PORT}
       - DISABLE_IPV6=true
 
-    image: ghcr.io/wg-easy/wg-easy:15@sha256:bb8152762c36f824eb42bb2f3c5ab8ad952818fbef677d584bc69ec513b251b0
+    image: ghcr.io/wg-easy/wg-easy:15.2.0
     volumes:
       - etc_wireguard:/etc/wireguard
     ports:
