@@ -76,6 +76,12 @@ all:
           ansible_host: stirling-pdf.vm
           managed_apps:
             - stirling-pdf
+
+        odoo.vm:
+          ansible_user: odoo
+          ansible_host: odoo.vm
+          managed_apps:
+            - odoo
         # Add more hosts as needed:
         #
         # odoo.vm:
