@@ -56,7 +56,7 @@ extract_version() {
         version=$(grep -E "^\s*image:" "${compose_file}" 2>/dev/null |
             grep -v "x-shared" |
             head -1 |
-            sed "s/.*image:\s*//; s/["']//g" |
+            sed "s/.*image:\s*//; s/[\"']//g" |
             cut -d@ -f1 |
             xargs 2>/dev/null || echo "")
     fi
