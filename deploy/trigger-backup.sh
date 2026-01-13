@@ -24,12 +24,9 @@ set -euo pipefail
 # ============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-LOG_DIR="${HOME}/logs/backups"
-LOG_FILE="${LOG_DIR}/backup-$(date +%Y%m%d-%H%M%S).log"
-OPERATION_TYPE="Backup"
+export OPERATION_TYPE="Backup"
 
-# Source common functions
-# shellcheck source=common.sh
+# shellcheck source=deploy/common.sh
 source "${SCRIPT_DIR}/common.sh"
 
 # ============================================================================
@@ -76,11 +73,9 @@ run_backup_playbook() {
     
     # Run the backup playbook in a subshell to avoid cd side effects
     # Capture output to file for error analysis
-    local output_file
+    # Create temporary file for Ansible output
     output_file=$(mktemp)
-    
-    # Use a robust trap that catches multiple signals and is cleaned up later
-    trap "rm -f -- '${output_file}'" EXIT HUP INT QUIT TERM
+    trap 'rm -f -- "$output_file"' EXIT HUP INT QUIT TERM
 
     local exit_code=0
     (

@@ -25,7 +25,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 LOG_DIR="${HOME}/logs/deployments"
 LOG_FILE="${LOG_DIR}/deploy-$(date +%Y%m%d-%H%M%S).log"
-OPERATION_TYPE="Deployment"
+export OPERATION_TYPE="Deployment"
 
 # Telegram configuration (set these in SECRETS_FILE)
 # TELEGRAM_BOT_TOKEN="your-bot-token"
@@ -33,7 +33,7 @@ OPERATION_TYPE="Deployment"
 # SECRETS_FILE is defined in common.sh
 
 # Source common functions
-# shellcheck source=common.sh
+# shellcheck source=deploy/common.sh
 source "${SCRIPT_DIR}/common.sh"
 
 # ============================================================================
@@ -69,11 +69,9 @@ run_ansible_playbook() {
     
     # Run the deployment playbook in a subshell to avoid cd side effects
     # Capture output to file for error analysis
-    local output_file
+    # Create temporary file for Ansible output
     output_file=$(mktemp)
-    
-    # Use a robust trap that catches multiple signals and is cleaned up later
-    trap "rm -f -- '${output_file}'" EXIT HUP INT QUIT TERM
+    trap 'rm -f -- "$output_file"' EXIT HUP INT QUIT TERM
 
     local exit_code=0
     (
@@ -125,7 +123,7 @@ main() {
     if [[ -z "${app_name}" ]]; then
         echo "Usage: $0 <app-name>"
         echo "Available apps:"
-        ls -1 "${REPO_DIR}/docker/" 2>/dev/null | grep -v '^$' || echo "  (none found)"
+        find "${REPO_DIR}/docker/" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null || echo "  (none found)"
         exit 1
     fi
     
