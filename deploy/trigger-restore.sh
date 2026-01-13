@@ -97,7 +97,7 @@ run_restore_playbook() {
     trap 'rm -f -- "$output_file"' EXIT
     local exit_code=0
     (
-        cd "${ANSIBLE_DIR}"
+        cd "${ANSIBLE_DIR}" || exit 1
         ansible-playbook "${ansible_args[@]}" 2>&1
     ) | tee -a "${LOG_FILE}" | tee "${output_file}" || exit_code=$?
     

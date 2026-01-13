@@ -76,7 +76,7 @@ run_ansible_playbook() {
 
     local exit_code=0
     (
-        cd "${ANSIBLE_DIR}"
+        cd "${ANSIBLE_DIR}" || exit 1
         ansible-playbook \
             -i inventory/production.yml \
             playbooks/deploy-docker-app.yml \
