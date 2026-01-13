@@ -110,7 +110,7 @@
     - name: Parse new version from source
       vars:
         compose_content: "{{ source_compose_file.content | b64decode | from_yaml }}"
-        service_config: "{{ compose_content.services[app_name] | default(compose_content.services[app_name | replace('-', '_')]) | default({}) }}"
+        service_config: "{{ (compose_content.services | default({}))[app_name] | default((compose_content.services | default({}))[app_name | replace('-', '_')]) | default({}) }}"
         image_name: "{{ service_config.image | default('unknown') }}"
       ansible.builtin.set_fact:
         new_version: "{{ image_name.split(':') | last }}"
@@ -129,7 +129,7 @@
     - name: Parse old version from target
       vars:
         compose_content: "{{ target_compose_file.content | b64decode | from_yaml }}"
-        service_config: "{{ compose_content.services[app_name] | default(compose_content.services[app_name | replace('-', '_')]) | default({}) }}"
+        service_config: "{{ (compose_content.services | default({}))[app_name] | default((compose_content.services | default({}))[app_name | replace('-', '_')]) | default({}) }}"
         image_name: "{{ service_config.image | default('unknown') }}"
       ansible.builtin.set_fact:
         old_version: "{{ image_name.split(':') | last }}"

@@ -82,7 +82,7 @@
       ansible.builtin.set_fact:
         hc_interval: "{{ _interval }}"
         hc_timeout: "{{ _timeout }}"
-        max_retries: "{{ (_timeout | int // _interval | int) | int }}"
+        max_retries: "{{ ((_timeout | int) // (_interval | int)) | int }}"
 
     - name: Verify health and exited status
       block:
