@@ -24,7 +24,7 @@
   gather_facts: false
   vars:
     repo_dir: /home/deployer/git/server-hub
-  
+
   tasks:
     - name: Validate app_name is provided
       ansible.builtin.assert:
@@ -48,7 +48,7 @@
         msg: |
           No host found that manages app '{{ app_name }}'.
           Please add the app to a host's 'managed_apps' list in inventory/production.yml.
-          
+
           Current inventory:
           {% for host in groups['docker_hosts'] %}
           - {{ host }}: {{ hostvars[host].managed_apps | default([]) | join(', ') }}
@@ -73,7 +73,7 @@
 - name: Deploy Docker Compose application
   hosts: deploy_targets
   gather_facts: true
-  
+
   vars:
     app_name: "{{ deploy_app_name }}"
     repo_dir: "{{ deploy_repo_dir }}"
@@ -89,7 +89,7 @@
     telegram_bot_token: "{{ deploy_telegram_bot_token }}"
     telegram_chat_id: "{{ deploy_telegram_chat_id }}"
     telegram_enabled: "{{ deploy_telegram_enabled }}"
-  
+
   tasks:
     - name: Display deployment info
       ansible.builtin.debug:
@@ -231,7 +231,7 @@
       loop: "{{ files_to_copy.files }}"
       loop_control:
         label: "{{ item.path | basename }}"
-      when: 
+      when:
         - item.path | basename != '.env'
         - item.path | basename != '.env.enc'
 
@@ -270,7 +270,7 @@
           WARNING: No .env file found at {{ app_target_dir }}/.env
           No .env.enc file found in source either.
           If this app requires environment variables, create them manually.
-      when: 
+      when:
         - not env_file.stat.exists
         - not env_enc_file.stat.exists
 
@@ -314,7 +314,7 @@
 
     - name: Set healthcheck warning message
       ansible.builtin.set_fact:
-        healthcheck_warning: "{{ '⚠️ No healthchecks defined - consider adding healthcheck to docker-compose.yml' if (no_healthchecks_defined | default(false)) else '' }}"
+        healthcheck_warning: "{{ '⚠️ No healthchecks defined - consider adding healthcheck to docker-compose.yml' if (no_healthchecks_defined | default(false)) else '' }}" # noqa: yaml[line-length]
 
     - name: Set deployment failure if containers exited
       ansible.builtin.set_fact:
@@ -329,6 +329,7 @@
 
     # === ROLLBACK PHASE (if needed) ===
     - name: Execute rollback procedures
+      when: deployment_failed | bool
       block:
         - name: Log rollback start
           ansible.builtin.debug:
@@ -380,13 +381,12 @@
           vars:
             notify_title: "Deployment Rolled Back"
             notify_emoji: "⚠️"
-            notify_message: "App: <code>{{ app_name }}</code>\nError: {{ failure_reason | default('Health check failed') }}\nCurrent: Restored to <code>{{ old_version }}</code>"
+            notify_message: "App: <code>{{ app_name }}</code>\nError: {{ failure_reason | default('Health check failed') }}\nCurrent: Restored to <code>{{ old_version }}</code>" # noqa: yaml[line-length]
 
         - name: Fail the playbook after rollback
           ansible.builtin.fail:
             msg: "Deployment failed and was rolled back. Reason: {{ failure_reason | default('Health check failed') }}"
 
-      when: deployment_failed | bool
       rescue:
         - name: Rollback itself failed
           ansible.builtin.debug:
@@ -422,7 +422,7 @@
         cmd: docker image prune -f
       register: docker_prune
       changed_when: "'Total reclaimed space' in docker_prune.stdout"
-      when: 
+      when:
         - docker_prune_after_deploy | default(true)
         - not deployment_failed | default(false)
 
@@ -430,7 +430,7 @@
       ansible.builtin.file:
         path: "{{ backup_dir }}"
         state: absent
-      when: 
+      when:
         - not deployment_failed | default(false)
         - cleanup_backups_on_success | default(false)
 
@@ -439,14 +439,14 @@
       vars:
         notify_title: "Deployment Successful"
         notify_emoji: "✅"
-        notify_message: "App: <code>{{ app_name }}</code>\nVersion: <code>{{ new_version }}</code>\nStatus: {{ 'Running (no healthchecks)' if no_healthchecks_defined | default(false) else 'Healthy' }}{{ '\n\n' + healthcheck_warning if healthcheck_warning | default('') | length > 0 else '' }}"
+        notify_message: "App: <code>{{ app_name }}</code>\nVersion: <code>{{ new_version }}</code>\nStatus: {{ 'Running (no healthchecks)' if no_healthchecks_defined | default(false) else 'Healthy' }}{{ '\n\n' + healthcheck_warning if healthcheck_warning | default('') | length > 0 else '' }}" # noqa: yaml[line-length]
       when: not deployment_failed | default(false)
 
 
 - name: Deployment summary
   hosts: localhost
   gather_facts: false
-  
+
   tasks:
     - name: Display completion message
       ansible.builtin.debug:

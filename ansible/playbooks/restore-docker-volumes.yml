@@ -26,7 +26,7 @@
 - name: Find target host for application
   hosts: localhost
   gather_facts: false
-  
+
   tasks:
     - name: Validate app_name is provided
       ansible.builtin.assert:
@@ -59,17 +59,17 @@
   hosts: restore_targets
   gather_facts: true
   # Note: become is not needed if user is in docker group
-  
+
   vars:
     app_name: "{{ restore_app_name }}"
     app_dir: "{{ app_base_dir }}/{{ app_name }}"
     app_backup_dir: "{{ backup_source }}/{{ app_name }}"
     requested_timestamp: "{{ restore_backup_timestamp }}"
     list_only: "{{ restore_list_only | bool }}"
-    
+
     # Load telegram credentials from secrets file
     secrets_file: "{{ lookup('env', 'HOME') }}/.deploy-secrets"
-    
+
     # Note: The following variables are now defined in inventory/production.yml:
     # - backup_source: Backup source path for restore operations
     # - helper_image: Alpine image for restore operations
@@ -111,7 +111,12 @@
 
     - name: Extract unique timestamps
       ansible.builtin.set_fact:
-        available_timestamps: "{{ backup_files.files | map(attribute='path') | map('basename') | map('regex_replace', '^.*_([0-9T]+)\\.tar\\.gz$', '\\1') | unique | sort | reverse | list }}"
+        available_timestamps: >-
+          {{
+            backup_files.files | map(attribute='path') | map('basename') |
+            map('regex_replace', '^.*_([0-9T]+)\\.tar\\.gz$', '\\1') |
+            unique | sort | reverse | list
+          }}
 
     - name: Display available backups
       ansible.builtin.debug:
@@ -120,7 +125,7 @@
           {% for ts in available_timestamps %}
           - {{ ts }}
           {% endfor %}
-          
+
           Latest: {{ available_timestamps | first | default('none') }}
 
     - name: End play if list_only
@@ -146,7 +151,7 @@
           Host: {{ inventory_hostname }}
           Backup timestamp: {{ restore_timestamp }}
           ========================================
-          
+
           ⚠️  WARNING: This will OVERWRITE existing data!
 
     - name: Confirm restore
@@ -191,7 +196,8 @@
         cmd: "{{ docker_compose_cmd }} down"
         chdir: "{{ app_dir }}"
       when: compose_exists.stat.exists
-      ignore_errors: true
+      failed_when: false
+      changed_when: true
 
     - name: Wait for containers to stop
       ansible.builtin.pause:
@@ -205,6 +211,7 @@
             cmd: "tar -tzf {{ item.path }}"
           loop: "{{ restore_files.files }}"
           changed_when: false
+          # noqa: command-instead-of-module
 
         - name: Restore each volume
           ansible.builtin.shell: |
@@ -213,12 +220,12 @@
             BASENAME="$(basename "${BACKUP_FILE}")"
             SUFFIX="_{{ restore_timestamp }}.tar.gz"
             VOLUME_NAME="${BASENAME%${SUFFIX}}"
-            
+
             echo "Restoring volume: ${VOLUME_NAME}"
-            
+
             # Ensure volume exists
             docker volume create "${VOLUME_NAME}" 2>/dev/null || true
-            
+
             # Clear existing data and restore using find for safety
             # The '|| true' handles case where directory is already empty
             docker run --rm \
@@ -226,13 +233,14 @@
               -v "{{ app_backup_dir }}:/backup:ro" \
               {{ helper_image }} \
               sh -c "cd /dest && find . -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true; tar -xzf '/backup/{{ item.path | basename }}' -C /dest"
-            
+
             echo "SUCCESS: Restored ${VOLUME_NAME}"
           args:
             executable: /bin/bash
           loop: "{{ restore_files.files }}"
           loop_control:
             label: "{{ item.path | basename }}"
+          changed_when: true
 
         # === START SERVICES ===
         # Note: docker-compose.yml is NOT restored from backup as it's in GitHub.
@@ -242,6 +250,7 @@
             cmd: "{{ docker_compose_cmd }} up -d"
             chdir: "{{ app_dir }}"
           when: compose_exists.stat.exists
+          changed_when: true
 
         - name: Wait for containers to initialize
           ansible.builtin.pause:
@@ -311,7 +320,7 @@
           vars:
             notify_title: "Restore Completed"
             notify_emoji: "🔄"
-            notify_message: "<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n<b>Volumes restored ({{ restore_files.files | length }}):</b>\n<pre>{{ restore_details_text }}</pre>\n\n{{ health_status_text }}"
+            notify_message: "<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n<b>Volumes restored ({{ restore_files.files | length }}):</b>\n<pre>{{ restore_details_text }}</pre>\n\n{{ health_status_text }}" # noqa: yaml[line-length]
 
       rescue:
         - name: Attempt to restart services after restore failure
@@ -319,14 +328,15 @@
             cmd: "{{ docker_compose_cmd }} up -d"
             chdir: "{{ app_dir }}"
           when: compose_exists.stat.exists
-          ignore_errors: true
+          failed_when: false
+          changed_when: true
 
         - name: Send failure notification
           ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
           vars:
             notify_title: "Restore Failed"
             notify_emoji: "❌"
-            notify_message: "<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n⚠️ Services have been restarted"
+            notify_message: "<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n⚠️ Services have been restarted" # noqa: yaml[line-length]
 
         - name: Fail the restore task
           ansible.builtin.fail:
