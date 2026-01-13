@@ -86,7 +86,7 @@
             (
               health_wait_result.stdout_lines | map('from_json') | flatten |
               select('mapping') |
-              selectattr('Health', 'defined') |
+              selectattr('Health') |
               selectattr('Health', 'equalto', 'healthy') |
               list | length
             ) == (healthcheck_services_count | int)
