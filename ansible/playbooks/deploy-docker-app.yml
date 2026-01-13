@@ -329,6 +329,7 @@
             cmd: "{{ docker_compose_cmd }} down"
             chdir: "{{ app_target_dir }}"
           ignore_errors: true
+          changed_when: true
 
         - name: Check if backup exists
           ansible.builtin.stat:
@@ -362,6 +363,7 @@
             cmd: "{{ docker_compose_cmd }} up -d"
             chdir: "{{ app_target_dir }}"
           when: backup_exists.stat.exists
+          changed_when: true
 
         - name: Send rollback notification
           ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
