@@ -75,6 +75,15 @@
             else 'Found ' + (healthcheck_services_count | string) + ' service(s) with healthchecks'
           }}
 
+    - name: Calculate health check parameters
+      vars:
+        _interval: "{{ [health_check_interval | default(5) | int, 1] | max }}"
+        _timeout: "{{ health_check_timeout | default(60) | int }}"
+      ansible.builtin.set_fact:
+        hc_interval: "{{ _interval }}"
+        hc_timeout: "{{ _timeout }}"
+        max_retries: "{{ (_timeout | int // _interval | int) | int }}"
+
     - name: Verify health and exited status
       block:
         - name: Wait for services to become healthy
@@ -90,8 +99,8 @@
               selectattr('Health', 'equalto', 'healthy') |
               list | length
             ) == (healthcheck_services_count | int)
-          retries: "{{ [((health_check_timeout | default(60) | int) // ([health_check_interval | default(5) | int, 1] | max)), 1] | max }}"
-          delay: "{{ [health_check_interval | default(5) | int, 1] | max }}"
+          retries: "{{ max_retries }}"
+          delay: "{{ hc_interval }}"
           changed_when: false
           when: healthcheck_services_count | int > 0
 
