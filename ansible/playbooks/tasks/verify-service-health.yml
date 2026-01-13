@@ -82,7 +82,7 @@
       ansible.builtin.set_fact:
         hc_interval: "{{ _interval }}"
         hc_timeout: "{{ _timeout }}"
-        max_retries: "{{ ((_timeout | int) // (_interval | int)) | int }}"
+        max_retries: "{{ ((_timeout | int) // ([_interval | int, 1] | max)) | int }}"
 
     - name: Verify health and exited status
       block:
@@ -123,7 +123,9 @@
               One or more services reported an "unhealthy" status: {{ unhealthy_services | map(attribute='Service') | join(', ') }}.
               {% else %}
               Health checks timed out after {{ health_check_timeout | default(60) }} seconds.
-              Services may still be starting. Unhealthy/Starting services: {{ services_with_healthchecks | selectattr('Health', 'ne', 'healthy') | map(attribute='Service') | join(', ') }}
+              Services may still be starting. Unhealthy/Starting services: {{
+                services_with_healthchecks | selectattr('Health', 'ne', 'healthy') | map(attribute='Service') | join(', ')
+              }}
               {% endif %}
 
     - name: Identify exited containers and set final status
