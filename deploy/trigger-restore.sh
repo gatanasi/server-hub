@@ -29,12 +29,13 @@ set -euo pipefail
 # ============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+
 LOG_DIR="${HOME}/logs/restores"
 LOG_FILE="${LOG_DIR}/restore-$(date +%Y%m%d-%H%M%S).log"
-OPERATION_TYPE="Restore"
+export OPERATION_TYPE="Restore"
 
-# Source common functions
-# shellcheck source=common.sh
+# shellcheck source=deploy/common.sh
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/common.sh"
 
 # ============================================================================
@@ -91,13 +92,12 @@ run_restore_playbook() {
     esac
     
     # Run the restore playbook in a subshell to avoid cd side effects
-    # Capture output to file for error analysis
-    local output_file
+    # Create temporary file for Ansible output
     output_file=$(mktemp)
-    trap "rm -f -- '${output_file}'" EXIT
+    trap 'rm -f -- "$output_file"' EXIT
     local exit_code=0
     (
-        cd "${ANSIBLE_DIR}"
+        cd "${ANSIBLE_DIR}" || exit 1
         ansible-playbook "${ansible_args[@]}" 2>&1
     ) | tee -a "${LOG_FILE}" | tee "${output_file}" || exit_code=$?
     

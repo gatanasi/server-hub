@@ -57,23 +57,23 @@ jobs:
   backup:
     name: Backup ${{ github.event.inputs.app_name }}
     runs-on: self-hosted
-    
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@v6.0.1
 
       - name: Validate inputs
         run: |
           APP="${{ github.event.inputs.app_name }}"
           BACKUP_DEST="${{ github.event.inputs.backup_destination }}"
           TARGET_HOST="${{ github.event.inputs.target_host }}"
-          
+
           # Validate app name
           if [[ ! "$APP" =~ ^[a-zA-Z0-9_-]+$ ]]; then
             echo "::error::Invalid app name: $APP"
             exit 1
           fi
-          
+
           # Validate backup destination path (must be absolute, no path traversal)
           if [[ ! "$BACKUP_DEST" =~ ^/[a-zA-Z0-9/_.-]+$ ]]; then
             echo "::error::Invalid backup_destination path: $BACKUP_DEST. Must be an absolute path without special characters."
@@ -84,13 +84,13 @@ jobs:
             echo "::error::backup_destination cannot contain path traversal components ('..')"
             exit 1
           fi
-          
+
           # Validate target host if provided
           if [[ -n "$TARGET_HOST" && ! "$TARGET_HOST" =~ ^[a-zA-Z0-9._-]+$ ]]; then
             echo "::error::Invalid target_host: $TARGET_HOST"
             exit 1
           fi
-          
+
           echo "Starting backup for: $APP"
 
       - name: Setup SSH
@@ -103,19 +103,19 @@ jobs:
         id: backup
         run: |
           echo "::group::Running backup on deployer.vm"
-          
+
           APP_NAME="${{ github.event.inputs.app_name }}"
           TARGET_HOST="${{ github.event.inputs.target_host }}"
           BACKUP_DEST="${{ github.event.inputs.backup_destination }}"
-          
+
           # Build the backup command
           # Format: backup <app> [--destination path] [--host hostname]
           BACKUP_CMD="backup ${APP_NAME} --destination ${BACKUP_DEST}"
-          
+
           if [[ -n "$TARGET_HOST" ]]; then
             BACKUP_CMD="${BACKUP_CMD} --host ${TARGET_HOST}"
           fi
-          
+
           # SSH to deployer.vm
           # Notifications are handled by the deployer VM scripts
           ssh -i ~/.ssh/deploy_key \
@@ -124,11 +124,11 @@ jobs:
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
               "${BACKUP_CMD}"
-          
+
           BACKUP_EXIT=$?
-          
+
           echo "::endgroup::"
-          
+
           if [[ $BACKUP_EXIT -eq 0 ]]; then
             echo "✅ Backup successful for ${{ github.event.inputs.app_name }}"
           else

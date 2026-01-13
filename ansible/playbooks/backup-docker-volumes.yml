@@ -34,14 +34,14 @@
   gather_facts: true
   # Note: become is not needed if user is in docker group
   # Use become only for specific tasks that require root (e.g., creating backup dirs)
-  
+
   vars:
     # Timestamp format for backup files
     backup_timestamp: "{{ ansible_date_time.iso8601_basic_short }}"
-    
+
     # Load telegram credentials from secrets file
     secrets_file: "{{ lookup('env', 'HOME') }}/.deploy-secrets"
-    
+
     # Note: The following variables are now defined in inventory/production.yml:
     # - backup_destination: Backup destination path (NFS/SMB mount)
     # - backup_keep_count: Number of backups to keep per volume
@@ -98,7 +98,7 @@
       loop_control:
         loop_var: current_app
       when: >
-        (app_name is not defined) or 
+        (app_name is not defined) or
         (app_name == current_app)
 
   post_tasks:
@@ -111,17 +111,18 @@
 
     - name: Cleanup old backups per app (keep last {{ backup_keep_count }})
       ansible.builtin.shell: |
+        set -o pipefail
         APP_DIR="{{ item.path }}"
         KEEP={{ backup_keep_count }}
         DELETED=0
-        
+
         # Get unique volume prefixes (everything before the timestamp)
         # Format: volumename_YYYYMMDDTHHMMSS.tar.gz
         for PREFIX in $(ls -1 "$APP_DIR"/*.tar.gz 2>/dev/null | sed 's/_[0-9]\{8\}T[0-9]\{6\}\.tar\.gz$//' | sort -u); do
           # Get all backups for this volume, sorted by timestamp (oldest first)
           BACKUPS=$(ls -1 "${PREFIX}"_*.tar.gz 2>/dev/null | sort)
           COUNT=$(echo "$BACKUPS" | wc -l)
-          
+
           # Delete oldest backups if we have more than KEEP
           if [ "$COUNT" -gt "$KEEP" ]; then
             DELETE_COUNT=$((COUNT - KEEP))
@@ -151,4 +152,6 @@
           {{ result.stdout }}
           {% endif %}
           {% endfor %}
-      when: host_will_backup | bool and (cleanup_results.results | default([]) | selectattr('stdout', 'defined') | selectattr('stdout', 'search', 'Deleted') | list | length > 0)
+      when:
+        - host_will_backup | bool
+        - (cleanup_results.results | default([]) | selectattr('stdout', 'defined') | selectattr('stdout', 'search', 'Deleted') | list | length > 0)

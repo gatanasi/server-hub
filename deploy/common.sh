@@ -182,7 +182,7 @@ pull_latest_repo() {
     log "Pulling latest changes from git..."
     
     (
-        cd "${REPO_DIR}"
+        cd "${REPO_DIR}" || exit 1
         git fetch origin main
         git reset --hard origin/main
         chmod +x "${REPO_DIR}/deploy/"*.sh 2>/dev/null || true
