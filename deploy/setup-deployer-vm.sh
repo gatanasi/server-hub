@@ -20,8 +20,9 @@ set -euo pipefail
 # ============================================================================
 
 DEPLOYER_USER="${USER:-deployer}"
-DEPLOYER_HOME="/home/${DEPLOYER_USER}"
-REPO_DIR="${DEPLOYER_HOME}/git/server-hub"
+DEPLOYER_HOME="${HOME}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 LOG_DIR="/var/log/deployments"
 ANSIBLE_LOG_DIR="/var/log/ansible"
 

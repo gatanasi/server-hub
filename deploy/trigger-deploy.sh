@@ -22,17 +22,15 @@ set -euo pipefail
 # Configuration
 # ============================================================================
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="/home/deployer/git/server-hub"
-ANSIBLE_DIR="${REPO_DIR}/ansible"
-LOG_DIR="/home/deployer/logs/deployments"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+LOG_DIR="${HOME}/logs/deployments"
 LOG_FILE="${LOG_DIR}/deploy-$(date +%Y%m%d-%H%M%S).log"
 OPERATION_TYPE="Deployment"
 
-# Telegram configuration (set these in /home/deployer/.deploy-secrets)
+# Telegram configuration (set these in SECRETS_FILE)
 # TELEGRAM_BOT_TOKEN="your-bot-token"
 # TELEGRAM_CHAT_ID="your-chat-id"
-SECRETS_FILE="/home/deployer/.deploy-secrets"
+# SECRETS_FILE is defined in common.sh
 
 # Source common functions
 # shellcheck source=common.sh

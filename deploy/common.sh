@@ -19,8 +19,13 @@ fi
 # Configuration (can be overridden before sourcing)
 # ============================================================================
 
-REPO_DIR="${REPO_DIR:-/home/deployer/git/server-hub}"
-SECRETS_FILE="${SECRETS_FILE:-/home/deployer/.deploy-secrets}"
+# Calculate directories relative to this script
+# Use a distinct variable name to avoid conflict with the sourcing script
+COMMON_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+REPO_DIR="${REPO_DIR:-$(cd "${COMMON_SCRIPT_DIR}/.." && pwd)}"
+ANSIBLE_DIR="${ANSIBLE_DIR:-${REPO_DIR}/ansible}"
+
+SECRETS_FILE="${SECRETS_FILE:-${HOME}/.deploy-secrets}"
 
 # These must be set by the sourcing script
 : "${LOG_FILE:?LOG_FILE must be set before sourcing common.sh}"
