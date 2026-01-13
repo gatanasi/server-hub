@@ -34,6 +34,7 @@ export OPERATION_TYPE="Deployment"
 
 # Source common functions
 # shellcheck source=deploy/common.sh
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/common.sh"
 
 # ============================================================================
