@@ -51,20 +51,18 @@
       register: initial_compose_ps
       changed_when: false
 
-    - name: Parse service healthcheck configuration
-      ansible.builtin.set_fact:
+    - name: Parse service healthcheck configuration and set counts
+      vars:
         # Filter services that have a truthy Health status (excludes missing, null, empty)
-        services_with_healthchecks: >-
+        services_with_healthchecks_list: >-
           {{
             initial_compose_ps.stdout | from_json |
             selectattr('Health') |
             list
           }}
-
-    - name: Set healthcheck counts
       ansible.builtin.set_fact:
-        healthcheck_services_count: "{{ services_with_healthchecks | length }}"
-        no_healthchecks_defined: "{{ (services_with_healthchecks | length) == 0 }}"
+        healthcheck_services_count: "{{ services_with_healthchecks_list | length }}"
+        no_healthchecks_defined: "{{ (services_with_healthchecks_list | length) == 0 }}"
 
     - name: Display healthcheck info
       ansible.builtin.debug:
@@ -114,23 +112,22 @@
               Services may still be starting. Unhealthy/Starting services: {{ services | selectattr('Health', 'defined') | selectattr('Health', 'ne', 'healthy') | map(attribute='Service') | join(', ') }}
               {% endif %}
 
-    - name: Identify exited containers
-      ansible.builtin.set_fact:
-        exited_containers_list: >-
+    - name: Identify exited containers and set final status
+      vars:
+        containers_that_exited: >-
           {{
             (health_wait_result.stdout if health_wait_result is defined and health_wait_result.skipped is not defined else initial_compose_ps.stdout) | from_json |
             selectattr('State', 'in', ['exited', 'dead']) |
             map(attribute='Service') |
             list
           }}
+      ansible.builtin.set_fact:
+        failed_containers: "{{ containers_that_exited }}"
+        health_check_passed: "{{ containers_that_exited | length == 0 }}"
 
     - name: Fail if containers exited
       ansible.builtin.fail:
-        msg: "Container(s) exited unexpectedly: {{ exited_containers_list | join(', ') }}"
+        msg: "Container(s) exited unexpectedly: {{ failed_containers | join(', ') }}"
       when:
         - fail_on_unhealthy | default(true) | bool
-        - exited_containers_list | length > 0
-
-    - name: Set final health check status
-      ansible.builtin.set_fact:
-        health_check_passed: "{{ exited_containers_list | length == 0 }}"
+        - failed_containers | length > 0
