@@ -195,7 +195,7 @@
     - name: "{{ current_app }} | Build volume details for notification"
       ansible.builtin.set_fact:
         volume_details_text: "{{ backup_details | map('regex_replace', '^([^:]+):(.+)$', '  • \\1: \\2') | join('\n') }}"
-        health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
+        health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services_count | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
       when: docker_volumes | length > 0
 
     - name: "{{ current_app }} | Send success notification"

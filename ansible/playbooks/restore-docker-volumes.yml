@@ -304,7 +304,7 @@
                 • {{ result.item.path | basename | regex_replace('_' + restore_timestamp + '\\.tar\\.gz$', '') }}: {{ result.stdout.split() | first }}
               {%- endif %}
               {%- endfor %}
-            health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
+            health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services_count | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
 
         - name: Send success notification
           ansible.builtin.include_tasks: tasks/send-telegram-notification.yml

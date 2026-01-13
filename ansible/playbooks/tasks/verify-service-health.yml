@@ -30,7 +30,6 @@
 #
 # Sets facts:
 #   - healthcheck_services_count: Number of services with healthchecks
-#   - healthcheck_services: Number of services with healthchecks (deprecated, for backward compatibility)
 #   - health_check_passed: Boolean indicating if health check passed
 #   - no_healthchecks_defined: Boolean if no healthchecks are defined
 #
@@ -39,7 +38,6 @@
   ansible.builtin.set_fact:
     health_check_passed: true
     healthcheck_services_count: 0
-    healthcheck_services: 0 # For backward compatibility
     no_healthchecks_defined: true
   when: skip_health_check | default(false) | bool
 
@@ -66,7 +64,6 @@
           }}
       ansible.builtin.set_fact:
         healthcheck_services_count: "{{ services_with_healthchecks_list | length }}"
-        healthcheck_services: "{{ services_with_healthchecks_list | length }}" # For backward compatibility
         no_healthchecks_defined: "{{ (services_with_healthchecks_list | length) == 0 }}"
 
     - name: Display healthcheck info
