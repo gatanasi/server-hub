@@ -31,6 +31,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 export OPERATION_TYPE="Restore"
 
+LOG_DIR="${HOME}/logs/restores"
+LOG_FILE="${LOG_DIR}/restore-$(date +%Y%m%d-%H%M%S).log"
+export OPERATION_TYPE="Restore"
+
 # shellcheck source=deploy/common.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/common.sh"

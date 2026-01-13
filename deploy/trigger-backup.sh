@@ -26,6 +26,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 export OPERATION_TYPE="Backup"
 
+LOG_DIR="${HOME}/logs/backups"
+LOG_FILE="${LOG_DIR}/backup-$(date +%Y%m%d-%H%M%S).log"
+export OPERATION_TYPE="Backup"
+
 # shellcheck source=deploy/common.sh
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/common.sh"

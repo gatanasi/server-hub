@@ -118,7 +118,7 @@
           }}
         image_name: "{{ service_config.image | default('unknown') }}"
       ansible.builtin.set_fact:
-        new_version: "{{ image_name.split(':') | last }}"
+        new_version: "{{ (image_name.split('@') | first).split(':') | last }}"
 
     - name: Check if target docker-compose.yml exists
       ansible.builtin.stat:
@@ -142,7 +142,7 @@
           }}
         image_name: "{{ service_config.image | default('unknown') }}"
       ansible.builtin.set_fact:
-        old_version: "{{ image_name.split(':') | last }}"
+        old_version: "{{ (image_name.split('@') | first).split(':') | last }}"
       when: target_compose_stat.stat.exists
 
     - name: Set default old version if missing
