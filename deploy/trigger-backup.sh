@@ -23,7 +23,7 @@ set -euo pipefail
 # Configuration
 # ============================================================================
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 LOG_DIR="${HOME}/logs/backups"
 LOG_FILE="${LOG_DIR}/backup-$(date +%Y%m%d-%H%M%S).log"
 OPERATION_TYPE="Backup"

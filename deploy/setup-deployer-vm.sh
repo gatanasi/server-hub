@@ -21,7 +21,7 @@ set -euo pipefail
 
 DEPLOYER_USER="${USER:-deployer}"
 DEPLOYER_HOME="${HOME}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 LOG_DIR="/var/log/deployments"
 ANSIBLE_LOG_DIR="/var/log/ansible"

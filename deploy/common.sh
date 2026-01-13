@@ -21,8 +21,8 @@ fi
 
 # Calculate directories relative to this script
 # Use a distinct variable name to avoid conflict with the sourcing script
-COMMON_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="${REPO_DIR:-$(dirname "${COMMON_SCRIPT_DIR}")}"
+COMMON_SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+REPO_DIR="${REPO_DIR:-$(cd "${COMMON_SCRIPT_DIR}/.." && pwd)}"
 ANSIBLE_DIR="${ANSIBLE_DIR:-${REPO_DIR}/ansible}"
 
 SECRETS_FILE="${SECRETS_FILE:-${HOME}/.deploy-secrets}"
