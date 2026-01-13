@@ -29,7 +29,7 @@
 #   - fail_on_unhealthy: Fail playbook if unhealthy (default: true)
 #
 # Sets facts:
-#   - healthcheck_services: Number of services with healthchecks
+#   - healthcheck_services_count: Number of services with healthchecks
 #   - health_check_passed: Boolean indicating if health check passed
 #   - no_healthchecks_defined: Boolean if no healthchecks are defined
 #
@@ -37,127 +37,88 @@
 - name: Skip health check if requested
   ansible.builtin.set_fact:
     health_check_passed: true
-    healthcheck_services: 0
+    healthcheck_services_count: 0
     no_healthchecks_defined: true
   when: skip_health_check | default(false) | bool
 
 - name: Verify service health
   when: not (skip_health_check | default(false) | bool)
   block:
-    - name: Get services with healthchecks
-      ansible.builtin.shell: |
-        cd "{{ app_dir }}"
-        if command -v jq &>/dev/null; then
-          COUNT=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
-            jq -rs '[.[] | select(.Health != null and .Health != "")] | length' 2>/dev/null)
-          if [[ $? -eq 0 && -n "$COUNT" ]]; then
-            echo "$COUNT"
-            exit 0
-          fi
-        fi
-        {{ docker_compose_cmd }} ps 2>/dev/null | grep -cE '\(healthy\)|\(unhealthy\)|\(starting\)' || echo "0"
-      args:
-        executable: /bin/bash
-      register: healthcheck_count
+    - name: Get initial Docker Compose service state
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} ps --format json"
+        chdir: "{{ app_dir }}"
+      register: initial_compose_ps
       changed_when: false
 
-    - name: Set healthcheck count
+    - name: Parse service healthcheck configuration
       ansible.builtin.set_fact:
-        healthcheck_services: "{{ healthcheck_count.stdout | default('0') | int }}"
-        no_healthchecks_defined: "{{ (healthcheck_count.stdout | default('0') | int) == 0 }}"
+        # Filter services that have a non-empty Health status
+        services_with_healthchecks: >-
+          {{
+            initial_compose_ps.stdout | from_json |
+            selectattr('Health', 'defined') |
+            selectattr('Health', 'ne', '') |
+            selectattr('Health', 'ne', None) |
+            list
+          }}
+
+    - name: Set healthcheck counts
+      ansible.builtin.set_fact:
+        healthcheck_services_count: "{{ services_with_healthchecks | length }}"
+        no_healthchecks_defined: "{{ (services_with_healthchecks | length) == 0 }}"
 
     - name: Display healthcheck info
       ansible.builtin.debug:
-        msg: "{{ 'No services with healthchecks found - skipping health verification' if no_healthchecks_defined else 'Found ' + (healthcheck_services | string) + ' service(s) with healthchecks' }}"
+        msg: >-
+          {{
+            'No services with healthchecks found - skipping health verification'
+            if no_healthchecks_defined
+            else 'Found ' + (healthcheck_services_count | string) + ' service(s) with healthchecks'
+          }}
 
-    - name: Wait for healthchecks to pass
-      ansible.builtin.shell: |
-        cd "{{ app_dir }}"
-        
-        check_with_jq() {
-          local JSON=$({{ docker_compose_cmd }} ps --format json 2>/dev/null)
-          TOTAL=$(echo "$JSON" | jq -rs '[.[] | select(.Health != null and .Health != "")] | length' 2>/dev/null) || return 1
-          HEALTHY=$(echo "$JSON" | jq -rs '[.[] | select(.Health == "healthy")] | length' 2>/dev/null) || return 1
-          UNHEALTHY=$(echo "$JSON" | jq -rs '[.[] | select(.Health == "unhealthy")] | length' 2>/dev/null) || return 1
-          return 0
-        }
-        
-        check_with_grep() {
-          local PS_OUTPUT=$({{ docker_compose_cmd }} ps 2>/dev/null)
-          TOTAL=$(echo "$PS_OUTPUT" | grep -cE '\(healthy\)|\(unhealthy\)|\(starting\)' || echo "0")
-          HEALTHY=$(echo "$PS_OUTPUT" | grep -c '(healthy)' || echo "0")
-          UNHEALTHY=$(echo "$PS_OUTPUT" | grep -c '(unhealthy)' || echo "0")
-        }
-        
-        if command -v jq &>/dev/null && check_with_jq; then
-          :
-        else
-          check_with_grep
-        fi
-        
-        echo "healthy=$HEALTHY total=$TOTAL unhealthy=$UNHEALTHY"
-        
-        if [[ "$UNHEALTHY" -gt 0 ]]; then
-          exit 2
-        elif [[ "$TOTAL" -gt 0 && "$HEALTHY" -eq "$TOTAL" ]]; then
-          exit 0
-        else
-          exit 1
-        fi
-      args:
-        executable: /bin/bash
-      register: health_status
-      until: health_status.rc == 0
-      retries: "{{ [((health_check_timeout | default(60)) | int / (health_check_interval | default(5)) | int) | int, 1] | max }}"
-      delay: "{{ health_check_interval | default(5) }}"
-      failed_when: false
+    - name: Wait for services to become healthy
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} ps --format json"
+        chdir: "{{ app_dir }}"
+      register: health_wait_result
+      until: >-
+        (
+          health_wait_result.stdout | from_json |
+          selectattr('Health', 'defined') |
+          selectattr('Health', 'equalto', 'healthy') |
+          list | length
+        ) == (healthcheck_services_count | int)
+      retries: "{{ [((health_check_timeout | default(60) | int) / (health_check_interval | default(5) | int)) | int, 1] | max }}"
+      delay: "{{ health_check_interval | default(5) | int }}"
       changed_when: false
-      when: healthcheck_services | int > 0
+      when: healthcheck_services_count | int > 0
 
-    - name: Fail if services reported unhealthy
-      ansible.builtin.fail:
-        msg: >-
-          One or more services reported an "unhealthy" status during health checks.
-          Last health check output: {{ health_status.stdout | default('') }}
-      when:
-        - healthcheck_services | int > 0
-        - health_status.rc | default(0) == 2
-
-    - name: Fail if health checks timed out
-      ansible.builtin.fail:
-        msg: >-
-          Health checks did not reach "healthy" status before the timeout of
-          {{ health_check_timeout | default(60) }} seconds. Services may still be starting.
-          Last health check output: {{ health_status.stdout | default('') }}
-      when:
-        - healthcheck_services | int > 0
-        - health_status.rc | default(0) == 1
-
-    - name: Check for exited containers
-      ansible.builtin.shell: |
-        cd "{{ app_dir }}"
-        if command -v jq &>/dev/null; then
-          RESULT=$({{ docker_compose_cmd }} ps --format json 2>/dev/null | \
-            jq -rs '[.[] | select(.State == "exited" or .State == "dead")] | .[].Service' 2>/dev/null)
-          if [[ $? -eq 0 ]]; then
-            echo "$RESULT"
-            exit 0
-          fi
-        fi
-        {{ docker_compose_cmd }} ps 2>/dev/null | grep -E "Exited|Dead" | awk '{print $1}' || true
-      args:
-        executable: /bin/bash
-      register: exited_containers
+    - name: Check for unexpectedly exited containers
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} ps --format json"
+        chdir: "{{ app_dir }}"
+      register: final_compose_ps
       changed_when: false
 
-    - name: Set health check result
+    - name: Identify exited containers
       ansible.builtin.set_fact:
-        health_check_passed: "{{ exited_containers.stdout | length == 0 }}"
-        failed_containers: "{{ exited_containers.stdout_lines | default([]) }}"
+        exited_containers_list: >-
+          {{
+            final_compose_ps.stdout | from_json |
+            selectattr('State', 'defined') |
+            selectattr('State', 'in', ['exited', 'dead']) |
+            map(attribute='Service') |
+            list
+          }}
 
     - name: Fail if containers exited
       ansible.builtin.fail:
-        msg: "Container(s) exited unexpectedly: {{ exited_containers.stdout_lines | join(', ') }}"
+        msg: "Container(s) exited unexpectedly: {{ exited_containers_list | join(', ') }}"
       when:
         - fail_on_unhealthy | default(true) | bool
-        - exited_containers.stdout | length > 0
+        - exited_containers_list | length > 0
+
+    - name: Mark health check as passed
+      ansible.builtin.set_fact:
+        health_check_passed: true
