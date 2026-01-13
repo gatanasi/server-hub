@@ -58,6 +58,7 @@
         services_with_healthchecks_list: >-
           {{
             initial_compose_ps.stdout_lines | map('from_json') | flatten |
+            select('mapping') |
             selectattr('Health') |
             list
           }}
@@ -84,6 +85,7 @@
           until: >-
             (
               health_wait_result.stdout_lines | map('from_json') | flatten |
+              select('mapping') |
               selectattr('Health', 'defined') |
               selectattr('Health', 'equalto', 'healthy') |
               list | length
@@ -104,7 +106,7 @@
         - name: Determine failure reason and fail
           ansible.builtin.fail:
             msg: >-
-              {% set services = failure_inspection.stdout_lines | map('from_json') | flatten %}
+              {% set services = failure_inspection.stdout_lines | map('from_json') | flatten | select('mapping') %}
               {% set services_with_healthchecks = services | selectattr('Health') | list %}
               {% set unhealthy = services_with_healthchecks | selectattr('Health', 'equalto', 'unhealthy') | list %}
               {% if unhealthy | length > 0 %}
@@ -119,6 +121,7 @@
         containers_that_exited: >-
           {{
             (health_wait_result if health_wait_result is not skipped else initial_compose_ps).stdout_lines | map('from_json') | flatten |
+            select('mapping') |
             selectattr('State', 'in', ['exited', 'dead']) |
             map(attribute='Service') |
             list
