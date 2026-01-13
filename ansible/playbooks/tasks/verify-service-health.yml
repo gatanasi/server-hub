@@ -57,7 +57,7 @@
         # Handle both JSON array and NDJSON formats
         services_with_healthchecks_list: >-
           {{
-            initial_compose_ps.stdout_lines | map('from_json') | list | flatten |
+            initial_compose_ps.stdout_lines | map('from_json') | flatten |
             selectattr('Health') |
             list
           }}
@@ -83,13 +83,13 @@
           register: health_wait_result
           until: >-
             (
-              health_wait_result.stdout_lines | map('from_json') | list | flatten |
+              health_wait_result.stdout_lines | map('from_json') | flatten |
               selectattr('Health', 'defined') |
               selectattr('Health', 'equalto', 'healthy') |
               list | length
             ) == (healthcheck_services_count | int)
-          retries: "{{ [((health_check_timeout | default(60) | int) // (health_check_interval | default(5) | int)), 1] | max }}"
-          delay: "{{ health_check_interval | default(5) | int }}"
+          retries: "{{ [((health_check_timeout | default(60) | int) // ([health_check_interval | default(5) | int, 1] | max)), 1] | max }}"
+          delay: "{{ [health_check_interval | default(5) | int, 1] | max }}"
           changed_when: false
           when: healthcheck_services_count | int > 0
 
@@ -104,7 +104,7 @@
         - name: Determine failure reason and fail
           ansible.builtin.fail:
             msg: >-
-              {% set services = failure_inspection.stdout_lines | map('from_json') | list | flatten %}
+              {% set services = failure_inspection.stdout_lines | map('from_json') | flatten %}
               {% set services_with_healthchecks = services | selectattr('Health') | list %}
               {% set unhealthy = services_with_healthchecks | selectattr('Health', 'equalto', 'unhealthy') | list %}
               {% if unhealthy | length > 0 %}
@@ -118,7 +118,7 @@
       vars:
         containers_that_exited: >-
           {{
-            (health_wait_result if health_wait_result is not skipped else initial_compose_ps).stdout_lines | map('from_json') | list | flatten |
+            (health_wait_result if health_wait_result is not skipped else initial_compose_ps).stdout_lines | map('from_json') | flatten |
             selectattr('State', 'in', ['exited', 'dead']) |
             map(attribute='Service') |
             list
