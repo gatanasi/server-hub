@@ -71,7 +71,10 @@ services:
                 # Start renewal loop
                 while :; do
                     echo "Starting renewal loop..."
-                    certbot renew --quiet --deploy-hook "cp /etc/letsencrypt/live/${CERTBOT_DOMAIN}/fullchain.pem /output_ssl/nginx.crt && cp /etc/letsencrypt/live/${CERTBOT_DOMAIN}/privkey.pem /output_ssl/nginx.key && docker restart openspeedtest";
+                    certbot renew --quiet \
+                        --deploy-hook "cp /etc/letsencrypt/live/${CERTBOT_DOMAIN}/fullchain.pem /output_ssl/nginx.crt && \
+                                       cp /etc/letsencrypt/live/${CERTBOT_DOMAIN}/privkey.pem /output_ssl/nginx.key && \
+                                       docker restart openspeedtest";
                     sleep 12h;
                 done;
             '

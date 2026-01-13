@@ -49,7 +49,7 @@ jobs:
     outputs:
       apps: ${{ steps.detect.outputs.apps }}
       has_changes: ${{ steps.detect.outputs.has_changes }}
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -66,33 +66,36 @@ jobs:
           else
             # Push trigger - detect changed files
             echo "Detecting changed docker-compose and .env.enc files..."
-            
+
             # Use github.event.before to compare ALL pushed commits, not just the last one
             # This handles batch pushes correctly (e.g., pushing 5 commits at once)
             BEFORE_SHA="${{ github.event.before }}"
             AFTER_SHA="${{ github.sha }}"
-            
+
             echo "Comparing commits: $BEFORE_SHA...$AFTER_SHA"
-            
+
             # Get list of changed files (docker-compose.yml, docker-compose.yaml, and .env.enc)
-            CHANGED_FILES=$(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA" -- 'docker/**/docker-compose.yml' 'docker/**/docker-compose.yaml' 'docker/**/.env.enc' || echo "")
-            
+            CHANGED_FILES=$(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA" -- \
+              'docker/**/docker-compose.yml' \
+              'docker/**/docker-compose.yaml' \
+              'docker/**/.env.enc' || echo "")
+
             if [[ -z "$CHANGED_FILES" ]]; then
               echo "No deployment-related files changed"
               echo "has_changes=false" >> $GITHUB_OUTPUT
               echo "apps=[]" >> $GITHUB_OUTPUT
               exit 0
             fi
-            
+
             echo "Changed files:"
             echo "$CHANGED_FILES"
-            
+
             # Extract app names from paths (docker/<app-name>/...)
             APPS=$(echo "$CHANGED_FILES" | sed -n 's|docker/\([^/]*\)/.*|\1|p' | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
-            
+
             echo "Apps to deploy: $APPS"
           fi
-          
+
           echo "apps=$APPS" >> $GITHUB_OUTPUT
           echo "has_changes=true" >> $GITHUB_OUTPUT
 
@@ -101,13 +104,13 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.has_changes == 'true'
     runs-on: self-hosted
-    
+
     strategy:
       matrix:
         app: ${{ fromJson(needs.detect-changes.outputs.apps) }}
       max-parallel: 1  # Deploy one at a time to avoid conflicts
       fail-fast: false  # Continue deploying other apps if one fails
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -131,7 +134,7 @@ jobs:
         id: deploy
         run: |
           echo "::group::Triggering deployment on deployer.vm"
-          
+
           # SSH to deployer.vm - the forced command will execute trigger-deploy.sh
           # We pass the app name as part of the SSH command
           # Notifications are handled by the deployer VM scripts
@@ -141,11 +144,11 @@ jobs:
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
               "${{ matrix.app }}"
-          
+
           DEPLOY_EXIT=$?
-          
+
           echo "::endgroup::"
-          
+
           if [[ $DEPLOY_EXIT -eq 0 ]]; then
             echo "✅ Deployment successful for ${{ matrix.app }}"
           else

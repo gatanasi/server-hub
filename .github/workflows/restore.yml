@@ -67,7 +67,7 @@ jobs:
   restore:
     name: ${{ github.event.inputs.operation }} - ${{ github.event.inputs.app_name }}
     runs-on: self-hosted
-    
+
     steps:
       - name: Validate inputs
         run: |
@@ -75,13 +75,13 @@ jobs:
           OP="${{ github.event.inputs.operation }}"
           TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
           BACKUP_SRC="${{ github.event.inputs.backup_source }}"
-          
+
           # Validate app name
           if [[ ! "$APP" =~ ^[a-zA-Z0-9_-]+$ ]]; then
             echo "::error::Invalid app name: $APP"
             exit 1
           fi
-          
+
           # Validate backup source path (must be absolute, no path traversal)
           if [[ ! "$BACKUP_SRC" =~ ^/[a-zA-Z0-9/_.-]+$ ]]; then
             echo "::error::Invalid backup_source path: $BACKUP_SRC. Must be an absolute path without special characters."
@@ -92,7 +92,7 @@ jobs:
             echo "::error::backup_source cannot contain path traversal components ('..')"
             exit 1
           fi
-          
+
           # Validate timestamp format for restore_specific
           if [[ "$OP" == "restore_specific" ]]; then
             if [[ -z "$TIMESTAMP" ]]; then
@@ -104,7 +104,7 @@ jobs:
               exit 1
             fi
           fi
-          
+
           echo "Operation: $OP for $APP"
 
       - name: Checkout repository
@@ -120,20 +120,20 @@ jobs:
         id: restore
         run: |
           echo "::group::Running restore on deployer.vm"
-          
+
           APP_NAME="${{ github.event.inputs.app_name }}"
           OPERATION="${{ github.event.inputs.operation }}"
           TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
           BACKUP_SRC="${{ github.event.inputs.backup_source }}"
-          
+
           # Build the restore command
           # Format: restore <app> <operation> [--source path] [--timestamp TIMESTAMP]
           RESTORE_CMD="restore ${APP_NAME} ${OPERATION} --source ${BACKUP_SRC}"
-          
+
           if [[ "$OPERATION" == "restore_specific" && -n "$TIMESTAMP" ]]; then
             RESTORE_CMD="${RESTORE_CMD} --timestamp ${TIMESTAMP}"
           fi
-          
+
           # SSH to deployer.vm
           # Notifications are handled by the deployer VM scripts
           ssh -i ~/.ssh/deploy_key \
@@ -142,11 +142,11 @@ jobs:
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
               "${RESTORE_CMD}"
-          
+
           RESTORE_EXIT=$?
-          
+
           echo "::endgroup::"
-          
+
           if [[ $RESTORE_EXIT -eq 0 ]]; then
             echo "✅ Operation successful"
           else
