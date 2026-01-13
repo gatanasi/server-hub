@@ -29,9 +29,7 @@ set -euo pipefail
 # ============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="/home/deployer/git/server-hub"
-ANSIBLE_DIR="${REPO_DIR}/ansible"
-LOG_DIR="/home/deployer/logs/restores"
+LOG_DIR="${HOME}/logs/restores"
 LOG_FILE="${LOG_DIR}/restore-$(date +%Y%m%d-%H%M%S).log"
 OPERATION_TYPE="Restore"
 

@@ -24,9 +24,7 @@ set -euo pipefail
 # ============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="/home/deployer/git/server-hub"
-ANSIBLE_DIR="${REPO_DIR}/ansible"
-LOG_DIR="/home/deployer/logs/backups"
+LOG_DIR="${HOME}/logs/backups"
 LOG_FILE="${LOG_DIR}/backup-$(date +%Y%m%d-%H%M%S).log"
 OPERATION_TYPE="Backup"
 
