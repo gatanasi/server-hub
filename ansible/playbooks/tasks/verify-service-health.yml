@@ -54,9 +54,10 @@
     - name: Parse service healthcheck configuration and set counts
       vars:
         # Filter services that have a truthy Health status (excludes missing, null, empty)
+        # Handle both JSON array and NDJSON formats
         services_with_healthchecks_list: >-
           {{
-            initial_compose_ps.stdout | from_json |
+            initial_compose_ps.stdout_lines | map('from_json') | list | flatten |
             selectattr('Health') |
             list
           }}
@@ -82,7 +83,7 @@
           register: health_wait_result
           until: >-
             (
-              health_wait_result.stdout | from_json |
+              health_wait_result.stdout_lines | map('from_json') | list | flatten |
               selectattr('Health', 'defined') |
               selectattr('Health', 'equalto', 'healthy') |
               list | length
@@ -103,7 +104,7 @@
         - name: Determine failure reason and fail
           ansible.builtin.fail:
             msg: >-
-              {% set services = failure_inspection.stdout | from_json %}
+              {% set services = failure_inspection.stdout_lines | map('from_json') | list | flatten %}
               {% set unhealthy = services | selectattr('Health', 'defined') | selectattr('Health', 'equalto', 'unhealthy') | list %}
               {% if unhealthy | length > 0 %}
               One or more services reported an "unhealthy" status: {{ unhealthy | map(attribute='Service') | join(', ') }}.
@@ -116,7 +117,7 @@
       vars:
         containers_that_exited: >-
           {{
-            (health_wait_result.stdout if health_wait_result is defined and health_wait_result.skipped is not defined else initial_compose_ps.stdout) | from_json |
+            (health_wait_result if health_wait_result is defined and health_wait_result.skipped is not defined else initial_compose_ps).stdout_lines | map('from_json') | list | flatten |
             selectattr('State', 'in', ['exited', 'dead']) |
             map(attribute='Service') |
             list
