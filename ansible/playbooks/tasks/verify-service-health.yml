@@ -53,13 +53,11 @@
 
     - name: Parse service healthcheck configuration
       ansible.builtin.set_fact:
-        # Filter services that have a non-empty Health status
+        # Filter services that have a truthy Health status (excludes missing, null, empty)
         services_with_healthchecks: >-
           {{
             initial_compose_ps.stdout | from_json |
-            selectattr('Health', 'defined') |
-            selectattr('Health', 'ne', '') |
-            selectattr('Health', 'ne', None) |
+            selectattr('Health') |
             list
           }}
 
@@ -77,36 +75,50 @@
             else 'Found ' + (healthcheck_services_count | string) + ' service(s) with healthchecks'
           }}
 
-    - name: Wait for services to become healthy
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} ps --format json"
-        chdir: "{{ app_dir }}"
-      register: health_wait_result
-      until: >-
-        (
-          health_wait_result.stdout | from_json |
-          selectattr('Health', 'defined') |
-          selectattr('Health', 'equalto', 'healthy') |
-          list | length
-        ) == (healthcheck_services_count | int)
-      retries: "{{ [((health_check_timeout | default(60) | int) / (health_check_interval | default(5) | int)) | int, 1] | max }}"
-      delay: "{{ health_check_interval | default(5) | int }}"
-      changed_when: false
-      when: healthcheck_services_count | int > 0
+    - name: Verify health and exited status
+      block:
+        - name: Wait for services to become healthy
+          ansible.builtin.command:
+            cmd: "{{ docker_compose_cmd }} ps --format json"
+            chdir: "{{ app_dir }}"
+          register: health_wait_result
+          until: >-
+            (
+              health_wait_result.stdout | from_json |
+              selectattr('Health', 'defined') |
+              selectattr('Health', 'equalto', 'healthy') |
+              list | length
+            ) == (healthcheck_services_count | int)
+          retries: "{{ [((health_check_timeout | default(60) | int) / (health_check_interval | default(5) | int)) | int, 1] | max }}"
+          delay: "{{ health_check_interval | default(5) | int }}"
+          changed_when: false
+          when: healthcheck_services_count | int > 0
 
-    - name: Check for unexpectedly exited containers
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} ps --format json"
-        chdir: "{{ app_dir }}"
-      register: final_compose_ps
-      changed_when: false
+      rescue:
+        - name: Inspect failed services
+          ansible.builtin.command:
+            cmd: "{{ docker_compose_cmd }} ps --format json"
+            chdir: "{{ app_dir }}"
+          register: failure_inspection
+          changed_when: false
+
+        - name: Determine failure reason and fail
+          ansible.builtin.fail:
+            msg: >-
+              {% set services = failure_inspection.stdout | from_json %}
+              {% set unhealthy = services | selectattr('Health', 'defined') | selectattr('Health', 'equalto', 'unhealthy') | list %}
+              {% if unhealthy | length > 0 %}
+              One or more services reported an "unhealthy" status: {{ unhealthy | map(attribute='Service') | join(', ') }}.
+              {% else %}
+              Health checks timed out after {{ health_check_timeout | default(60) }} seconds.
+              Services may still be starting. Unhealthy/Starting services: {{ services | selectattr('Health', 'defined') | selectattr('Health', 'ne', 'healthy') | map(attribute='Service') | join(', ') }}
+              {% endif %}
 
     - name: Identify exited containers
       ansible.builtin.set_fact:
         exited_containers_list: >-
           {{
-            final_compose_ps.stdout | from_json |
-            selectattr('State', 'defined') |
+            (health_wait_result.stdout if health_wait_result is defined and health_wait_result.skipped is not defined else initial_compose_ps.stdout) | from_json |
             selectattr('State', 'in', ['exited', 'dead']) |
             map(attribute='Service') |
             list
@@ -119,6 +131,6 @@
         - fail_on_unhealthy | default(true) | bool
         - exited_containers_list | length > 0
 
-    - name: Mark health check as passed
+    - name: Set final health check status
       ansible.builtin.set_fact:
-        health_check_passed: true
+        health_check_passed: "{{ exited_containers_list | length == 0 }}"
