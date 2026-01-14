@@ -1,7 +1,7 @@
 ---
 - name: Parse version from Dockerfile content
   vars:
-    # 1. Decode and strip comments
+    # 1. Decode and strip comments (full line comments)
     _content_no_comments: "{{ dockerfile_content | b64decode | regex_replace('^\\s*#.*$', '', multiline=True) }}"
 
     # 2. Get all FROM lines (case-insensitive)
@@ -10,9 +10,10 @@
     # 3. Get the last FROM instruction (safe slicing)
     _last_from_line: "{{ (_from_lines[-1:] | first) | default('') }}"
 
-    # 4. Extract image spec SAFELY using Regex (Handles 'FROM --platform=... image:tag')
-    # The reviewer's suggestion of .split()[1] would fail here.
-    _image_spec: "{{ _last_from_line | regex_search('^[Ff][Rr][Oo][Mm]\\s+(?:--platform=\\S+\\s+)?(\\S+)', '\\1') | first | default('') }}"
+    # 4. Extract image spec SAFELY using Regex
+    # - Handles 'FROM --platform=... image:tag'
+    # - Stops at whitespace OR '#' (inline comments without space)
+    _image_spec: "{{ _last_from_line | regex_search('^[Ff][Rr][Oo][Mm]\\s+(?:--platform=\\S+\\s+)?([^\\s#]+)', '\\1') | first | default('') }}"
 
     # 5. Remove digest (e.g., @sha256:...) and split by colon
     _image_parts: "{{ (_image_spec.split('@') | first).split(':') }}"
