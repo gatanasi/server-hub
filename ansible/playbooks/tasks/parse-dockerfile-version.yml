@@ -1,8 +1,13 @@
 ---
 - name: Parse version from Dockerfile content
+  vars:
+    # 1. Decode and strip comments
+    _content_no_comments: "{{ dockerfile_content | b64decode | regex_replace('^\\s*#.*$', '', multiline=True) }}"
+    # 2. Get all FROM lines (case-insensitive)
+    _from_lines: "{{ _content_no_comments | regex_findall('^[Ff][Rr][Oo][Mm].*$', multiline=True) }}"
+    # 3. Get the last FROM instruction (safe slicing)
+    _last_from_line: "{{ (_from_lines[-1:] | first) | default('') }}"
+    # 4. Extract tag if present (use findall for safety on missing tags)
+    _parsed_version: "{{ (_last_from_line | regex_findall('\\S+:([^@\\s]+)')) | first }}"
   ansible.builtin.set_fact:
-    "{{ output_fact }}": "{{ (
-        (dockerfile_content | b64decode | regex_replace('^\\s*#.*$', '', multiline=True) |
-        regex_findall('[Ff][Rr][Oo][Mm]\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)'))[-1:] | first |
-        default(lookup('vars', output_fact), true)
-      ) }}"
+    "{{ output_fact }}": "{{ _parsed_version | default(lookup('vars', output_fact), true) }}"
