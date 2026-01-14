@@ -286,12 +286,34 @@
         build_required: "{{ services_with_build | length > 0 }}"
       when: source_compose_file.content is defined
 
-    - name: Build Docker images (if build context exists)
+    - name: Get image IDs before build
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} images -q"
+        chdir: "{{ app_target_dir }}"
+      register: images_before
+      changed_when: false
+      when: build_required | default(false)
+
+    - name: Build Docker images
       ansible.builtin.command:
         cmd: "{{ docker_compose_cmd }} build"
         chdir: "{{ app_target_dir }}"
       register: docker_build
-      changed_when: "' => ' in docker_build.stdout or 'Successfully built' in docker_build.stdout"
+      changed_when: false # We determine change in the next step
+      when: build_required | default(false)
+
+    - name: Get image IDs after build
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} images -q"
+        chdir: "{{ app_target_dir }}"
+      register: images_after
+      changed_when: false
+      when: build_required | default(false)
+
+    - name: Report build status
+      ansible.builtin.debug:
+        msg: "Images rebuilt: {{ images_before.stdout != images_after.stdout }}"
+      changed_when: images_before.stdout != images_after.stdout
       when: build_required | default(false)
 
     - name: Restart containers with new configuration
