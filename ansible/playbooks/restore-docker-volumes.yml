@@ -252,13 +252,7 @@
             wait: true
             wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
           when: compose_exists.stat.exists
-
-        - name: Verify services are running
-          community.docker.docker_compose_v2:
-            project_src: "{{ app_dir }}"
-            state: present
           register: services_status
-          when: compose_exists.stat.exists
 
         - name: Display service status
           ansible.builtin.debug:
