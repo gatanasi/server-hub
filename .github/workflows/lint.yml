@@ -19,5 +19,3 @@ jobs:
         with:
           working_directory: './ansible'
           requirements_file: 'requirements.yml'
-        env:
-          ANSIBLE_LOG_PATH: /dev/null
