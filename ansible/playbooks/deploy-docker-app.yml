@@ -223,6 +223,23 @@
       delegate_to: localhost
       register: files_to_copy
 
+    - name: Find subdirectories to create
+      ansible.builtin.find:
+        paths: "{{ app_source_dir }}"
+        recurse: true
+        file_type: directory
+      delegate_to: localhost
+      register: dirs_to_create
+
+    - name: Ensure subdirectories exist on target
+      ansible.builtin.file:
+        path: "{{ app_target_dir }}/{{ item.path | relpath(app_source_dir) }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ dirs_to_create.files }}"
+      loop_control:
+        label: "{{ item.path | relpath(app_source_dir) }}"
+
     - name: Copy docker-compose files to target
       ansible.builtin.copy:
         src: "{{ item.path }}"
