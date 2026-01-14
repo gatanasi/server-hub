@@ -320,7 +320,7 @@
 
     - name: Restart containers with new configuration
       ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} up -d --remove-orphans"
+        cmd: "{{ docker_compose_cmd }} up -d --remove-orphans --force-recreate"
         chdir: "{{ app_target_dir }}"
       register: docker_up
       changed_when: true
