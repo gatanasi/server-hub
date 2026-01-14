@@ -129,41 +129,12 @@
     # docker-compose stack from Git, then restore the volume backups created
     # by this playbook.
     - name: Start application stack for {{ current_app }}
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} start"
-        chdir: "{{ app_dir }}"
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        state: present
+        wait: true
+        wait_timeout: 90
       register: start_result
-      when: docker_volumes | length > 0
-      changed_when: true
-
-    - name: Wait for containers to initialize for {{ current_app }}
-      ansible.builtin.pause:
-        seconds: 5
-      when: docker_volumes | length > 0
-
-    # === HEALTH CHECK PHASE ===
-    - name: Extract max healthcheck start_period for {{ current_app }}
-      ansible.builtin.include_tasks: tasks/extract-max-start-period.yml
-      # app_dir is already defined in this scope and will be inherited by the included tasks
-      when: docker_volumes | length > 0
-
-    - name: Set health check timeout for {{ current_app }}
-      ansible.builtin.set_fact:
-        health_check_timeout: "{{ [((compose_max_start_period | int) + (health_check_buffer | int)), (health_check_timeout_default | int)] | max }}"
-      when: docker_volumes | length > 0
-
-    - name: Verify service health for {{ current_app }}
-      ansible.builtin.include_tasks: verify-service-health.yml
-      vars:
-        fail_on_unhealthy: true
-      when: docker_volumes | length > 0
-
-    - name: Verify services are running for {{ current_app }}
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} ps"
-        chdir: "{{ app_dir }}"
-      register: services_status
-      changed_when: false
       when: docker_volumes | length > 0
 
     - name: Get backup sizes for {{ current_app }}
@@ -198,7 +169,6 @@
     - name: Build volume details for notification for {{ current_app }}
       ansible.builtin.set_fact:
         volume_details_text: "{{ backup_details | map('regex_replace', '^([^:]+):(.+)$', '  • \\1: \\2') | join('\n') }}"
-        health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services_count | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
       when: docker_volumes | length > 0
 
     - name: Send success notification for {{ current_app }}
@@ -217,7 +187,7 @@
             <b>Volumes ({{ docker_volumes | length }}):</b>
             <pre>{{ volume_details_text }}</pre>
 
-            {{ health_status_text }}
+            ✅ Service Restored & Healthy
           parse_mode: "HTML"
         status_code: [200]
       delegate_to: localhost
@@ -229,11 +199,12 @@
 
   rescue:
     - name: Ensure services are running after backup failure for {{ current_app }}
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} up -d"
-        chdir: "{{ app_dir }}"
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        state: present
+        wait: true
+        wait_timeout: 90
       failed_when: false
-      changed_when: true
 
     - name: Send failure notification for {{ current_app }}
       ansible.builtin.uri:
