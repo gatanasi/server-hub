@@ -213,44 +213,19 @@
       when: existing_compose.stat.exists and current_images.stdout | length > 2
 
     # === DEPLOYMENT PHASE ===
-    - name: Prepare application files for transfer
-      ansible.builtin.find:
-        paths: "{{ app_source_dir }}"
-        recurse: true
-        file_type: file
-        excludes:
-          - "*.log"
-      delegate_to: localhost
-      register: files_to_copy
-
-    - name: Find subdirectories to create
-      ansible.builtin.find:
-        paths: "{{ app_source_dir }}"
-        recurse: true
-        file_type: directory
-      delegate_to: localhost
-      register: dirs_to_create
-
-    - name: Ensure subdirectories exist on target
-      ansible.builtin.file:
-        path: "{{ app_target_dir }}/{{ item.path | relpath(app_source_dir) }}"
-        state: directory
-        mode: '0755'
-      loop: "{{ dirs_to_create.files }}"
-      loop_control:
-        label: "{{ item.path | relpath(app_source_dir) }}"
-
-    - name: Copy docker-compose files to target
-      ansible.builtin.copy:
-        src: "{{ item.path }}"
-        dest: "{{ app_target_dir }}/{{ item.path | relpath(app_source_dir) }}"
-        mode: '0644'
-      loop: "{{ files_to_copy.files }}"
-      loop_control:
-        label: "{{ item.path | basename }}"
-      when:
-        - item.path | basename != '.env'
-        - item.path | basename != '.env.enc'
+    - name: Sync application files to target
+      ansible.posix.synchronize:
+        src: "{{ app_source_dir }}/"
+        dest: "{{ app_target_dir }}/"
+        checksum: yes
+        delete: no
+        recursive: yes
+        rsync_opts:
+          - "--exclude=*.log"
+          - "--exclude=.env"
+          - "--exclude=.env.enc"
+          - "--exclude=.git"
+          - "--exclude=.gitignore"
 
     # Handle encrypted environment variables
     - name: Check if encrypted .env.enc exists in source
