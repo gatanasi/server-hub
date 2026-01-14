@@ -7,7 +7,7 @@
     _content_no_comments: "{{ dockerfile_content | b64decode | regex_replace('^\\s*#.*$', '', multiline=True) }}"
 
     # 2. Get all FROM lines (case-insensitive)
-    _from_lines: "{{ _content_no_comments | regex_findall('^\\s*' + _from_keyword_re + '.*$', multiline=True) }}"
+    _from_lines: "{{ _content_no_comments | regex_findall('^' + _from_keyword_re + '.*$', multiline=True) }}"
 
     # 3. Get the last FROM instruction (safe slicing)
     _last_from_line: "{{ (_from_lines[-1:] | first) | default('') }}"
@@ -15,7 +15,7 @@
     # 4. Extract image spec SAFELY using Regex
     # - Handles 'FROM' + generic flags (e.g. --platform=...) + image
     # - Stops at whitespace OR '#' (inline comments)
-    _image_spec: "{{ _last_from_line | regex_search('^\\s*' + _from_keyword_re + '(?:\\s+--\\S+)*\\s+([^\\s#]+)', '\\1') | first | default('') }}"
+    _image_spec: "{{ _last_from_line | regex_search('^' + _from_keyword_re + '(?:\\s+--\\S+)*\\s+([^\\s#]+)', '\\1') | first | default('') }}"
 
     # 5. Remove digest (e.g., @sha256:...) and split by colon
     _image_parts: "{{ (_image_spec.split('@') | first).split(':') }}"
