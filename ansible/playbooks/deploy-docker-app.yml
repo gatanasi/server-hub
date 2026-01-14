@@ -131,9 +131,9 @@
     - name: Parse version from source Dockerfile
       ansible.builtin.set_fact:
         new_version: "{{ (
-            (source_dockerfile.content | b64decode | regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') | last) |
-            default(new_version, true)
-          ) }}"
+            (source_dockerfile.content | b64decode | regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') |
+            default([new_version]) | last)
+            }}"
       when: source_dockerfile.content is defined
 
     - name: Check if target docker-compose.yml exists
@@ -173,9 +173,9 @@
     - name: Parse version from target Dockerfile
       ansible.builtin.set_fact:
         old_version: "{{ (
-            (target_dockerfile.content | b64decode | regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') | last) |
-            default(old_version, true)
-          ) }}"
+            (target_dockerfile.content | b64decode | regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') |
+            default([old_version]) | last)
+            }}"
       when: target_dockerfile.content is defined
 
     - name: Set default old version if missing
