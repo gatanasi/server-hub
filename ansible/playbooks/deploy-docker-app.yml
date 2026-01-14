@@ -213,27 +213,19 @@
       when: existing_compose.stat.exists and current_images.stdout | length > 2
 
     # === DEPLOYMENT PHASE ===
-    - name: Prepare application files for transfer
-      ansible.builtin.find:
-        paths: "{{ app_source_dir }}"
-        recurse: true
-        file_type: file
-        excludes:
-          - "*.log"
-      delegate_to: localhost
-      register: files_to_copy
-
-    - name: Copy docker-compose files to target
-      ansible.builtin.copy:
-        src: "{{ item.path }}"
-        dest: "{{ app_target_dir }}/{{ item.path | relpath(app_source_dir) }}"
-        mode: '0644'
-      loop: "{{ files_to_copy.files }}"
-      loop_control:
-        label: "{{ item.path | basename }}"
-      when:
-        - item.path | basename != '.env'
-        - item.path | basename != '.env.enc'
+    - name: Sync application files to target
+      ansible.posix.synchronize:
+        src: "{{ app_source_dir }}/"
+        dest: "{{ app_target_dir }}/"
+        checksum: true
+        delete: false
+        recursive: true
+        rsync_opts:
+          - "--exclude=*.log"
+          - "--exclude=.env"
+          - "--exclude=.env.enc"
+          - "--exclude=.git"
+          - "--exclude=.gitignore"
 
     # Handle encrypted environment variables
     - name: Check if encrypted .env.enc exists in source
@@ -280,6 +272,51 @@
         chdir: "{{ app_target_dir }}"
       register: docker_pull
       changed_when: "'Pulled' in docker_pull.stdout or 'Downloaded' in docker_pull.stdout"
+
+    - name: Check for build context in docker-compose.yml
+      vars:
+        compose_content: "{{ source_compose_file.content | b64decode | from_yaml }}"
+        services_with_build: >-
+          {{
+            (compose_content.services | default({})).values() |
+            selectattr('build', 'defined') |
+            list
+          }}
+      ansible.builtin.set_fact:
+        build_required: "{{ services_with_build | length > 0 }}"
+      when: source_compose_file.content is defined
+
+    - name: Build images if required
+      block:
+        - name: Get image IDs before build
+          ansible.builtin.command:
+            cmd: "{{ docker_compose_cmd }} images -q"
+            chdir: "{{ app_target_dir }}"
+          register: images_before
+          changed_when: false
+          when: build_required | default(false)
+
+        - name: Build Docker images
+          ansible.builtin.command:
+            cmd: "{{ docker_compose_cmd }} build"
+            chdir: "{{ app_target_dir }}"
+          register: docker_build
+          changed_when: false # We determine change in the next step
+          when: build_required | default(false)
+
+        - name: Get image IDs after build
+          ansible.builtin.command:
+            cmd: "{{ docker_compose_cmd }} images -q"
+            chdir: "{{ app_target_dir }}"
+          register: images_after
+          changed_when: false
+          when: build_required | default(false)
+
+        - name: Report build status
+          ansible.builtin.debug:
+            msg: "Images rebuilt: {{ images_before.stdout != images_after.stdout }}"
+          changed_when: images_before.stdout != images_after.stdout
+          when: build_required | default(false)
 
     - name: Restart containers with new configuration
       ansible.builtin.command:
