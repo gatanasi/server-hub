@@ -27,7 +27,7 @@ services:
       start_period: 120s
 
   db:
-    image: postgres:16.11@sha256:803ea6da631eab4a350da4ba87541e4737197b8c26ec0feb23ff6f9714212d1d
+    image: postgres:18.1@sha256:2d417d4c88058c9707bd19d45f95c1db2b087507b89d44f669d43f596781614e
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
