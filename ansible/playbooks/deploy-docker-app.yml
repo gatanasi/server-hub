@@ -150,6 +150,22 @@
         old_version: "none"
       when: not target_compose_stat.stat.exists
 
+    - name: Fallback to Dockerfile for old_version
+      when: old_version | default('none') == 'none' and target_compose_stat.stat.exists
+      block:
+        - name: Read target Dockerfile (fallback)
+          ansible.builtin.slurp:
+            src: "{{ app_target_dir }}/Dockerfile"
+          register: target_dockerfile
+          failed_when: false
+
+        - name: Parse version from target Dockerfile
+          ansible.builtin.include_tasks: tasks/parse-dockerfile-version.yml
+          vars:
+            dockerfile_content: "{{ target_dockerfile.content }}"
+            output_fact: "old_version"
+          when: target_dockerfile.content is defined
+
     - name: Send deployment started notification
       ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
       vars:
@@ -301,7 +317,9 @@
               ansible.builtin.shell: |
                 while IFS='=' read -r image_tag image_id; do
                   if [[ -n "$image_id" && -n "$image_tag" ]]; then
-                    docker tag "$image_id" "$image_tag" || true
+                    if ! docker tag "$image_id" "$image_tag" 2>/dev/null; then
+                       echo "Warning: Failed to restore tag for ${image_tag} (${image_id})" >&2
+                    fi
                   fi
                 done < "{{ backup_dir }}/images.bak"
               args:
