@@ -273,12 +273,26 @@
       register: docker_pull
       changed_when: "'Pulled' in docker_pull.stdout or 'Downloaded' in docker_pull.stdout"
 
+    - name: Check for build context in docker-compose.yml
+      vars:
+        compose_content: "{{ source_compose_file.content | b64decode | from_yaml }}"
+        services_with_build: >-
+          {{
+            (compose_content.services | default({})).values() |
+            selectattr('build', 'defined') |
+            list
+          }}
+      ansible.builtin.set_fact:
+        build_required: "{{ services_with_build | length > 0 }}"
+      when: source_compose_file.content is defined
+
     - name: Build Docker images (if build context exists)
       ansible.builtin.command:
         cmd: "{{ docker_compose_cmd }} build"
         chdir: "{{ app_target_dir }}"
       register: docker_build
       changed_when: "' => ' in docker_build.stdout or 'Successfully built' in docker_build.stdout"
+      when: build_required | default(false)
 
     - name: Restart containers with new configuration
       ansible.builtin.command:
