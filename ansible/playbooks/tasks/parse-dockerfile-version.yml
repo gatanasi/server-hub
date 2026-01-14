@@ -3,11 +3,25 @@
   vars:
     # 1. Decode and strip comments
     _content_no_comments: "{{ dockerfile_content | b64decode | regex_replace('^\\s*#.*$', '', multiline=True) }}"
+    
     # 2. Get all FROM lines (case-insensitive)
     _from_lines: "{{ _content_no_comments | regex_findall('^[Ff][Rr][Oo][Mm].*$', multiline=True) }}"
+    
     # 3. Get the last FROM instruction (safe slicing)
     _last_from_line: "{{ (_from_lines[-1:] | first) | default('') }}"
-    # 4. Extract tag if present (use findall for safety on missing tags)
-    _parsed_version: "{{ (_last_from_line | regex_findall('\\S+:([^@\\s]+)')) | first }}"
+    
+    # 4. Extract image spec SAFELY using Regex (Handles 'FROM --platform=... image:tag')
+    # The reviewer's suggestion of .split()[1] would fail here.
+    _image_spec: "{{ _last_from_line | regex_search('^[Ff][Rr][Oo][Mm]\\s+(?:--platform=\\S+\\s+)?(\\S+)', '\\1') | first | default('') }}"
+    
+    # 5. Remove digest (e.g., @sha256:...) and split by colon
+    _image_parts: "{{ (_image_spec.split('@') | first).split(':') }}"
+    _potential_tag: "{{ _image_parts | last }}"
+
+    # 6. Validate Tag: 
+    # - Must have more than 1 part (otherwise it's just 'ubuntu' -> implicit latest)
+    # - Tag cannot contain '/' (if it does, it's actually a port like 'registry:5000/image')
+    _parsed_version: "{{ _potential_tag if ((_image_parts | length > 1) and ('/' not in _potential_tag)) else '' }}"
+
   ansible.builtin.set_fact:
     "{{ output_fact }}": "{{ _parsed_version | default(lookup('vars', output_fact), true) }}"
