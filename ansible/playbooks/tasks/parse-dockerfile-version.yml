@@ -11,9 +11,9 @@
     _last_from_line: "{{ (_from_lines[-1:] | first) | default('') }}"
 
     # 4. Extract image spec SAFELY using Regex
-    # - Handles 'FROM --platform=... image:tag'
-    # - Stops at whitespace OR '#' (inline comments without space)
-    _image_spec: "{{ _last_from_line | regex_search('^[Ff][Rr][Oo][Mm]\\s+(?:--platform=\\S+\\s+)?([^\\s#]+)', '\\1') | first | default('') }}"
+    # - Handles 'FROM' + generic flags (e.g. --platform=...) + image
+    # - Stops at whitespace OR '#' (inline comments)
+    _image_spec: "{{ _last_from_line | regex_search('^[Ff][Rr][Oo][Mm](?:\\s+--\\S+)*\\s+([^\\s#]+)', '\\1') | first | default('') }}"
 
     # 5. Remove digest (e.g., @sha256:...) and split by colon
     _image_parts: "{{ (_image_spec.split('@') | first).split(':') }}"
@@ -25,4 +25,4 @@
     _parsed_version: "{{ _potential_tag if ((_image_parts | length > 1) and ('/' not in _potential_tag)) else '' }}"
 
   ansible.builtin.set_fact:
-    "{{ output_fact }}": "{{ _parsed_version | default(lookup('vars', output_fact), true) }}"
+    "{{ output_fact }}": "{{ _parsed_version if _parsed_version | length > 0 else lookup('vars', output_fact) }}"
