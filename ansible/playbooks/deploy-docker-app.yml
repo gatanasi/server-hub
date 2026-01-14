@@ -126,15 +126,15 @@
       delegate_to: localhost
       register: source_dockerfile
       failed_when: false
+      when: new_version == 'unknown'
 
     - name: Parse version from source Dockerfile
       ansible.builtin.set_fact:
-        new_version: "{{ (source_dockerfile.content | b64decode | regex_search('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:(\\S+)', '\\1') | first) |
-                         default(new_version, true)
+        new_version: "{{
+                        (source_dockerfile.content | b64decode | regex_search('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:(\\S+)', '\\1') | first) |
+                        default(new_version, true)
                       }}"
-      when:
-        - new_version == 'unknown'
-        - source_dockerfile.content is defined
+      when: source_dockerfile.content is defined
 
     - name: Check if target docker-compose.yml exists
       ansible.builtin.stat:
@@ -173,13 +173,11 @@
 
     - name: Parse version from target Dockerfile
       ansible.builtin.set_fact:
-        old_version: "{{ (target_dockerfile.content | b64decode | regex_search('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:(\\S+)', '\\1') | first) |
-                         default(old_version, true)
+        old_version: "{{
+                        (target_dockerfile.content | b64decode | regex_search('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:(\\S+)', '\\1') | first) |
+                        default(old_version, true)
                       }}"
-      when:
-        - target_compose_stat.stat.exists
-        - old_version == 'unknown'
-        - target_dockerfile.content is defined
+      when: target_dockerfile.content is defined
 
     - name: Set default old version if missing
       ansible.builtin.set_fact:
