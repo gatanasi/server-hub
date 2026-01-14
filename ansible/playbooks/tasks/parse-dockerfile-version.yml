@@ -26,4 +26,4 @@
     _parsed_version: "{{ _potential_tag if ((_image_parts | length > 1) and ('/' not in _potential_tag) and not _potential_tag.startswith('$')) else '' }}"
 
   ansible.builtin.set_fact:
-    "{{ output_fact }}": "{{ _parsed_version | default(vars[output_fact], true) }}"
+    "{{ output_fact }}": "{{ _parsed_version if _parsed_version else vars[output_fact] }}"
