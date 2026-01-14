@@ -256,7 +256,7 @@
 
         - name: Display service status
           ansible.builtin.debug:
-            msg: "{{ services_status }}"
+            var: services_status.services
           when: compose_exists.stat.exists
 
         - name: Restore complete

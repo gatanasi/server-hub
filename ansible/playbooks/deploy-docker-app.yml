@@ -192,6 +192,24 @@
       when: existing_env.stat.exists
       no_log: true
 
+    - name: Get current image IDs (for rollback of mutable tags)
+      ansible.builtin.command:
+        cmd: docker compose images --format "{{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }}={{ '{{' }}.ID{{ '}}' }}"
+        chdir: "{{ app_target_dir }}"
+      register: current_images
+      changed_when: false
+      failed_when: false
+      when: target_compose_stat.stat.exists
+
+    - name: Save image IDs to backup
+      ansible.builtin.copy:
+        content: "{{ current_images.stdout }}"
+        dest: "{{ backup_dir }}/images.bak"
+        mode: '0644'
+      when:
+        - target_compose_stat.stat.exists
+        - current_images.rc == 0
+
     # === DEPLOYMENT PHASE ===
     - name: Sync application files to target
       ansible.posix.synchronize:
@@ -278,6 +296,19 @@
                 mode: '0600'
               when: existing_env.stat.exists
               no_log: true
+
+            - name: Restore image tags (rollback mutable tags)
+              ansible.builtin.shell: |
+                while IFS='=' read -r image_tag image_id; do
+                  if [[ -n "$image_id" && -n "$image_tag" ]]; then
+                    docker tag "$image_id" "$image_tag" || true
+                  fi
+                done < "{{ backup_dir }}/images.bak"
+              args:
+                executable: /bin/bash
+              when: target_compose_stat.stat.exists
+              changed_when: true
+              failed_when: false
 
             - name: Restore services
               community.docker.docker_compose_v2:
