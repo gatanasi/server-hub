@@ -3,6 +3,6 @@
   ansible.builtin.set_fact:
     "{{ output_fact }}": "{{ (
         (dockerfile_content | b64decode | regex_replace('^\\s*#.*$', '', multiline=True) |
-        regex_findall('[Ff][Rr][Oo][Mm]\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') | last) |
+        regex_findall('[Ff][Rr][Oo][Mm]\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)'))[-1:] | first |
         default(lookup('vars', output_fact), true)
       ) }}"
