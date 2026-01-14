@@ -5,7 +5,7 @@
     _content_no_comments: "{{ dockerfile_content | b64decode | regex_replace('^\\s*#.*$', '', multiline=True) }}"
 
     # 2. Get all FROM lines (case-insensitive)
-    _from_lines: "{{ _content_no_comments | regex_findall('^[Ff][Rr][Oo][Mm].*$', multiline=True) }}"
+    _from_lines: "{{ _content_no_comments | regex_findall('^\\s*[Ff][Rr][Oo][Mm].*$', multiline=True) }}"
 
     # 3. Get the last FROM instruction (safe slicing)
     _last_from_line: "{{ (_from_lines[-1:] | first) | default('') }}"
@@ -13,7 +13,7 @@
     # 4. Extract image spec SAFELY using Regex
     # - Handles 'FROM' + generic flags (e.g. --platform=...) + image
     # - Stops at whitespace OR '#' (inline comments)
-    _image_spec: "{{ _last_from_line | regex_search('^[Ff][Rr][Oo][Mm](?:\\s+--\\S+)*\\s+([^\\s#]+)', '\\1') | first | default('') }}"
+    _image_spec: "{{ _last_from_line | regex_search('^\\s*[Ff][Rr][Oo][Mm](?:\\s+--\\S+)*\\s+([^\\s#]+)', '\\1') | first | default('') }}"
 
     # 5. Remove digest (e.g., @sha256:...) and split by colon
     _image_parts: "{{ (_image_spec.split('@') | first).split(':') }}"
@@ -26,4 +26,4 @@
     _parsed_version: "{{ _potential_tag if ((_image_parts | length > 1) and ('/' not in _potential_tag) and not _potential_tag.startswith('$')) else '' }}"
 
   ansible.builtin.set_fact:
-    "{{ output_fact }}": "{{ _parsed_version if _parsed_version | length > 0 else lookup('vars', output_fact) }}"
+    "{{ output_fact }}": "{{ _parsed_version | default(vars[output_fact], true) }}"
