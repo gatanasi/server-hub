@@ -13,13 +13,13 @@
     },
     {
       "description": "Group Non-Major updates for Dockerfiles by filename",
-      "matchManagers": ["docker"],
+      "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "groupName": "Non-major updates for {{packageFile}}"
     },
     {
       "description": "Group Major updates for Dockerfiles by filename",
-      "matchManagers": ["docker"],
+      "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["major"],
       "groupName": "Major updates for {{packageFile}}"
     },
