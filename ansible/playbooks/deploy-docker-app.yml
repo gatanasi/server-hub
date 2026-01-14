@@ -304,14 +304,25 @@
                 mode: '0644'
               when: target_compose_stat.stat.exists
 
+            - name: Check if .env backup exists
+              ansible.builtin.stat:
+                path: "{{ backup_dir }}/.env.bak"
+              register: env_backup_stat
+
             - name: Restore .env from backup
               ansible.builtin.copy:
                 src: "{{ backup_dir }}/.env.bak"
                 dest: "{{ app_target_dir }}/.env"
                 remote_src: true
                 mode: '0600'
-              when: existing_env.stat.exists
+              when: env_backup_stat.stat.exists
               no_log: true
+
+            - name: Remove .env if no backup exists
+              ansible.builtin.file:
+                path: "{{ app_target_dir }}/.env"
+                state: absent
+              when: not env_backup_stat.stat.exists
 
             - name: Restore image tags (rollback mutable tags)
               ansible.builtin.shell: |
