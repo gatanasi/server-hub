@@ -191,8 +191,11 @@ pull_latest_repo() {
     
     (
         cd "${REPO_DIR}" || exit 1
-        git fetch origin main
-        git reset --hard origin/main
+        # Get current branch name
+        current_branch=$(git rev-parse --abbrev-ref HEAD)
+        
+        git fetch origin "${current_branch}"
+        git reset --hard "origin/${current_branch}"
         chmod +x "${REPO_DIR}/deploy/"*.sh 2>/dev/null || true
     )
     
