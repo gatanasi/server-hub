@@ -131,8 +131,8 @@
     - name: Parse version from source Dockerfile
       ansible.builtin.set_fact:
         new_version: "{{ (
-            (source_dockerfile.content | b64decode | regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') |
-            default([new_version]) | last)
+            (source_dockerfile.content | b64decode | regex_replace('^\\s*#.*$', '', multiline=True) |
+            regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') | last) | default(new_version, true)
           ) }}"
       when: source_dockerfile.content is defined
 
@@ -173,8 +173,8 @@
     - name: Parse version from target Dockerfile
       ansible.builtin.set_fact:
         old_version: "{{ (
-            (target_dockerfile.content | b64decode | regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') |
-            default([old_version]) | last)
+            (target_dockerfile.content | b64decode | regex_replace('^\\s*#.*$', '', multiline=True) |
+            regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') | last) | default(old_version, true)
           ) }}"
       when: target_dockerfile.content is defined
 
