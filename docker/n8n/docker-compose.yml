@@ -37,7 +37,7 @@ x-shared: &shared
 
 services:
   postgres:
-    image: postgres:16.11@sha256:803ea6da631eab4a350da4ba87541e4737197b8c26ec0feb23ff6f9714212d1d
+    image: postgres:18.1@sha256:2d417d4c88058c9707bd19d45f95c1db2b087507b89d44f669d43f596781614e
     restart: always
     environment:
       - POSTGRES_USER
@@ -56,7 +56,7 @@ services:
       start_period: 40s
 
   redis:
-    image: redis:6-alpine@sha256:37e002448575b32a599109664107e374c8709546905c372a34d64919043b9ceb
+    image: redis:8-alpine@sha256:6cbef353e480a8a6e7f10ec545f13d7d3fa85a212cdcc5ffaf5a1c818b9d3798
     restart: always
     volumes:
       - redis_storage:/data
