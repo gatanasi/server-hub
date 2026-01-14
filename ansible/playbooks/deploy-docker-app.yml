@@ -260,31 +260,45 @@
             notify_message: "App: <code>{{ app_name }}</code>\nError: {{ ansible_failed_result.msg | default('Check logs') }}\nAction: Restoring <code>{{ old_version }}</code>" # noqa: yaml[line-length]
 
         # === ROLLBACK ===
-        - name: Restore docker-compose.yml from backup
-          ansible.builtin.copy:
-            src: "{{ backup_dir }}/docker-compose.yml.bak"
-            dest: "{{ app_target_dir }}/docker-compose.yml"
-            remote_src: true
-            mode: '0644'
-          when: target_compose_stat.stat.exists
+        - name: Attempt rollback steps
+          block:
+            - name: Restore docker-compose.yml from backup
+              ansible.builtin.copy:
+                src: "{{ backup_dir }}/docker-compose.yml.bak"
+                dest: "{{ app_target_dir }}/docker-compose.yml"
+                remote_src: true
+                mode: '0644'
+              when: target_compose_stat.stat.exists
 
-        - name: Restore .env from backup
-          ansible.builtin.copy:
-            src: "{{ backup_dir }}/.env.bak"
-            dest: "{{ app_target_dir }}/.env"
-            remote_src: true
-            mode: '0600'
-          when: existing_env.stat.exists
-          no_log: true
+            - name: Restore .env from backup
+              ansible.builtin.copy:
+                src: "{{ backup_dir }}/.env.bak"
+                dest: "{{ app_target_dir }}/.env"
+                remote_src: true
+                mode: '0600'
+              when: existing_env.stat.exists
+              no_log: true
 
-        - name: Restore services
-          community.docker.docker_compose_v2:
-            project_src: "{{ app_target_dir }}"
-            state: present
-            pull: missing # Don't force pull on rollback to be faster/safer
-            wait: true
-            wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
-          when: target_compose_stat.stat.exists
+            - name: Restore services
+              community.docker.docker_compose_v2:
+                project_src: "{{ app_target_dir }}"
+                state: present
+                pull: missing # Don't force pull on rollback to be faster/safer
+                wait: true
+                wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
+              when: target_compose_stat.stat.exists
+
+          rescue:
+            - name: Send critical failure notification
+              ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
+              vars:
+                notify_title: "CRITICAL: Rollback Failed"
+                notify_emoji: "🔴"
+                notify_message: "App: <code>{{ app_name }}</code>\n\n⚠️ Manual intervention required!"
+
+            - name: Fail after rollback failure
+              ansible.builtin.fail:
+                msg: "CRITICAL: Deployment failed AND rollback failed. Manual intervention required!"
 
         - name: Fail the playbook after rollback
           ansible.builtin.fail:
