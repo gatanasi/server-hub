@@ -22,7 +22,8 @@
     # 6. Validate Tag:
     # - Must have more than 1 part (otherwise it's just 'ubuntu' -> implicit latest)
     # - Tag cannot contain '/' (if it does, it's actually a port like 'registry:5000/image')
-    _parsed_version: "{{ _potential_tag if ((_image_parts | length > 1) and ('/' not in _potential_tag)) else '' }}"
+    # - Tag cannot start with '$' (otherwise it's a build ARG like 'image:$VERSION')
+    _parsed_version: "{{ _potential_tag if ((_image_parts | length > 1) and ('/' not in _potential_tag) and not _potential_tag.startswith('$')) else '' }}"
 
   ansible.builtin.set_fact:
     "{{ output_fact }}": "{{ _parsed_version if _parsed_version | length > 0 else lookup('vars', output_fact) }}"

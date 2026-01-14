@@ -120,20 +120,22 @@
       ansible.builtin.set_fact:
         new_version: "{{ (image_name.split('@') | first).split(':') | last }}"
 
-    - name: Read source Dockerfile (fallback)
-      ansible.builtin.slurp:
-        src: "{{ app_source_dir }}/Dockerfile"
-      delegate_to: localhost
-      register: source_dockerfile
-      failed_when: false
+    - name: Fallback to Dockerfile for new_version
       when: new_version == 'unknown'
+      block:
+        - name: Read source Dockerfile (fallback)
+          ansible.builtin.slurp:
+            src: "{{ app_source_dir }}/Dockerfile"
+          delegate_to: localhost
+          register: source_dockerfile
+          failed_when: false
 
-    - name: Parse version from source Dockerfile
-      ansible.builtin.include_tasks: tasks/parse-dockerfile-version.yml
-      vars:
-        dockerfile_content: "{{ source_dockerfile.content }}"
-        output_fact: "new_version"
-      when: source_dockerfile.content is defined
+        - name: Parse version from source Dockerfile
+          ansible.builtin.include_tasks: tasks/parse-dockerfile-version.yml
+          vars:
+            dockerfile_content: "{{ source_dockerfile.content }}"
+            output_fact: "new_version"
+          when: source_dockerfile.content is defined
 
     - name: Check if target docker-compose.yml exists
       ansible.builtin.stat:
@@ -160,21 +162,23 @@
         old_version: "{{ (image_name.split('@') | first).split(':') | last }}"
       when: target_compose_stat.stat.exists
 
-    - name: Read target Dockerfile (fallback)
-      ansible.builtin.slurp:
-        src: "{{ app_target_dir }}/Dockerfile"
-      register: target_dockerfile
-      failed_when: false
+    - name: Fallback to Dockerfile for old_version
       when:
         - target_compose_stat.stat.exists
         - old_version == 'unknown'
+      block:
+        - name: Read target Dockerfile (fallback)
+          ansible.builtin.slurp:
+            src: "{{ app_target_dir }}/Dockerfile"
+          register: target_dockerfile
+          failed_when: false
 
-    - name: Parse version from target Dockerfile
-      ansible.builtin.include_tasks: tasks/parse-dockerfile-version.yml
-      vars:
-        dockerfile_content: "{{ target_dockerfile.content }}"
-        output_fact: "old_version"
-      when: target_dockerfile.content is defined
+        - name: Parse version from target Dockerfile
+          ansible.builtin.include_tasks: tasks/parse-dockerfile-version.yml
+          vars:
+            dockerfile_content: "{{ target_dockerfile.content }}"
+            output_fact: "old_version"
+          when: target_dockerfile.content is defined
 
     - name: Set default old version if missing
       ansible.builtin.set_fact:
