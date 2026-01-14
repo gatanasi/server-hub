@@ -129,11 +129,10 @@
       when: new_version == 'unknown'
 
     - name: Parse version from source Dockerfile
-      ansible.builtin.set_fact:
-        new_version: "{{ (
-            (source_dockerfile.content | b64decode | regex_replace('^\\s*#.*$', '', multiline=True) |
-            regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') | last) | default(new_version, true)
-          ) }}"
+      ansible.builtin.include_tasks: tasks/parse-dockerfile-version.yml
+      vars:
+        dockerfile_content: "{{ source_dockerfile.content }}"
+        output_fact: "new_version"
       when: source_dockerfile.content is defined
 
     - name: Check if target docker-compose.yml exists
@@ -171,11 +170,10 @@
         - old_version == 'unknown'
 
     - name: Parse version from target Dockerfile
-      ansible.builtin.set_fact:
-        old_version: "{{ (
-            (target_dockerfile.content | b64decode | regex_replace('^\\s*#.*$', '', multiline=True) |
-            regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') | last) | default(old_version, true)
-          ) }}"
+      ansible.builtin.include_tasks: tasks/parse-dockerfile-version.yml
+      vars:
+        dockerfile_content: "{{ target_dockerfile.content }}"
+        output_fact: "old_version"
       when: target_dockerfile.content is defined
 
     - name: Set default old version if missing
