@@ -34,7 +34,7 @@ all:
     backup_keep_count: 3
 
     # Helper image for backup/restore operations (pinned for reproducibility)
-    helper_image: alpine:3.20
+    helper_image: alpine:3.23.2
 
     # Timeout for stopping containers during backup/restore (seconds)
     stop_timeout: 60

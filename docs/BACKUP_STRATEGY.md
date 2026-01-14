@@ -79,7 +79,7 @@ To customize: `-e "backup_keep_count=5"`
 ### Backup Process
 
 1. **Stop** the application stack gracefully
-2. **Create** tar.gz archives of each Docker volume using `alpine:3.20`
+2. **Create** tar.gz archives of each Docker volume using `alpine:3.23.2`
 3. **Start** the application stack
 4. **Verify** services are healthy:
    - Extracts `start_period` from docker-compose.yml healthchecks
@@ -188,7 +188,7 @@ ansible-playbook playbooks/restore-docker-volumes.yml \
 3. **Confirm** restore action (unless auto_confirm=true)
 4. **Stop and remove** the application stack (`docker compose down`)
 5. **Clear** existing volume data (using safe `find -exec rm` pattern)
-6. **Extract** backup archives to volumes using `alpine:3.20`
+6. **Extract** backup archives to volumes using `alpine:3.23.2`
 7. **Start** the application stack
 8. **Verify** services are healthy:
    - Reads `start_period` from docker-compose.yml healthchecks
