@@ -12,20 +12,21 @@
       "groupSlug": "github-actions"
     },
     {
+      "description": "Group ALL updates (Major/Minor/Patch/Digest) for Dockerfiles by filename",
       "matchManagers": ["docker"],
-      "matchUpdateTypes": ["major"]
+      "groupName": "All updates for {{packageFile}}"
     },
     {
-      "matchManagers": ["docker"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "docker minor updates",
-      "groupSlug": "docker-minor-patch"
+      "description": "Group Non-Major updates for Docker Compose by filename",
+      "matchManagers": ["docker-compose"],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "Non-major updates for {{packageFile}}"
     },
     {
-      "matchManagers": ["docker"],
-      "matchUpdateTypes": ["digest"],
-      "groupName": "docker digest updates",
-      "groupSlug": "docker-digest"
+      "description": "Group Major updates for Docker Compose by filename",
+      "matchManagers": ["docker-compose"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "Major updates for {{packageFile}}"
     }
   ]
 }
