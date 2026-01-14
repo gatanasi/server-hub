@@ -281,6 +281,13 @@
       register: docker_pull
       changed_when: "'Pulled' in docker_pull.stdout or 'Downloaded' in docker_pull.stdout"
 
+    - name: Build Docker images (if build context exists)
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} build"
+        chdir: "{{ app_target_dir }}"
+      register: docker_build
+      changed_when: "'Building' in docker_build.stdout"
+
     - name: Restart containers with new configuration
       ansible.builtin.command:
         cmd: "{{ docker_compose_cmd }} up -d --remove-orphans"

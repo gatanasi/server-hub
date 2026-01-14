@@ -25,9 +25,7 @@ on:
     branches:
       - main
     paths:
-      - 'docker/**/docker-compose.yml'
-      - 'docker/**/docker-compose.yaml'
-      - 'docker/**/.env.enc'
+      - 'docker/**'
 
   # Allow manual trigger with app name selection
   workflow_dispatch:
@@ -76,9 +74,7 @@ jobs:
 
             # Get list of changed files (docker-compose.yml, docker-compose.yaml, and .env.enc)
             CHANGED_FILES=$(git diff --name-only "$BEFORE_SHA" "$AFTER_SHA" -- \
-              'docker/**/docker-compose.yml' \
-              'docker/**/docker-compose.yaml' \
-              'docker/**/.env.enc' || echo "")
+              'docker/**' || echo "")
 
             if [[ -z "$CHANGED_FILES" ]]; then
               echo "No deployment-related files changed"
