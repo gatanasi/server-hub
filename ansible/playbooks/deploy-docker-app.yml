@@ -133,7 +133,7 @@
         new_version: "{{ (
             (source_dockerfile.content | b64decode | regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') |
             default([new_version]) | last)
-            }}"
+          ) }}"
       when: source_dockerfile.content is defined
 
     - name: Check if target docker-compose.yml exists
@@ -175,7 +175,7 @@
         old_version: "{{ (
             (target_dockerfile.content | b64decode | regex_findall('FROM\\s+(?:--platform=\\S+\\s+)?\\S+:([^@\\s]+)') |
             default([old_version]) | last)
-            }}"
+          ) }}"
       when: target_dockerfile.content is defined
 
     - name: Set default old version if missing
