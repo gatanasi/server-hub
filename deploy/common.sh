@@ -50,6 +50,14 @@ error() {
 }
 
 # ============================================================================
+# Ansible Configuration
+# ============================================================================
+
+# Enable file-based logging for Ansible in production
+export ANSIBLE_LOG_PATH="${HOME}/logs/ansible/ansible.log"
+mkdir -p "$(dirname "${ANSIBLE_LOG_PATH}")"
+
+# ============================================================================
 # Notification Functions
 # ============================================================================
 
