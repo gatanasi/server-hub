@@ -151,7 +151,7 @@
       when: not target_compose_stat.stat.exists
 
     - name: Fallback to Dockerfile for old_version
-      when: old_version | default('none') == 'none' and target_compose_stat.stat.exists
+      when: old_version == 'unknown' and target_compose_stat.stat.exists
       block:
         - name: Read target Dockerfile (fallback)
           ansible.builtin.slurp:
