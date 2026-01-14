@@ -54,7 +54,7 @@ jobs:
         with:
           fetch-depth: 0  # Fetch full history to compare all pushed commits
 
-      - name: Detect changed docker-compose files
+      - name: Detect changed files
         id: detect
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -63,7 +63,7 @@ jobs:
             echo "Manual deployment requested for: ${{ github.event.inputs.app_name }}"
           else
             # Push trigger - detect changed files
-            echo "Detecting changed docker-compose and .env.enc files..."
+            echo "Detecting changed files..."
 
             # Use github.event.before to compare ALL pushed commits, not just the last one
             # This handles batch pushes correctly (e.g., pushing 5 commits at once)
