@@ -2,8 +2,8 @@
 # deploy-docker-app.yml - Deploy a Docker Compose application
 #
 # This playbook deploys a Docker Compose application to the appropriate host.
-# It finds the host that manages the given app, syncs the docker-compose files,
-# restarts the containers, verifies health, and rolls back on failure.
+# It uses community.docker.docker_compose_v2 for idempotent deployments
+# and native health check verification.
 #
 # Usage:
 #   ansible-playbook playbooks/deploy-docker-app.yml -e "app_name=n8n"
@@ -11,12 +11,6 @@
 # Required variables:
 #   - app_name: Name of the application (must match directory in docker/)
 #   - repo_dir: Path to the git repository on deployer.vm (default: /home/deployer/git/server-hub)
-#
-# Features:
-#   - SOPS decryption for .env.enc files
-#   - Health check verification with configurable timeout
-#   - Automatic rollback on failure
-#   - Telegram notifications
 #
 
 - name: Find target host for application
@@ -48,11 +42,6 @@
         msg: |
           No host found that manages app '{{ app_name }}'.
           Please add the app to a host's 'managed_apps' list in inventory/production.yml.
-
-          Current inventory:
-          {% for host in groups['docker_hosts'] %}
-          - {{ host }}: {{ hostvars[host].managed_apps | default([]) | join(', ') }}
-          {% endfor %}
       when: target_host is not defined
 
     - name: Display target host
@@ -80,15 +69,9 @@
     app_source_dir: "{{ repo_dir }}/docker/{{ app_name }}"
     app_target_dir: "{{ app_base_dir }}/{{ app_name }}"
     backup_dir: "{{ app_target_dir }}/.backup"
-    # Health check timeout is dynamically calculated from docker-compose healthcheck.start_period
-    # Falls back to this default if no healthchecks are defined or parsing fails
-    health_check_timeout_default: 90
-    health_check_interval: 5
-    # Buffer time added to start_period for timeout calculation (accounts for check execution)
-    health_check_buffer: 30
     telegram_bot_token: "{{ deploy_telegram_bot_token }}"
-    telegram_chat_id: "{{ deploy_telegram_chat_id }}"
-    telegram_enabled: "{{ deploy_telegram_enabled }}"
+    telegram_chat_id: "{{ telegram_chat_id }}"
+    telegram_enabled: "{{ telegram_enabled }}"
 
   tasks:
     - name: Display deployment info
@@ -162,24 +145,6 @@
         old_version: "{{ (image_name.split('@') | first).split(':') | last }}"
       when: target_compose_stat.stat.exists
 
-    - name: Fallback to Dockerfile for old_version
-      when:
-        - target_compose_stat.stat.exists
-        - old_version == 'unknown'
-      block:
-        - name: Read target Dockerfile (fallback)
-          ansible.builtin.slurp:
-            src: "{{ app_target_dir }}/Dockerfile"
-          register: target_dockerfile
-          failed_when: false
-
-        - name: Parse version from target Dockerfile
-          ansible.builtin.include_tasks: tasks/parse-dockerfile-version.yml
-          vars:
-            dockerfile_content: "{{ target_dockerfile.content }}"
-            output_fact: "old_version"
-          when: target_dockerfile.content is defined
-
     - name: Set default old version if missing
       ansible.builtin.set_fact:
         old_version: "none"
@@ -205,18 +170,13 @@
         state: directory
         mode: '0700'
 
-    - name: Check if docker-compose.yml exists
-      ansible.builtin.stat:
-        path: "{{ app_target_dir }}/docker-compose.yml"
-      register: existing_compose
-
     - name: Backup current docker-compose.yml
       ansible.builtin.copy:
         src: "{{ app_target_dir }}/docker-compose.yml"
         dest: "{{ backup_dir }}/docker-compose.yml.bak"
         remote_src: true
         mode: '0644'
-      when: existing_compose.stat.exists
+      when: target_compose_stat.stat.exists
 
     - name: Check if .env exists
       ansible.builtin.stat:
@@ -231,21 +191,6 @@
         mode: '0600'
       when: existing_env.stat.exists
       no_log: true
-
-    - name: Get current image digests for rollback
-      ansible.builtin.shell: |
-        cd "{{ app_target_dir }}" && \
-        {{ docker_compose_cmd }} images --format json 2>/dev/null || echo "[]"
-      register: current_images
-      changed_when: false
-      when: existing_compose.stat.exists
-
-    - name: Save current image info
-      ansible.builtin.copy:
-        content: "{{ current_images.stdout }}"
-        dest: "{{ backup_dir }}/images.json"
-        mode: '0644'
-      when: existing_compose.stat.exists and current_images.stdout | length > 2
 
     # === DEPLOYMENT PHASE ===
     - name: Sync application files to target
@@ -286,151 +231,42 @@
       no_log: true
       when: env_enc_file.stat.exists
 
-    - name: Check if .env file exists on target
-      ansible.builtin.stat:
-        path: "{{ app_target_dir }}/.env"
-      register: env_file
-
-    - name: Warn if .env file is missing (and no .env.enc found)
-      ansible.builtin.debug:
-        msg: |
-          WARNING: No .env file found at {{ app_target_dir }}/.env
-          No .env.enc file found in source either.
-          If this app requires environment variables, create them manually.
-      when:
-        - not env_file.stat.exists
-        - not env_enc_file.stat.exists
-
-    - name: Pull latest Docker images
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} pull"
-        chdir: "{{ app_target_dir }}"
-      register: docker_pull
-      changed_when: "'Pulled' in docker_pull.stdout or 'Downloaded' in docker_pull.stdout"
-
-    - name: Check for build context in docker-compose.yml
-      vars:
-        compose_content: "{{ source_compose_file.content | b64decode | from_yaml }}"
-        services_with_build: >-
-          {{
-            (compose_content.services | default({})).values() |
-            selectattr('build', 'defined') |
-            list
-          }}
-      ansible.builtin.set_fact:
-        build_required: "{{ services_with_build | length > 0 }}"
-      when: source_compose_file.content is defined
-
-    - name: Build images if required
+    # === DOCKER COMPOSE DEPLOYMENT ===
+    - name: Deploy with Docker Compose
       block:
-        - name: Get image IDs before build
-          ansible.builtin.command:
-            cmd: "{{ docker_compose_cmd }} images -q"
-            chdir: "{{ app_target_dir }}"
-          register: images_before
-          changed_when: false
-          when: build_required | default(false)
+        - name: Bring up services (with pull, build, and health wait)
+          community.docker.docker_compose_v2:
+            project_src: "{{ app_target_dir }}"
+            state: present
+            pull: always
+            build: always
+            wait: true
+            wait_timeout: 90
+            remove_orphans: true
+            # User requested NOT to set recreate: always, so we default to 'auto' (idempotent)
+            # recreate: auto
+          register: compose_deployment
 
-        - name: Build Docker images
-          ansible.builtin.command:
-            cmd: "{{ docker_compose_cmd }} build"
-            chdir: "{{ app_target_dir }}"
-          register: docker_build
-          changed_when: false # We determine change in the next step
-          when: build_required | default(false)
-
-        - name: Get image IDs after build
-          ansible.builtin.command:
-            cmd: "{{ docker_compose_cmd }} images -q"
-            chdir: "{{ app_target_dir }}"
-          register: images_after
-          changed_when: false
-          when: build_required | default(false)
-
-        - name: Report build status
+      rescue:
+        - name: Log failure
           ansible.builtin.debug:
-            msg: "Images rebuilt: {{ images_before.stdout != images_after.stdout }}"
-          changed_when: images_before.stdout != images_after.stdout
-          when: build_required | default(false)
+            msg: "Deployment failed! Initiating rollback. Error: {{ ansible_failed_result.msg | default('Unknown error') }}"
 
-    - name: Restart containers with new configuration
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} up -d --remove-orphans --force-recreate"
-        chdir: "{{ app_target_dir }}"
-      register: docker_up
-      changed_when: true
+        - name: Send rollback notification
+          ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
+          vars:
+            notify_title: "Deployment Failed - Rolling Back"
+            notify_emoji: "⚠️"
+            notify_message: "App: <code>{{ app_name }}</code>\nError: {{ ansible_failed_result.msg | default('Check logs') }}\nAction: Restoring <code>{{ old_version }}</code>" # noqa: yaml[line-length]
 
-    # === HEALTH CHECK PHASE ===
-    - name: Wait for containers to initialize
-      ansible.builtin.pause:
-        seconds: 5
-
-    - name: Extract max healthcheck start_period from docker-compose.yml
-      ansible.builtin.include_tasks: tasks/extract-max-start-period.yml
-      vars:
-        app_dir: "{{ app_target_dir }}"
-
-    - name: Calculate health check timeout
-      ansible.builtin.set_fact:
-        health_check_timeout: "{{ [((compose_max_start_period | int) + (health_check_buffer | int)), (health_check_timeout_default | int)] | max }}"
-
-    - name: Display health check configuration
-      ansible.builtin.debug:
-        msg: "Health check timeout: {{ health_check_timeout }}s (max start_period: {{ compose_max_start_period }}s + buffer: {{ health_check_buffer }}s)"
-
-    - name: Verify service health
-      ansible.builtin.include_tasks: tasks/verify-service-health.yml
-      vars:
-        app_dir: "{{ app_target_dir }}"
-        fail_on_unhealthy: false  # We handle failure with rollback logic below
-
-    - name: Set healthcheck warning message
-      ansible.builtin.set_fact:
-        healthcheck_warning: "{{ '⚠️ No healthchecks defined - consider adding healthcheck to docker-compose.yml' if (no_healthchecks_defined | default(false)) else '' }}" # noqa: yaml[line-length]
-
-    - name: Set deployment failure if containers exited
-      ansible.builtin.set_fact:
-        deployment_failed: true
-        failure_reason: "Containers exited unexpectedly: {{ failed_containers | default([]) | join(', ') }}"
-      when: not (health_check_passed | default(true))
-
-    - name: Mark deployment as successful
-      ansible.builtin.set_fact:
-        deployment_failed: false
-      when: deployment_failed is not defined
-
-    # === ROLLBACK PHASE (if needed) ===
-    - name: Execute rollback procedures
-      when: deployment_failed | bool
-      block:
-        - name: Log rollback start
-          ansible.builtin.debug:
-            msg: "ROLLING BACK: {{ failure_reason | default('Health check failed') }}"
-
-        - name: Stop failed containers
-          ansible.builtin.command:
-            cmd: "{{ docker_compose_cmd }} down"
-            chdir: "{{ app_target_dir }}"
-          failed_when: false
-          changed_when: true
-
-        - name: Check if backup exists
-          ansible.builtin.stat:
-            path: "{{ backup_dir }}/docker-compose.yml.bak"
-          register: backup_exists
-
+        # === ROLLBACK ===
         - name: Restore docker-compose.yml from backup
           ansible.builtin.copy:
             src: "{{ backup_dir }}/docker-compose.yml.bak"
             dest: "{{ app_target_dir }}/docker-compose.yml"
             remote_src: true
             mode: '0644'
-          when: backup_exists.stat.exists
-
-        - name: Check if .env backup exists
-          ansible.builtin.stat:
-            path: "{{ backup_dir }}/.env.bak"
-          register: env_backup_exists
+          when: target_compose_stat.stat.exists
 
         - name: Restore .env from backup
           ansible.builtin.copy:
@@ -438,82 +274,42 @@
             dest: "{{ app_target_dir }}/.env"
             remote_src: true
             mode: '0600'
-          when: env_backup_exists.stat.exists
+          when: existing_env.stat.exists
           no_log: true
 
-        - name: Restart with previous configuration
-          ansible.builtin.command:
-            cmd: "{{ docker_compose_cmd }} up -d"
-            chdir: "{{ app_target_dir }}"
-          when: backup_exists.stat.exists
-          changed_when: true
-
-        - name: Send rollback notification
-          ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
-          vars:
-            notify_title: "Deployment Rolled Back"
-            notify_emoji: "⚠️"
-            notify_message: "App: <code>{{ app_name }}</code>\nError: {{ failure_reason | default('Health check failed') }}\nCurrent: Restored to <code>{{ old_version }}</code>" # noqa: yaml[line-length]
+        - name: Restore services
+          community.docker.docker_compose_v2:
+            project_src: "{{ app_target_dir }}"
+            state: present
+            pull: missing # Don't force pull on rollback to be faster/safer
+            wait: true
+            wait_timeout: 90
+          when: target_compose_stat.stat.exists
 
         - name: Fail the playbook after rollback
           ansible.builtin.fail:
-            msg: "Deployment failed and was rolled back. Reason: {{ failure_reason | default('Health check failed') }}"
-
-      rescue:
-        - name: Rollback itself failed
-          ansible.builtin.debug:
-            msg: "WARNING: Rollback failed! Manual intervention required."
-
-        - name: Send critical failure notification
-          ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
-          vars:
-            notify_title: "CRITICAL: Rollback Failed"
-            notify_emoji: "🔴"
-            notify_message: "App: <code>{{ app_name }}</code>\n\n⚠️ Manual intervention required!"
-
-        - name: Fail after rollback failure
-          ansible.builtin.fail:
-            msg: "CRITICAL: Deployment failed AND rollback failed. Manual intervention required!"
+            msg: "Deployment failed and was rolled back."
 
     # === SUCCESS PHASE ===
-    - name: Display container status
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} ps"
-        chdir: "{{ app_target_dir }}"
-      register: docker_ps
-      changed_when: false
-      when: not deployment_failed | default(false)
-
-    - name: Show running containers
-      ansible.builtin.debug:
-        msg: "{{ docker_ps.stdout_lines }}"
-      when: not deployment_failed | default(false)
-
     - name: Prune unused Docker images
       ansible.builtin.command:
         cmd: docker image prune -f
       register: docker_prune
       changed_when: "'Total reclaimed space' in docker_prune.stdout"
-      when:
-        - docker_prune_after_deploy | default(true)
-        - not deployment_failed | default(false)
+      when: docker_prune_after_deploy | default(true)
 
     - name: Clean up old backups (keep only latest)
       ansible.builtin.file:
         path: "{{ backup_dir }}"
         state: absent
-      when:
-        - not deployment_failed | default(false)
-        - cleanup_backups_on_success | default(false)
+      when: cleanup_backups_on_success | default(false)
 
     - name: Send success notification
       ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
       vars:
         notify_title: "Deployment Successful"
         notify_emoji: "✅"
-        notify_message: "App: <code>{{ app_name }}</code>\nVersion: <code>{{ new_version }}</code>\nStatus: {{ 'Running (no healthchecks)' if no_healthchecks_defined | default(false) else 'Healthy' }}{{ '\n\n' + healthcheck_warning if healthcheck_warning | default('') | length > 0 else '' }}" # noqa: yaml[line-length]
-      when: not deployment_failed | default(false)
-
+        notify_message: "App: <code>{{ app_name }}</code>\nVersion: <code>{{ new_version }}</code>\nStatus: Healthy"
 
 - name: Deployment summary
   hosts: localhost

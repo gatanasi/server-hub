@@ -11,10 +11,6 @@
 # Usage (when called via forced SSH command):
 #   ssh deployer@deployer.vm <app-name>
 #
-# Example:
-#   ./trigger-deploy.sh n8n
-#   ssh deployer@deployer.vm n8n
-#
 
 set -euo pipefail
 
@@ -26,11 +22,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 LOG_DIR="${HOME}/logs/deployments"
 LOG_FILE="${LOG_DIR}/deploy-$(date +%Y%m%d-%H%M%S).log"
 export OPERATION_TYPE="Deployment"
-
-# Telegram configuration (set these in SECRETS_FILE)
-# TELEGRAM_BOT_TOKEN="your-bot-token"
-# TELEGRAM_CHAT_ID="your-chat-id"
-# SECRETS_FILE is defined in common.sh
 
 # Source common functions
 # shellcheck source=deploy/common.sh
