@@ -218,16 +218,6 @@ main() {
     # Run restore
     run_restore_playbook "${app_name}" "${restore_op}" "${backup_src}" "${timestamp}"
     
-    # Send success notification (skip for list_backups)
-    if [[ "${restore_op}" != "list_backups" ]]; then
-        local restore_info=""
-        if [[ "${restore_op}" == "restore_latest" ]]; then
-            restore_info="latest backup"
-        else
-            restore_info="backup ${timestamp}"
-        fi
-    fi
-    
     log "=========================================="
     log "Restore completed successfully!"
     log "=========================================="
