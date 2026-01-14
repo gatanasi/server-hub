@@ -70,8 +70,8 @@
     app_target_dir: "{{ app_base_dir }}/{{ app_name }}"
     backup_dir: "{{ app_target_dir }}/.backup"
     telegram_bot_token: "{{ deploy_telegram_bot_token }}"
-    telegram_chat_id: "{{ telegram_chat_id }}"
-    telegram_enabled: "{{ telegram_enabled }}"
+    telegram_chat_id: "{{ deploy_telegram_chat_id }}"
+    telegram_enabled: "{{ deploy_telegram_enabled }}"
 
   tasks:
     - name: Display deployment info
