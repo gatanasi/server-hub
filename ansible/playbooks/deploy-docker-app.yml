@@ -217,9 +217,9 @@
       ansible.posix.synchronize:
         src: "{{ app_source_dir }}/"
         dest: "{{ app_target_dir }}/"
-        checksum: yes
-        delete: no
-        recursive: yes
+        checksum: yes | bool
+        delete: no | bool
+        recursive: yes | bool
         rsync_opts:
           - "--exclude=*.log"
           - "--exclude=.env"
