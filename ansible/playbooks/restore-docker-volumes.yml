@@ -192,9 +192,9 @@
       register: compose_exists
 
     - name: Stop application stack
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} down"
-        chdir: "{{ app_dir }}"
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        state: absent
       when: compose_exists.stat.exists
       failed_when: false
       changed_when: true

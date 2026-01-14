@@ -44,8 +44,6 @@ log() {
 error() {
     local msg="$*"
     log "ERROR: ${msg}"
-    # Wrap the message in <pre> tags to prevent HTML injection
-    send_notification "❌ ${OPERATION_TYPE} FAILED" "<pre>${msg}</pre>"
     exit 1
 }
 
@@ -56,28 +54,6 @@ error() {
 # Enable file-based logging for Ansible in production
 export ANSIBLE_LOG_PATH="${HOME}/logs/ansible/ansible.log"
 mkdir -p "$(dirname "${ANSIBLE_LOG_PATH}")"
-
-# ============================================================================
-# Notification Functions
-# ============================================================================
-
-send_notification() {
-    local title="$1"
-    local message="$2"
-    
-    if [[ -f "${SECRETS_FILE}" ]]; then
-        # shellcheck source=/dev/null
-        source "${SECRETS_FILE}"
-    fi
-    
-    if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]]; then
-        local text="${title}%0A%0A${message}"
-        curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_CHAT_ID}" \
-            -d "text=${text}" \
-            -d "parse_mode=HTML" > /dev/null 2>&1 || true
-    fi
-}
 
 # ============================================================================
 # Validation Functions

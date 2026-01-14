@@ -226,7 +226,6 @@ main() {
         else
             restore_info="backup ${timestamp}"
         fi
-        send_notification "🔄 Restore SUCCESS" "App: <code>${app_name}</code>%0ARestored: ${restore_info}"
     fi
     
     log "=========================================="
