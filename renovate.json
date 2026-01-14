@@ -12,9 +12,16 @@
       "groupSlug": "github-actions"
     },
     {
-      "description": "Group ALL updates (Major/Minor/Patch/Digest) for Dockerfiles by filename",
+      "description": "Group Non-Major updates for Dockerfiles by filename",
       "matchManagers": ["docker"],
-      "groupName": "All updates for {{packageFile}}"
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "Non-major updates for {{packageFile}}"
+    },
+    {
+      "description": "Group Major updates for Dockerfiles by filename",
+      "matchManagers": ["docker"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "Major updates for {{packageFile}}"
     },
     {
       "description": "Group Non-Major updates for Docker Compose by filename",
