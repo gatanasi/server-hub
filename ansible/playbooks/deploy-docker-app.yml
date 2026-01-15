@@ -326,13 +326,18 @@
 
             - name: Restore image tags (rollback mutable tags)
               ansible.builtin.shell: |
+                BACKUP_FILE="{{ backup_dir }}/images.bak"
+                if [ ! -f "$BACKUP_FILE" ]; then
+                  echo "Image backup file not found, skipping retagging."
+                  exit 0
+                fi
                 while IFS='=' read -r image_tag image_id; do
                   if [[ -n "$image_id" && -n "$image_tag" ]]; then
                     if ! docker tag "$image_id" "$image_tag" 2>/dev/null; then
                        echo "Warning: Failed to restore tag for ${image_tag} (${image_id})" >&2
                     fi
                   fi
-                done < "{{ backup_dir }}/images.bak"
+                done < "$BACKUP_FILE"
               args:
                 executable: /bin/bash
               when: target_compose_stat.stat.exists
