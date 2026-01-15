@@ -196,8 +196,6 @@
         project_src: "{{ app_dir }}"
         state: absent
       when: compose_exists.stat.exists
-      failed_when: false
-      changed_when: true
 
     - name: Wait for containers to stop
       ansible.builtin.pause:

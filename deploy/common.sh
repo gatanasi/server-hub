@@ -164,16 +164,19 @@ extract_ansible_errors() {
 
 pull_latest_repo() {
     log "Pulling latest changes from git..."
-    
+
     (
         cd "${REPO_DIR}" || exit 1
         # Get current branch name
-        current_branch=$(git rev-parse --abbrev-ref HEAD)
-        
+        current_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+        if [[ -z "$current_branch" ]]; then
+            error "Cannot deploy from a detached HEAD state. Please check out a branch."
+        fi
         git fetch origin "${current_branch}"
         git reset --hard "origin/${current_branch}"
+
         chmod +x "${REPO_DIR}/deploy/"*.sh 2>/dev/null || true
     )
-    
+
     log "Git pull complete. Current commit: $(cd "${REPO_DIR}" && git rev-parse --short HEAD)"
 }
