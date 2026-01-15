@@ -273,7 +273,7 @@
             project_src: "{{ app_target_dir }}"
             state: present
             pull: always
-            build: true
+            build: always
             wait: true
             wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
             remove_orphans: true
