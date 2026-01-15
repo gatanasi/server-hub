@@ -78,16 +78,11 @@
 
     # === STOP SERVICES ===
     - name: Stop application stack for {{ current_app }}
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} stop -t {{ stop_timeout }}"
-        chdir: "{{ app_dir }}"
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        state: stopped
+        timeout: "{{ stop_timeout | default(60) }}"
       register: stop_result
-      when: docker_volumes | length > 0
-      changed_when: true
-
-    - name: Wait for containers to stop for {{ current_app }}
-      ansible.builtin.pause:
-        seconds: 5
       when: docker_volumes | length > 0
 
     # === BACKUP VOLUMES ===
