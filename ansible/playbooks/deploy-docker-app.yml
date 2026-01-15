@@ -333,7 +333,7 @@
                 fi
                 while IFS='=' read -r image_tag image_id; do
                   if [[ -n "$image_id" && -n "$image_tag" ]]; then
-                    if ! docker tag "$image_id" "$image_tag" 2>/dev/null; then
+                    if ! docker tag "$image_id" "$image_tag"; then
                        echo "Warning: Failed to restore tag for ${image_tag} (${image_id})" >&2
                     fi
                   fi
