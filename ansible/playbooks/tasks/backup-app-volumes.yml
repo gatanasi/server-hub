@@ -81,7 +81,7 @@
       community.docker.docker_compose_v2:
         project_src: "{{ app_dir }}"
         state: stopped
-        timeout: "{{ stop_timeout | default(omit) }}"
+        timeout: "{{ stop_timeout | default(60) }}"
       register: stop_result
       when: docker_volumes | length > 0
 
