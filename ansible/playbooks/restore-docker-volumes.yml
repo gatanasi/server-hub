@@ -192,12 +192,10 @@
       register: compose_exists
 
     - name: Stop application stack
-      ansible.builtin.command:
-        cmd: "{{ docker_compose_cmd }} down"
-        chdir: "{{ app_dir }}"
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        state: absent
       when: compose_exists.stat.exists
-      failed_when: false
-      changed_when: true
 
     - name: Wait for containers to stop
       ansible.builtin.pause:
@@ -246,43 +244,17 @@
         # Note: docker-compose.yml is NOT restored from backup as it's in GitHub.
         # Use the deploy playbook to restore configuration files.
         - name: Start application stack
-          ansible.builtin.command:
-            cmd: "{{ docker_compose_cmd }} up -d"
-            chdir: "{{ app_dir }}"
+          community.docker.docker_compose_v2:
+            project_src: "{{ app_dir }}"
+            state: present
+            wait: true
+            wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
           when: compose_exists.stat.exists
-          changed_when: true
-
-        - name: Wait for containers to initialize
-          ansible.builtin.pause:
-            seconds: 5
-
-        # === HEALTH CHECK PHASE ===
-        - name: Extract max healthcheck start_period
-          ansible.builtin.include_tasks: tasks/extract-max-start-period.yml
-          when: compose_exists.stat.exists
-
-        - name: Set health check timeout
-          ansible.builtin.set_fact:
-            health_check_timeout: "{{ [((compose_max_start_period | int) + (health_check_buffer | int)), (health_check_timeout_default | int)] | max }}"
-          when: compose_exists.stat.exists
-
-        - name: Verify service health
-          ansible.builtin.include_tasks: tasks/verify-service-health.yml
-          vars:
-            fail_on_unhealthy: true
-          when: compose_exists.stat.exists
-
-        - name: Verify services are running
-          ansible.builtin.command:
-            cmd: "{{ docker_compose_cmd }} ps"
-            chdir: "{{ app_dir }}"
           register: services_status
-          changed_when: false
-          when: compose_exists.stat.exists
 
         - name: Display service status
           ansible.builtin.debug:
-            msg: "{{ services_status.stdout_lines }}"
+            var: services_status.services
           when: compose_exists.stat.exists
 
         - name: Restore complete
@@ -313,23 +285,23 @@
                 • {{ result.item.path | basename | regex_replace('_' + restore_timestamp + '\\.tar\\.gz$', '') }}: {{ result.stdout.split() | first }}
               {%- endif %}
               {%- endfor %}
-            health_status_text: "{{ '✅ All healthchecks passed' if (healthcheck_services_count | default(0) | int > 0) else '⚠️ No healthchecks defined' }}"
 
         - name: Send success notification
           ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
           vars:
             notify_title: "Restore Completed"
             notify_emoji: "🔄"
-            notify_message: "<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n<b>Volumes restored ({{ restore_files.files | length }}):</b>\n<pre>{{ restore_details_text }}</pre>\n\n{{ health_status_text }}" # noqa: yaml[line-length]
+            notify_message: "<b>Host:</b> <code>{{ inventory_hostname }}</code>\n<b>App:</b> <code>{{ app_name }}</code>\n<b>Backup:</b> <code>{{ restore_timestamp }}</code>\n\n<b>Volumes restored ({{ restore_files.files | length }}):</b>\n<pre>{{ restore_details_text }}</pre>\n\n✅ Service Restored & Healthy" # noqa: yaml[line-length]
 
       rescue:
         - name: Attempt to restart services after restore failure
-          ansible.builtin.command:
-            cmd: "{{ docker_compose_cmd }} up -d"
-            chdir: "{{ app_dir }}"
+          community.docker.docker_compose_v2:
+            project_src: "{{ app_dir }}"
+            state: present
+            wait: true
+            wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
           when: compose_exists.stat.exists
           failed_when: false
-          changed_when: true
 
         - name: Send failure notification
           ansible.builtin.include_tasks: tasks/send-telegram-notification.yml

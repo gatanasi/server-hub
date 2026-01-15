@@ -43,11 +43,8 @@ all:
     # Health Check Configuration
     # ===========================================
 
-    # Buffer time added to start_period for timeout calculation
-    health_check_buffer: 30
-
-    # Default health check timeout (minimum valid timeout)
-    health_check_timeout_default: 90
+    # Default timeout for Docker Compose wait (seconds)
+    docker_compose_wait_timeout: 90
 
   children:
     # Group for all Docker Compose hosts

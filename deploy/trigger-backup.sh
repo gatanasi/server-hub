@@ -181,13 +181,6 @@ main() {
     # Run backup
     run_backup_playbook "${app_name}" "${backup_dest}" "${target_host}"
     
-    # Send success notification
-    local target_info=""
-    if [[ -n "${target_host}" ]]; then
-        target_info="%0AHost: <code>${target_host}</code>"
-    fi
-    send_notification "💾 Backup SUCCESS" "App: <code>${app_name}</code>${target_info}%0ADestination: <code>${backup_dest}</code>"
-    
     log "========================================="
     log "Backup completed successfully!"
     log "========================================="
