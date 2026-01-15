@@ -77,18 +77,23 @@
       when: docker_volumes | length == 0
 
     # === STOP SERVICES ===
+    - name: Check for running services for {{ current_app }}
+      ansible.builtin.command:
+        cmd: "{{ docker_compose_cmd }} ps --services --filter status=running"
+        chdir: "{{ app_dir }}"
+      register: running_services
+      changed_when: false
+      when: docker_volumes | length > 0
+
     - name: Stop application stack for {{ current_app }}
       ansible.builtin.command:
         cmd: "{{ docker_compose_cmd }} stop -t {{ stop_timeout }}"
         chdir: "{{ app_dir }}"
       register: stop_result
-      when: docker_volumes | length > 0
+      when:
+        - docker_volumes | length > 0
+        - running_services.stdout | length > 0
       changed_when: true
-
-    - name: Wait for containers to stop for {{ current_app }}
-      ansible.builtin.pause:
-        seconds: 5
-      when: docker_volumes | length > 0
 
     # === BACKUP VOLUMES ===
     - name: Backup each volume for {{ current_app }}
