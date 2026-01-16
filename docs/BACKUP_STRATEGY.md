@@ -193,7 +193,6 @@ ansible-playbook playbooks/restore-docker-volumes.yml \
 8. **Verify** services are healthy:
    - Uses `community.docker.docker_compose_v2` with `wait: true`
    - Waits for all services with a healthcheck to become `healthy`
-   - Validates all services reach `healthy` status
 
 > **Error Recovery:** The restore process is wrapped in a block/rescue structure. If restoration fails, it automatically attempts to restart services and notifies via Telegram.
 
