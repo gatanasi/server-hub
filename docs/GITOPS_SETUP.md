@@ -445,12 +445,10 @@ services:
    - Current image information
 
 2. **Health Check Phase**: After `docker compose up`, the playbook:
-   - Extracts `start_period` values from docker-compose.yml
-   - **Dynamically calculates timeout**: `max(max_start_period + 30s buffer, health_check_timeout_default)`
-   - Waits for containers to initialize (5 seconds)
-   - Checks for services with Docker healthchecks
-   - Polls health status every 5 seconds until timeout
-   - Detects containers that exited unexpectedly
+   - Uses `community.docker.docker_compose_v2` with `wait: true`
+   - **Timeout**: Uses `docker_compose_wait_timeout` (default: 90s)
+   - Waits for all services with a healthcheck to become `healthy`
+   - Automatically detects container failures during startup
 
 3. **Rollback Phase**: If health check fails:
    - Stops the failed containers
@@ -466,17 +464,15 @@ In `ansible/inventory/production.yml`, you can set per-host options:
 docker_hosts:
   hosts:
     n8n.vm:
-      # Health check settings (timeout is auto-calculated from start_period)
-      health_check_timeout_default: 90  # Minimum timeout / fallback if no start_period
-      health_check_interval: 5          # Seconds between checks
-      health_check_buffer: 30           # Added to max start_period
+      # Health check settings
+      docker_compose_wait_timeout: 90  # Seconds to wait for healthy services
       
       # Cleanup settings
       docker_prune_after_deploy: true    # Prune unused images
       cleanup_backups_on_success: false  # Keep backups for manual rollback
 ```
 
-> **Note**: The `health_check_timeout` is **automatically calculated** as `max(max_start_period + buffer, health_check_timeout_default)`. This ensures that `health_check_timeout_default` acts as a minimum wait time, even for fast-starting services or those without explicit `start_period`.
+> **Note**: The `docker_compose_wait_timeout` defines how long Ansible waits for all services to report "healthy". If a service takes longer than this to start, the deployment will be considered a failure and will rollback.
 
 ### Adding Healthchecks to Your Compose File
 
@@ -649,7 +645,6 @@ ssh <user>@<target>.vm echo "OK"
 │       ├── restore-docker-volumes.yml  # Restore with confirmation
 │       └── tasks/
 │           ├── backup-app-volumes.yml      # Per-app backup tasks
-│           ├── verify-service-health.yml   # Shared health check logic
 │           └── load-telegram-credentials.yml # Shared credential loading
 ├── deploy/
 │   ├── trigger.sh                  # SSH forced command dispatcher

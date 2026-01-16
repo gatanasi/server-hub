@@ -82,9 +82,9 @@ To customize: `-e "backup_keep_count=5"`
 2. **Create** tar.gz archives of each Docker volume using `alpine:3.23.2`
 3. **Start** the application stack
 4. **Verify** services are healthy:
-   - Extracts `start_period` from docker-compose.yml healthchecks
-   - Dynamically calculates wait timeout (`max(max_start_period + 30s, health_check_timeout_default)`)
-   - Polls Docker health status until all services report `healthy`
+   - Uses `community.docker.docker_compose_v2` with `wait: true`
+   - Waits for all services with a healthcheck to become `healthy`
+   - Timeout is configurable via `docker_compose_wait_timeout` (default: 90s)
 5. **Cleanup** backups older than retention period
 6. **Notify** via Telegram (using shared `load-telegram-credentials.yml` task)
 
@@ -191,9 +191,8 @@ ansible-playbook playbooks/restore-docker-volumes.yml \
 6. **Extract** backup archives to volumes using `alpine:3.23.2`
 7. **Start** the application stack
 8. **Verify** services are healthy:
-   - Reads `start_period` from docker-compose.yml healthchecks
-   - Calculates appropriate wait timeout dynamically
-   - Validates all services reach `healthy` status
+   - Uses `community.docker.docker_compose_v2` with `wait: true`
+   - Waits for all services with a healthcheck to become `healthy`
 
 > **Error Recovery:** The restore process is wrapped in a block/rescue structure. If restoration fails, it automatically attempts to restart services and notifies via Telegram.
 
@@ -207,25 +206,16 @@ The backup and restore playbooks share common functionality with the deploy play
 
 | Task File | Purpose |
 |-----------|---------|
-| `tasks/verify-service-health.yml` | Docker health check verification with jq/grep fallback, exited container detection |
 | `tasks/load-telegram-credentials.yml` | Load Telegram bot credentials from `~/.deploy-secrets` |
 
 ### Benefits
 
-- **Code reuse:** Health check logic (~100 lines) and credential loading (~25 lines) written once, used by backup, restore, and deploy playbooks
-- **Consistency:** Same health check behavior across all operations
+- **Code reuse:** Credential loading (~25 lines) written once, used by backup, restore, and deploy playbooks
 - **Maintainability:** Bug fixes and improvements automatically apply to all playbooks
 
 ### Usage in Playbooks
 
 ```yaml
-# Include health verification
-- name: Verify service health
-  ansible.builtin.include_tasks: tasks/verify-service-health.yml
-  vars:
-    app_dir: "{{ app_target_dir }}"
-    fail_on_unhealthy: true  # Set to false for custom error handling
-
 # Include Telegram credential loading
 - name: Load Telegram credentials
   ansible.builtin.include_tasks: tasks/load-telegram-credentials.yml
