@@ -103,7 +103,7 @@
         services_with_build: "{{ (compose_content.services | default({})) | dict2items | selectattr('value.build', 'defined') | list }}"
       ansible.builtin.set_fact:
         new_version: "{{ (image_name.split('@') | first).split(':') | last }}"
-        docker_build_policy: "{{ 'always' if services_with_build else 'policy' }}"
+        docker_build_policy: "{{ 'always' if services_with_build else 'never' }}"
 
     - name: Fallback to Dockerfile for new_version
       when: new_version == 'unknown'
