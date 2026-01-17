@@ -66,7 +66,9 @@
           vars:
             notify_title: "Deployment Init Failed"
             notify_emoji: "❌"
-            notify_message: "App: <code>{{ app_name }}</code>\nError: <pre>{{ ansible_failed_result.msg | default('Unknown error during initialization') | to_nice_yaml }}</pre>"
+            notify_message: |
+              App: <code>{{ app_name }}</code>
+              Error: <pre>{{ ansible_failed_result.msg | default('Unknown error during initialization') | to_nice_yaml }}</pre>
 
         - name: Fail playbook
           ansible.builtin.fail:
