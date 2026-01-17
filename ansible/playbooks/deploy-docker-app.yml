@@ -31,32 +31,55 @@
     - name: Load Telegram credentials
       ansible.builtin.include_tasks: tasks/load-telegram-credentials.yml
 
-    - name: Find host that manages this app
-      ansible.builtin.set_fact:
-        target_host: "{{ item }}"
-      loop: "{{ groups['docker_hosts'] }}"
-      when: app_name in (hostvars[item].managed_apps | default([]))
+    - name: Resolve and setup target host
+      block:
+        - name: Find hosts that manage this app
+          ansible.builtin.set_fact:
+            _target_hosts: "{{ groups['docker_hosts'] | select('expr', 'app_name in hostvars[item].get(\"managed_apps\", [])') | list }}"
 
-    - name: Fail if no host manages this app
-      ansible.builtin.fail:
-        msg: |
-          No host found that manages app '{{ app_name }}'.
-          Please add the app to a host's 'managed_apps' list in inventory/production.yml.
-      when: target_host is not defined
+        - name: Fail if no host or multiple hosts are found
+          ansible.builtin.fail:
+            msg: |
+              {% if not _target_hosts %}
+              No host found that manages app '{{ app_name }}'.
+              Please add the app to a host's 'managed_apps' list in inventory/production.yml.
+              {% else %}
+              Multiple hosts found that manage app '{{ app_name }}': {{ _target_hosts | join(', ') }}.
+              An app must be managed by exactly one host.
+              {% endif %}
+          when: _target_hosts | length != 1
 
-    - name: Display target host
-      ansible.builtin.debug:
-        msg: "Will deploy '{{ app_name }}' to host '{{ target_host }}'"
+        - name: Set target host
+          ansible.builtin.set_fact:
+            target_host: "{{ _target_hosts[0] }}"
 
-    - name: Add target host to runtime group
-      ansible.builtin.add_host:
-        name: "{{ target_host }}"
-        groups: deploy_targets
-        deploy_app_name: "{{ app_name }}"
-        deploy_repo_dir: "{{ repo_dir }}"
-        deploy_telegram_bot_token: "{{ telegram_bot_token }}"
-        deploy_telegram_chat_id: "{{ telegram_chat_id }}"
-        deploy_telegram_enabled: "{{ telegram_enabled }}"
+        - name: Display target host
+          ansible.builtin.debug:
+            msg: "Will deploy '{{ app_name }}' to host '{{ target_host }}'"
+
+        - name: Add target host to runtime group
+          ansible.builtin.add_host:
+            name: "{{ target_host }}"
+            groups: deploy_targets
+            deploy_app_name: "{{ app_name }}"
+            deploy_repo_dir: "{{ repo_dir }}"
+            deploy_telegram_bot_token: "{{ telegram_bot_token }}"
+            deploy_telegram_chat_id: "{{ telegram_chat_id }}"
+            deploy_telegram_enabled: "{{ telegram_enabled }}"
+
+      rescue:
+        - name: Send initialization failure notification
+          ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
+          vars:
+            notify_title: "Deployment Init Failed"
+            notify_emoji: "❌"
+            notify_message: |
+              App: <code>{{ app_name }}</code>
+              Error: <pre>{{ ansible_failed_result.msg | default('Unknown error during initialization') }}</pre>
+
+        - name: Fail playbook
+          ansible.builtin.fail:
+            msg: "Deployment initialization failed. Reason: {{ ansible_failed_result.msg | default('Unknown error during initialization') }}"
 
 
 - name: Deploy Docker Compose application
