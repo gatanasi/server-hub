@@ -89,7 +89,7 @@ services:
       postgres:
         condition: service_healthy
       n8n:
-        condition: service_started
+        condition: service_healthy
     # Workers don't expose HTTP endpoints - they process jobs from the queue
     # Check that the worker process is running by verifying the node process exists
     healthcheck:
