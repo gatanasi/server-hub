@@ -248,7 +248,7 @@
             project_src: "{{ app_dir }}"
             state: present
             wait: true
-            wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
+            wait_timeout: "{{ docker_compose_wait_timeout }}"
           when: compose_exists.stat.exists
           register: services_status
 
@@ -299,7 +299,7 @@
             project_src: "{{ app_dir }}"
             state: present
             wait: true
-            wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
+            wait_timeout: "{{ docker_compose_wait_timeout }}"
           when: compose_exists.stat.exists
           failed_when: false
 

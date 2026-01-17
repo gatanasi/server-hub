@@ -274,11 +274,10 @@
             state: present
             pull: always
             build: always
+            recreate: always
             wait: true
-            wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
+            wait_timeout: "{{ docker_compose_wait_timeout }}"
             remove_orphans: true
-            # User requested NOT to set recreate: always, so we default to 'auto' (idempotent)
-            # recreate: auto
           register: compose_deployment
 
       rescue:
@@ -350,7 +349,7 @@
                 state: present
                 pull: missing # Don't force pull on rollback to be faster/safer
                 wait: true
-                wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
+                wait_timeout: "{{ docker_compose_wait_timeout }}"
               when: target_compose_stat.stat.exists
 
           rescue:

@@ -1,77 +1,24 @@
-volumes:
-  db_storage:
-  n8n_storage:
-  redis_storage:
-
-# GitOps managed - changes trigger automatic deployment via GitHub Actions
-x-shared: &shared
-  restart: always
-  image: docker.n8n.io/n8nio/n8n:stable@sha256:37d6559a03d8d24a01317148aca3909686e76527bb5f84387ff7cf2ce04bb09d
-  environment:
-    - DB_TYPE=postgresdb
-    - DB_POSTGRESDB_HOST=postgres
-    - DB_POSTGRESDB_PORT=5432
-    - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
-    - DB_POSTGRESDB_USER=${POSTGRES_NON_ROOT_USER}
-    - DB_POSTGRESDB_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
-    - EXECUTIONS_MODE=queue
-    - QUEUE_BULL_REDIS_HOST=redis
-    - QUEUE_HEALTH_CHECK_ACTIVE=true
-    - N8N_ENCRYPTION_KEY=${ENCRYPTION_KEY}
-    - N8N_HOST=${N8N_HOST}
-    - N8N_PORT=${N8N_PORT}
-    - N8N_PROTOCOL=https
-    - WEBHOOK_URL=https://${WEBHOOK_URL}
-    - N8N_PROXY_HOPS=1
-    - GENERIC_TIMEZONE=Europe/Zurich
-  links:
-    - postgres
-    - redis
-  volumes:
-    - n8n_storage:/home/node/.n8n
-  depends_on:
-    redis:
-      condition: service_healthy
-    postgres:
-      condition: service_healthy
-
 services:
-  postgres:
-    image: postgres:16.11@sha256:f992505e18f114c1e5102ac4dcf00f791b44462f6a423d899320f0bbf80e386f
-    restart: always
-    environment:
-      - POSTGRES_USER
-      - POSTGRES_PASSWORD
-      - POSTGRES_DB
-      - POSTGRES_NON_ROOT_USER
-      - POSTGRES_NON_ROOT_PASSWORD
-    volumes:
-      - db_storage:/var/lib/postgresql/data
-      - ./init-data.sh:/docker-entrypoint-initdb.d/init-data.sh
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 40s
-
-  redis:
-    image: redis:6-alpine@sha256:37e002448575b32a599109664107e374c8709546905c372a34d64919043b9ceb
-    restart: always
-    volumes:
-      - redis_storage:/data
-    healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
-
   n8n:
     container_name: n8n
-    <<: *shared
+    restart: always
+    image: docker.n8n.io/n8nio/n8n:stable@sha256:37d6559a03d8d24a01317148aca3909686e76527bb5f84387ff7cf2ce04bb09d
+    environment:
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=${N8N_PORT}
+      - N8N_PROTOCOL=https
+      - N8N_RUNNERS_ENABLED=true
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://${WEBHOOK_URL}
+      - N8N_PROXY_HOPS=1
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - TZ=${GENERIC_TIMEZONE}
     ports:
       - 8080:5678
+    volumes:
+      - n8n_data:/home/node/.n8n
     healthcheck:
       test: ['CMD-SHELL', 'wget -q --spider http://localhost:5678/healthz || exit 1']
       interval: 10s
@@ -79,17 +26,5 @@ services:
       retries: 10
       start_period: 60s
 
-  n8n-worker:
-    container_name: n8n-worker
-    <<: *shared
-    command: worker
-    depends_on:
-      - n8n
-    # Workers don't expose HTTP endpoints - they process jobs from the queue
-    # Check that the worker process is running by verifying the node process exists
-    healthcheck:
-      test: ['CMD-SHELL', 'pgrep -f "node.*worker" || exit 1']
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
+volumes:
+  n8n_data:

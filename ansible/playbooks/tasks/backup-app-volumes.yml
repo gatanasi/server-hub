@@ -128,7 +128,7 @@
         project_src: "{{ app_dir }}"
         state: present
         wait: true
-        wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
+        wait_timeout: "{{ docker_compose_wait_timeout }}"
       register: start_result
       when: docker_volumes | length > 0
 
@@ -198,7 +198,7 @@
         project_src: "{{ app_dir }}"
         state: present
         wait: true
-        wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
+        wait_timeout: "{{ docker_compose_wait_timeout }}"
       failed_when: false
 
     - name: Send failure notification for {{ current_app }}
