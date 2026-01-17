@@ -10,7 +10,7 @@
 # Required Secrets:
 # - DEPLOYER_SSH_KEY: Private SSH key for github-runner -> deployer.vm
 # - DEPLOYER_HOST: Hostname or IP of deployer.vm
-# - DEPLOYER_USER: Username on deployer.vm (usually 'deployer')
+# - DEPLOYER_USER: Username on deployer.vm
 # - DEPLOYER_SSH_KNOWN_HOSTS: SSH known_hosts entry for deployer.vm
 #
 # Note: Telegram notifications are sent by the deployer VM scripts/Ansible,

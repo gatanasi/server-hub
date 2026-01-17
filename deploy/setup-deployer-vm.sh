@@ -34,13 +34,6 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
 }
 
-check_user() {
-    if [[ "${USER}" != "deployer" ]]; then
-        log "WARNING: Running as ${USER}, expected 'deployer'"
-        log "Some operations may fail or need adjustment"
-    fi
-}
-
 setup_directories() {
     log "Setting up directories..."
     
@@ -215,8 +208,7 @@ main() {
     log "=========================================="
     log "Deployer VM Setup Script"
     log "=========================================="
-    
-    check_user
+
     setup_directories
     install_ansible
     install_ansible_collections
