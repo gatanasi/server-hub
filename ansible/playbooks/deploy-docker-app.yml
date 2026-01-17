@@ -79,7 +79,7 @@
 
         - name: Fail playbook
           ansible.builtin.fail:
-            msg: "Deployment initialization failed."
+            msg: "Deployment initialization failed. Reason: {{ ansible_failed_result.msg | default('Unknown error during initialization') }}"
 
 
 - name: Deploy Docker Compose application
