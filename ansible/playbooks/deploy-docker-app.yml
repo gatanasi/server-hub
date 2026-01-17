@@ -90,7 +90,7 @@
       delegate_to: localhost
       register: source_compose_file
 
-    - name: Parse new version from source
+    - name: Parse source docker-compose.yml
       vars:
         compose_content: "{{ source_compose_file.content | b64decode | from_yaml }}"
         service_config: >-
@@ -100,15 +100,10 @@
             default({})
           }}
         image_name: "{{ service_config.image | default('unknown') }}"
+        services_with_build: "{{ (compose_content.services | default({})) | dict2items | selectattr('value.build', 'defined') | list }}"
       ansible.builtin.set_fact:
         new_version: "{{ (image_name.split('@') | first).split(':') | last }}"
-
-    - name: Determine Docker Compose build policy
-      vars:
-        compose_data: "{{ source_compose_file.content | b64decode | from_yaml }}"
-        services_with_build: "{{ (compose_data.services | default({})) | dict2items | selectattr('value.build', 'defined') | list }}"
-      ansible.builtin.set_fact:
-        docker_build_policy: "{{ 'always' if services_with_build else 'never' }}"
+        docker_build_policy: "{{ 'always' if services_with_build else 'policy' }}"
 
     - name: Fallback to Dockerfile for new_version
       when: new_version == 'unknown'

@@ -2,7 +2,7 @@ services:
   caddy:
     container_name: caddy
     build: .
-    restart: always
+    restart: unless-stopped
     environment:
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       CF_API_TOKEN: ${CF_API_TOKEN}
@@ -27,8 +27,4 @@ services:
 
 volumes:
   caddy_data:
-    external: true
-    name: caddy_caddy_data
   caddy_config:
-    external: true
-    name: caddy_caddy_config
