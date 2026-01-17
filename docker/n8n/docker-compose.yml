@@ -84,10 +84,6 @@ services:
     <<: *shared
     command: worker
     depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
       n8n:
         condition: service_healthy
     # Workers don't expose HTTP endpoints - they process jobs from the queue
