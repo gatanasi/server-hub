@@ -33,18 +33,25 @@
 
     - name: Resolve and setup target host
       block:
-        - name: Find host that manages this app
+        - name: Find hosts that manage this app
           ansible.builtin.set_fact:
-            target_host: "{{ item }}"
-          loop: "{{ groups['docker_hosts'] }}"
-          when: app_name in (hostvars[item].managed_apps | default([]))
+            _target_hosts: "{{ groups['docker_hosts'] | select('expr', 'app_name in hostvars[item].get(\"managed_apps\", [])') | list }}"
 
-        - name: Fail if no host manages this app
+        - name: Fail if no host or multiple hosts are found
           ansible.builtin.fail:
             msg: |
+              {% if not _target_hosts %}
               No host found that manages app '{{ app_name }}'.
               Please add the app to a host's 'managed_apps' list in inventory/production.yml.
-          when: target_host is not defined
+              {% else %}
+              Multiple hosts found that manage app '{{ app_name }}': {{ _target_hosts | join(', ') }}.
+              An app must be managed by exactly one host.
+              {% endif %}
+          when: _target_hosts | length != 1
+
+        - name: Set target host
+          ansible.builtin.set_fact:
+            target_host: "{{ _target_hosts[0] }}"
 
         - name: Display target host
           ansible.builtin.debug:
@@ -68,7 +75,7 @@
             notify_emoji: "❌"
             notify_message: |
               App: <code>{{ app_name }}</code>
-              Error: <pre>{{ ansible_failed_result.msg | default('Unknown error during initialization') | to_nice_yaml }}</pre>
+              Error: <pre>{{ ansible_failed_result.msg | default('Unknown error during initialization') }}</pre>
 
         - name: Fail playbook
           ansible.builtin.fail:
