@@ -101,6 +101,46 @@
 		}
 	}
 
+	@immich expression {host}.startsWith("immich")
+	handle @immich {
+		reverse_proxy http://test-immich.vm:2283 {
+			import common_proxy_headers
+		}
+	}
+
+	@erpnext expression {host}.startsWith("erpnext")
+	handle @erpnext {
+		reverse_proxy http://erpnext.vm:8080 {
+			import common_proxy_headers
+		}
+	}
+
+	@dolibarr expression {host}.startsWith("dolibarr")
+	handle @dolibarr {
+		reverse_proxy http://dolibarr.vm:8080 {
+			import common_proxy_headers
+		}
+	}
+
+	@ghost expression {host}.startsWith("ghost")
+	handle @ghost {
+		handle /.ghost/activitypub/* {
+			reverse_proxy http://ghost.vm:8080
+		}
+
+		handle /.well-known/webfinger {
+			reverse_proxy http://ghost.vm:8080
+		}
+
+		handle /.well-known/nodeinfo {
+			reverse_proxy http://ghost.vm:2368
+		}
+
+		reverse_proxy http://ghost.vm:2368 {
+			import common_proxy_headers
+		}
+	}
+
 	handle {
 		respond "Not Found" 404
 	}

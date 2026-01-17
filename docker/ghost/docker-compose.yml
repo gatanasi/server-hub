@@ -1,0 +1,92 @@
+services:
+  ghost:
+    # Do not alter this without updating the Tinybird Sync container as well
+    image: ghost:${GHOST_VERSION:-6-alpine}
+    restart: always
+    ports:
+      - "${GHOST_PORT:-2368}:2368"
+    environment:
+      NODE_ENV: production
+      url: https://${DOMAIN:?DOMAIN environment variable is required}
+      admin__url: ${ADMIN_DOMAIN:+https://${ADMIN_DOMAIN}}
+      database__client: mysql
+      database__connection__host: db
+      database__connection__user: ${DATABASE_USER:-ghost}
+      database__connection__password: ${DATABASE_PASSWORD:?DATABASE_PASSWORD environment variable is required}
+      database__connection__database: ghost
+    volumes:
+      - ${UPLOAD_LOCATION:-./data/ghost}:/var/lib/ghost/content
+    depends_on:
+      db:
+        condition: service_healthy
+      activitypub:
+        condition: service_started
+        required: true
+    networks:
+      - ghost_network
+
+  db:
+    image: mysql:8.0.42@sha256:4445b2668d41143cb50e471ee207f8822006249b6859b24f7e12479684def5d9
+    restart: always
+    expose:
+      - "3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD:?DATABASE_ROOT_PASSWORD environment variable is required}
+      MYSQL_USER: ${DATABASE_USER:-ghost}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD environment variable is required}
+      MYSQL_DATABASE: ghost
+      MYSQL_MULTIPLE_DATABASES: activitypub
+    volumes:
+      - ${MYSQL_DATA_LOCATION:-./data/mysql}:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: mysqladmin ping -p$$MYSQL_ROOT_PASSWORD -h 127.0.0.1
+      interval: 1s
+      start_period: 30s
+      start_interval: 10s
+      retries: 120
+    networks:
+      - ghost_network
+
+  activitypub:
+    image: ghcr.io/tryghost/activitypub:1.1.0@sha256:39c212fe23603b182d68e67d555c6b9b04b1e57459dfc0bef26d6e4980eb04d1
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${UPLOAD_LOCATION:-./data/ghost}:/opt/activitypub/content
+    environment:
+      # See https://github.com/TryGhost/ActivityPub/blob/main/docs/env-vars.md
+      NODE_ENV: production
+      MYSQL_HOST: db
+      MYSQL_USER: ${DATABASE_USER:-ghost}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD environment variable is required}
+      MYSQL_DATABASE: activitypub
+      LOCAL_STORAGE_PATH: /opt/activitypub/content/images/activitypub
+      LOCAL_STORAGE_HOSTING_URL: https://${DOMAIN}/content/images/activitypub
+    depends_on:
+      db:
+        condition: service_healthy
+      activitypub-migrate:
+        condition: service_completed_successfully
+    networks:
+      - ghost_network
+
+  # Supporting Services
+
+  activitypub-migrate:
+    image: ghcr.io/tryghost/activitypub-migrations:1.1.0@sha256:b3ab20f55d66eb79090130ff91b57fe93f8a4254b446c2c7fa4507535f503662
+    environment:
+      MYSQL_DB: mysql://${DATABASE_USER:-ghost}:${DATABASE_PASSWORD:?DATABASE_PASSWORD environment variable is required}@tcp(db:3306)/activitypub
+    networks:
+      - ghost_network
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: no
+
+volumes:
+  traffic_analytics_data:
+
+networks:
+  ghost_network:
