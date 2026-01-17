@@ -103,6 +103,13 @@
       ansible.builtin.set_fact:
         new_version: "{{ (image_name.split('@') | first).split(':') | last }}"
 
+    - name: Determine Docker Compose build policy
+      vars:
+        compose_data: "{{ source_compose_file.content | b64decode | from_yaml }}"
+        services_with_build: "{{ compose_data.services | dict2items | selectattr('value.build', 'defined') | list }}"
+      ansible.builtin.set_fact:
+        docker_build_policy: "{{ 'always' if (services_with_build | length > 0) else 'never' }}"
+
     - name: Fallback to Dockerfile for new_version
       when: new_version == 'unknown'
       block:
@@ -273,7 +280,7 @@
             project_src: "{{ app_target_dir }}"
             state: present
             pull: always
-            build: always
+            build: "{{ docker_build_policy }}"
             wait: true
             wait_timeout: "{{ docker_compose_wait_timeout | default(90) }}"
             remove_orphans: true

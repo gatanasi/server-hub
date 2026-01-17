@@ -27,18 +27,12 @@ x-shared: &shared
   links:
     - postgres
     - redis
-  volumes:
-    - n8n_storage:/home/node/.n8n
-  depends_on:
-    redis:
-      condition: service_healthy
+      volumes:
+        - n8n_storage:/home/node/.n8n
+  
+  services:
     postgres:
-      condition: service_healthy
-
-services:
-  postgres:
-    image: postgres:16.11@sha256:f992505e18f114c1e5102ac4dcf00f791b44462f6a423d899320f0bbf80e386f
-    restart: always
+      image: postgres:16.11@sha256:f992505e18f114c1e5102ac4dcf00f791b44462f6a423d899320f0bbf80e386f    restart: always
     environment:
       - POSTGRES_USER
       - POSTGRES_PASSWORD
@@ -72,6 +66,11 @@ services:
     <<: *shared
     ports:
       - 8080:5678
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ['CMD-SHELL', 'wget -q --spider http://localhost:5678/healthz || exit 1']
       interval: 10s
@@ -84,7 +83,12 @@ services:
     <<: *shared
     command: worker
     depends_on:
-      - n8n
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      n8n:
+        condition: service_started
     # Workers don't expose HTTP endpoints - they process jobs from the queue
     # Check that the worker process is running by verifying the node process exists
     healthcheck:
