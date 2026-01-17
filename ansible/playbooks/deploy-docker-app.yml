@@ -10,14 +10,14 @@
 #
 # Required variables:
 #   - app_name: Name of the application (must match directory in docker/)
-#   - repo_dir: Path to the git repository on deployer.vm (default: /home/deployer/git/server-hub)
+#   - repo_dir: Path to the git repository on deployer.vm (default: "{{ playbook_dir }}/../..")
 #
 
 - name: Find target host for application
   hosts: localhost
   gather_facts: false
   vars:
-    repo_dir: /home/deployer/git/server-hub
+    repo_dir: "{{ playbook_dir }}/../.."
 
   tasks:
     - name: Validate app_name is provided
