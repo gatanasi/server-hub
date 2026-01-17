@@ -35,7 +35,10 @@
       block:
         - name: Find hosts that manage this app
           ansible.builtin.set_fact:
-            _target_hosts: "{{ groups['docker_hosts'] | select('expr', 'app_name in hostvars[item].get(\"managed_apps\", [])') | list }}"
+            _target_hosts: "{{
+                              groups['docker_hosts'] | map('extract', hostvars) | selectattr('managed_apps', 'defined') |
+                              selectattr('managed_apps', 'contains', app_name) | map(attribute='inventory_hostname') | list
+                            }}"
 
         - name: Fail if no host or multiple hosts are found
           ansible.builtin.fail:
