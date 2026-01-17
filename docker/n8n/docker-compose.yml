@@ -6,7 +6,7 @@ volumes:
 # GitOps managed - changes trigger automatic deployment via GitHub Actions
 x-shared: &shared
   restart: always
-  image: docker.n8n.io/n8nio/n8n:stable@sha256:6f1bd76e2a9acdc079527915e3b956509522dde03d83c5d034b5d9bca90ea88d
+  image: docker.n8n.io/n8nio/n8n:stable@sha256:37d6559a03d8d24a01317148aca3909686e76527bb5f84387ff7cf2ce04bb09d
   environment:
     - DB_TYPE=postgresdb
     - DB_POSTGRESDB_HOST=postgres
@@ -37,7 +37,7 @@ x-shared: &shared
 
 services:
   postgres:
-    image: postgres:16.11@sha256:803ea6da631eab4a350da4ba87541e4737197b8c26ec0feb23ff6f9714212d1d
+    image: postgres:16.11@sha256:f992505e18f114c1e5102ac4dcf00f791b44462f6a423d899320f0bbf80e386f
     restart: always
     environment:
       - POSTGRES_USER
