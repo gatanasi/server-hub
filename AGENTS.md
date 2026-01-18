@@ -1,4 +1,4 @@
-# GEMINI.md — Developer Context & Instructions
+# Developer Context & Instructions
 
 This file documents the architectural context, workflows, and conventions for the `server-hub` repository. Use this as your primary reference when working on this codebase.
 
