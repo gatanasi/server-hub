@@ -103,6 +103,13 @@
 
 	@immich expression {host}.startsWith("immich")
 	handle @immich {
+		reverse_proxy http://immich.vm:8080 {
+			import common_proxy_headers
+		}
+	}
+
+	@test-immich expression {host}.startsWith("test-immich")
+	handle @test-immich {
 		reverse_proxy http://test-immich.vm:2283 {
 			import common_proxy_headers
 		}
