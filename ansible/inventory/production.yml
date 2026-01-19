@@ -97,6 +97,12 @@ all:
           ansible_host: wireguard.vm
           managed_apps:
             - wg-easy
+
+        immich.vm:
+          ansible_user: immich
+          ansible_host: immich.vm
+          managed_apps:
+            - immich
         # Add more hosts as needed:
         # multi-app.vm:
         #   ansible_user: apps
