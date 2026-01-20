@@ -3,7 +3,7 @@ name: immich
 services:
   immich-server:
     container_name: immich_server
-    image: ghcr.io/immich-app/immich-server:v2.4.1
+    image: ghcr.io/immich-app/immich-server:v2.4.1@sha256:e6a6298e67ae077808fdb7d8d5565955f60b0708191576143fc02d30ab1389d1
     extends:
       file: hwaccel.transcoding.yml
       service: vaapi # set to one of [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding
@@ -28,7 +28,7 @@ services:
     container_name: immich_machine_learning
     # For hardware acceleration, add one of -[armnn, cuda, rocm, openvino, rknn] to the image tag.
     # Example tag: ${IMMICH_VERSION:-release}-cuda
-    image: ghcr.io/immich-app/immich-machine-learning:v2.4.1-rocm
+    image: ghcr.io/immich-app/immich-machine-learning:v2.4.1-rocm@sha256:5aeb66a7c2a4479c8bde06d6230b45d3f7937fb2a193d3926679efd8f450ed4a
     extends:
       file: hwaccel.ml.yml
       service: rocm # set to one of [armnn, cuda, rocm, openvino, openvino-wsl, rknn] for accelerated inference - use the `-wsl` version for WSL2 where applicable
@@ -42,7 +42,7 @@ services:
 
   redis:
     container_name: immich_redis
-    image: docker.io/valkey/valkey:9.0.1
+    image: docker.io/valkey/valkey:9.0.1@sha256:546304417feac0874c3dd576e0952c6bb8f06bb4093ea0c9ca303c73cf458f63
     healthcheck:
       test: redis-cli ping || exit 1
     restart: always
