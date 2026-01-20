@@ -32,7 +32,7 @@ services:
       - /dev/dri:/dev/dri
       - /dev/kfd:/dev/kfd
     environment:
-      - HSA_OVERRIDE_GFX_VERSION=d3d12
+      - HSA_OVERRIDE_GFX_VERSION=11.0.2
 
   openvino:
     device_cgroup_rules:
