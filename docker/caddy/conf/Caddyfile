@@ -108,13 +108,6 @@
 		}
 	}
 
-	@test-immich expression {host}.startsWith("test-immich")
-	handle @test-immich {
-		reverse_proxy http://test-immich.vm:2283 {
-			import common_proxy_headers
-		}
-	}
-
 	@erpnext expression {host}.startsWith("erpnext")
 	handle @erpnext {
 		reverse_proxy http://erpnext.vm:8080 {
