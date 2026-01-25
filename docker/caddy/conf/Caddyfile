@@ -103,6 +103,8 @@
 
 	@immich expression {host}.startsWith("immich")
 	handle @immich {
+		import internal_cors
+
 		reverse_proxy http://immich.vm:8080 {
 			import common_proxy_headers
 		}
