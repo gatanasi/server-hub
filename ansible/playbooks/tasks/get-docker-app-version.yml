@@ -25,13 +25,13 @@
       - "{{ app_name }}"
       - "{{ app_name | replace('-', '_') }}"
       - "{{ app_name }}-server"
-      - "{{ app_name }}_server"
+      - "{{ (app_name + '-server') | replace('-', '_') }}"
       - "{{ app_name }}-app"
-      - "{{ app_name }}_app"
+      - "{{ (app_name + '-app') | replace('-', '_') }}"
       - "{{ app_name }}-backend"
-      - "{{ app_name }}_backend"
+      - "{{ (app_name + '-backend') | replace('-', '_') }}"
       - "{{ app_name }}-web"
-      - "{{ app_name }}_web"
+      - "{{ (app_name + '-web') | replace('-', '_') }}"
     matching_candidates: "{{ candidates | select('in', services.keys()) | list }}"
   ansible.builtin.set_fact:
     _found_service_config: "{{ services[matching_candidates | first] if matching_candidates else {} }}"
@@ -48,12 +48,12 @@
       }}
   when: _found_service_config == {}
 
-# Last Resort: Take the first service if still nothing found and services exist
+# Last Resort: Take the first service alphabetically if still nothing found
 - name: Fallback to first service
   vars:
     services: "{{ compose_content.services | default({}) }}"
   ansible.builtin.set_fact:
-    _found_service_config: "{{ services.values() | first }}"
+    _found_service_config: "{{ services[services.keys() | sort | first] }}"
   when:
     - _found_service_config == {}
     - (services | length) > 0
