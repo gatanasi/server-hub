@@ -32,13 +32,9 @@
       - "{{ app_name }}_backend"
       - "{{ app_name }}-web"
       - "{{ app_name }}_web"
+    matching_candidates: "{{ candidates | select('in', services.keys()) | list }}"
   ansible.builtin.set_fact:
-    _found_service_config: >-
-      {{
-        services[candidates | select('in', services.keys()) | first] 
-        if (candidates | select('in', services.keys()) | list | length > 0)
-        else {}
-      }}
+    _found_service_config: "{{ services[matching_candidates | first] if matching_candidates else {} }}"
 
 # Fallback: Find service by image name if no service name matched
 - name: Find service by image name
@@ -67,10 +63,11 @@
     image_full: "{{ _found_service_config.image | default('unknown') }}"
     # Handle 'image:tag' and 'image:tag@digest'
     image_without_digest: "{{ image_full.split('@') | first }}"
-    # Split by last colon to get tag. If no colon (e.g. 'ubuntu'), tag is effectively 'latest' but implementation below returns whole string if no colon found by split.
-    # Logic: split(':') -> last. 
-    # If image is 'ubuntu', split is ['ubuntu'], last is 'ubuntu'. This isn't ideal but consistent with prev logic.
-    # Refined logic: if ':' in string, take last part. Else 'latest'.
-    tag_candidate: "{{ image_without_digest.split(':') | last if ':' in image_without_digest else 'latest' }}"
+    image_parts: "{{ image_without_digest.split(':') }}"
+    potential_tag: "{{ image_parts | last }}"
+    # A valid tag exists if there's a ':', and the part after the last ':' doesn't contain a '/'
+    # (which would indicate a port in the repository name, e.g. registry:5000/image).
+    is_valid_tag: "{{ image_parts | length > 1 and '/' not in potential_tag }}"
+    tag_candidate: "{{ potential_tag if is_valid_tag else 'latest' }}"
   ansible.builtin.set_fact:
     "{{ output_fact }}": "{{ tag_candidate if image_full != 'unknown' else 'unknown' }}"
