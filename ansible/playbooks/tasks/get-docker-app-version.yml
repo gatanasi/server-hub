@@ -1,0 +1,76 @@
+---
+# ansible/playbooks/tasks/get-docker-app-version.yml
+#
+# Robustly extracts the version/tag from a docker-compose dictionary structure.
+#
+# Inputs:
+#   compose_content: (dict) Parsed docker-compose.yml content
+#   app_name: (string) The application name to search for
+#   output_fact: (string) The name of the fact to set with the found version
+#
+# Logic:
+# 1. Finds the most likely service name using heuristics (exact, suffix, image match).
+# 2. Extracts the image tag.
+# 3. Sets the `output_fact`.
+
+- name: Reset matches
+  ansible.builtin.set_fact:
+    _found_service_config: {}
+
+- name: Find matching service
+  vars:
+    services: "{{ compose_content.services | default({}) }}"
+    # Potential service names to check in order
+    candidates:
+      - "{{ app_name }}"
+      - "{{ app_name | replace('-', '_') }}"
+      - "{{ app_name }}-server"
+      - "{{ app_name }}_server"
+      - "{{ app_name }}-app"
+      - "{{ app_name }}_app"
+      - "{{ app_name }}-backend"
+      - "{{ app_name }}_backend"
+      - "{{ app_name }}-web"
+      - "{{ app_name }}_web"
+  ansible.builtin.set_fact:
+    _found_service_config: >-
+      {{
+        services[candidates | select('in', services.keys()) | first] 
+        if (candidates | select('in', services.keys()) | list | length > 0)
+        else {}
+      }}
+
+# Fallback: Find service by image name if no service name matched
+- name: Find service by image name
+  vars:
+    services: "{{ compose_content.services | default({}) }}"
+  ansible.builtin.set_fact:
+    _found_service_config: >-
+      {{
+        services.values() | selectattr('image', 'defined') | 
+        selectattr('image', 'search', app_name) | first | default({})
+      }}
+  when: _found_service_config == {}
+
+# Last Resort: Take the first service if still nothing found and services exist
+- name: Fallback to first service
+  vars:
+    services: "{{ compose_content.services | default({}) }}"
+  ansible.builtin.set_fact:
+    _found_service_config: "{{ services.values() | first }}"
+  when: 
+    - _found_service_config == {}
+    - (services | length) > 0
+
+- name: Extract version from image
+  vars:
+    image_full: "{{ _found_service_config.image | default('unknown') }}"
+    # Handle 'image:tag' and 'image:tag@digest'
+    image_without_digest: "{{ image_full.split('@') | first }}"
+    # Split by last colon to get tag. If no colon (e.g. 'ubuntu'), tag is effectively 'latest' but implementation below returns whole string if no colon found by split.
+    # Logic: split(':') -> last. 
+    # If image is 'ubuntu', split is ['ubuntu'], last is 'ubuntu'. This isn't ideal but consistent with prev logic.
+    # Refined logic: if ':' in string, take last part. Else 'latest'.
+    tag_candidate: "{{ image_without_digest.split(':') | last if ':' in image_without_digest else 'latest' }}"
+  ansible.builtin.set_fact:
+    "{{ output_fact }}": "{{ tag_candidate if image_full != 'unknown' else 'unknown' }}"

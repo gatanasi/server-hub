@@ -117,17 +117,10 @@
       register: source_compose_file
 
     - name: Parse new version from source
+      ansible.builtin.include_tasks: tasks/get-docker-app-version.yml
       vars:
         compose_content: "{{ source_compose_file.content | b64decode | from_yaml }}"
-        service_config: >-
-          {{
-            (compose_content.services | default({}))[app_name] |
-            default((compose_content.services | default({}))[app_name | replace('-', '_')]) |
-            default({})
-          }}
-        image_name: "{{ service_config.image | default('unknown') }}"
-      ansible.builtin.set_fact:
-        new_version: "{{ (image_name.split('@') | first).split(':') | last }}"
+        output_fact: "new_version"
 
     - name: Fallback to Dockerfile for new_version
       when: new_version == 'unknown'
@@ -158,17 +151,10 @@
       when: target_compose_stat.stat.exists
 
     - name: Parse old version from target
+      ansible.builtin.include_tasks: tasks/get-docker-app-version.yml
       vars:
         compose_content: "{{ target_compose_file.content | b64decode | from_yaml }}"
-        service_config: >-
-          {{
-            (compose_content.services | default({}))[app_name] |
-            default((compose_content.services | default({}))[app_name | replace('-', '_')]) |
-            default({})
-          }}
-        image_name: "{{ service_config.image | default('unknown') }}"
-      ansible.builtin.set_fact:
-        old_version: "{{ (image_name.split('@') | first).split(':') | last }}"
+        output_fact: "old_version"
       when: target_compose_stat.stat.exists
 
     - name: Set default old version if missing
