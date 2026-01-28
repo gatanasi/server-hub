@@ -43,7 +43,7 @@
   ansible.builtin.set_fact:
     _found_service_config: >-
       {{
-        services.values() | selectattr('image', 'defined') | 
+        services.values() | selectattr('image', 'defined') |
         selectattr('image', 'search', app_name) | first | default({})
       }}
   when: _found_service_config == {}
@@ -54,7 +54,7 @@
     services: "{{ compose_content.services | default({}) }}"
   ansible.builtin.set_fact:
     _found_service_config: "{{ services.values() | first }}"
-  when: 
+  when:
     - _found_service_config == {}
     - (services | length) > 0
 
