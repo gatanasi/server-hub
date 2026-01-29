@@ -1,0 +1,74 @@
+---
+# ansible/playbooks/tasks/get-docker-app-version.yml
+#
+# Robustly extracts the version/tag from a docker-compose dictionary structure.
+#
+# Inputs:
+#   compose_content: (dict) Parsed docker-compose.yml content
+#   app_name: (string) The application name to search for
+#   output_fact: (string) The name of the fact to set with the found version
+#
+# Logic:
+# 1. Finds the most likely service name using heuristics (exact, suffix, image match).
+# 2. Extracts the image tag.
+# 3. Sets the `output_fact`.
+
+- name: Reset matches
+  ansible.builtin.set_fact:
+    _found_service_config: {}
+
+- name: Find matching service
+  vars:
+    services: "{{ compose_content.services | default({}) }}"
+    # Potential service names to check in order
+    candidates:
+      - "{{ app_name }}"
+      - "{{ app_name | replace('-', '_') }}"
+      - "{{ app_name }}-server"
+      - "{{ (app_name + '-server') | replace('-', '_') }}"
+      - "{{ app_name }}-app"
+      - "{{ (app_name + '-app') | replace('-', '_') }}"
+      - "{{ app_name }}-backend"
+      - "{{ (app_name + '-backend') | replace('-', '_') }}"
+      - "{{ app_name }}-web"
+      - "{{ (app_name + '-web') | replace('-', '_') }}"
+    matching_candidates: "{{ candidates | select('in', services.keys()) | list }}"
+  ansible.builtin.set_fact:
+    _found_service_config: "{{ services[matching_candidates | first] if matching_candidates else {} }}"
+
+# Fallback: Find service by image name if no service name matched
+- name: Find service by image name
+  vars:
+    services: "{{ compose_content.services | default({}) }}"
+  ansible.builtin.set_fact:
+    _found_service_config: >-
+      {{
+        services.values() | selectattr('image', 'defined') |
+        selectattr('image', 'search', app_name) | first | default({})
+      }}
+  when: _found_service_config == {}
+
+# Last Resort: Take the first service alphabetically if still nothing found
+- name: Fallback to first service
+  vars:
+    services: "{{ compose_content.services | default({}) }}"
+  ansible.builtin.set_fact:
+    _found_service_config: "{{ services[services.keys() | sort | first] }}"
+  when:
+    - _found_service_config == {}
+    - (services | length) > 0
+
+- name: Extract version from image
+  vars:
+    image_full: "{{ _found_service_config.image | default('unknown') }}"
+    # Handle 'image:tag' and 'image:tag@digest'
+    image_without_digest: "{{ image_full.split('@') | first }}"
+    image_parts: "{{ image_without_digest.split(':') }}"
+    potential_tag: "{{ image_parts | last }}"
+    # A valid tag exists if there's a ':', the part after the last ':' doesn't contain a '/',
+    # (which would indicate a port in the repository name, e.g. registry:5000/image),
+    # and doesn't start with '$' (which would be an env var placeholder like ${VERSION}).
+    is_valid_tag: "{{ image_parts | length > 1 and '/' not in potential_tag and not potential_tag.startswith('$') }}"
+    tag_candidate: "{{ potential_tag if is_valid_tag else 'latest' }}"
+  ansible.builtin.set_fact:
+    "{{ output_fact }}": "{{ tag_candidate if image_full != 'unknown' else 'unknown' }}"
