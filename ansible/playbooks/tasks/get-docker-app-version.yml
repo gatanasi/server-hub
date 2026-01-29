@@ -65,9 +65,10 @@
     image_without_digest: "{{ image_full.split('@') | first }}"
     image_parts: "{{ image_without_digest.split(':') }}"
     potential_tag: "{{ image_parts | last }}"
-    # A valid tag exists if there's a ':', and the part after the last ':' doesn't contain a '/'
-    # (which would indicate a port in the repository name, e.g. registry:5000/image).
-    is_valid_tag: "{{ image_parts | length > 1 and '/' not in potential_tag }}"
+    # A valid tag exists if there's a ':', the part after the last ':' doesn't contain a '/',
+    # (which would indicate a port in the repository name, e.g. registry:5000/image),
+    # and doesn't start with '$' (which would be an env var placeholder like ${VERSION}).
+    is_valid_tag: "{{ image_parts | length > 1 and '/' not in potential_tag and not potential_tag.startswith('$') }}"
     tag_candidate: "{{ potential_tag if is_valid_tag else 'latest' }}"
   ansible.builtin.set_fact:
     "{{ output_fact }}": "{{ tag_candidate if image_full != 'unknown' else 'unknown' }}"
