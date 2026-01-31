@@ -11,9 +11,9 @@ https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/docs/install/installry
 ```
 arch: amd64
 cores: 14
-dev0: /dev/dri/renderD128,gid=993
+dev0: /dev/dri/renderD128,gid=992
 dev1: /dev/dri/card1,gid=44
-dev2: /dev/kfd,gid=993
+dev2: /dev/kfd,gid=992
 features: keyctl=1,nesting=1
 hostname: ollama
 memory: 16384

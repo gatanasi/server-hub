@@ -103,6 +103,18 @@ all:
           ansible_host: immich.vm
           managed_apps:
             - immich
+
+        jellyfin.vm:
+          ansible_user: jellyfin
+          ansible_host: jellyfin.vm
+          managed_apps:
+            - jellyfin
+
+        arr.vm:
+          ansible_user: arr
+          ansible_host: arr.vm
+          managed_apps:
+            - arr
         # Add more hosts as needed:
         # multi-app.vm:
         #   ansible_user: apps
