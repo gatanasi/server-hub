@@ -174,8 +174,6 @@ pull_latest_repo() {
         fi
         git fetch origin "${current_branch}"
         git reset --hard "origin/${current_branch}"
-
-        chmod +x "${REPO_DIR}/deploy/"*.sh 2>/dev/null || true
     )
 
     log "Git pull complete. Current commit: $(cd "${REPO_DIR}" && git rev-parse --short HEAD)"

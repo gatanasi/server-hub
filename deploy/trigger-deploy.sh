@@ -104,11 +104,11 @@ main() {
     log "Starting deployment for app: ${app_name}"
     log "=========================================="
 
-    # Step 1: Validate app name (security check)
-    validate_app_name "${app_name}"
-
-    # Step 2: Pull latest code from git
+    # Step 1: Pull latest code from git
     pull_latest_repo
+
+    # Step 2: Validate app name (security check)
+    validate_app_name "${app_name}"
 
     # Step 3: Run Ansible playbook
     run_ansible_playbook "${app_name}"

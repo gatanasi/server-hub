@@ -169,15 +169,15 @@ main() {
     log "========================================="
     log "Starting backup for app: ${app_name}"
     log "========================================="
-    
+
+    # Pull latest code
+    pull_latest_repo
+
     # Validate inputs using common functions
     validate_app_name "${app_name}" "true"  # allow 'all' for backups
     validate_path "${backup_dest}" "backup destination"
     validate_hostname "${target_host}"
-    
-    # Pull latest code
-    pull_latest_repo
-    
+   
     # Run backup
     run_backup_playbook "${app_name}" "${backup_dest}" "${target_host}"
     
