@@ -4,7 +4,7 @@ services:
     container_name: jellyfin
     user: 1000:1000
     group_add:
-      - "render"
+      - render
     ports:
       - 8080:8096/tcp
       - 7359:7359/udp
