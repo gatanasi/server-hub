@@ -1,7 +1,7 @@
 services:
   # --- Network & VPN Gateway ---
   gluetun:
-    image: ghcr.io/qdm12/gluetun:v3.41.0
+    image: ghcr.io/qdm12/gluetun:v3.41.0@sha256:6b54856716d0de56e5bb00a77029b0adea57284cf5a466f23aad5979257d3045
     container_name: gluetun
     cap_add:
       - NET_ADMIN
@@ -31,7 +31,7 @@ services:
 
   # --- Download Client ---
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:5.1.4
+    image: lscr.io/linuxserver/qbittorrent:5.1.4@sha256:b8a08ffba8850e2e71153e153cf5eed2dedbf499ef9b123262735ce924b65586
     container_name: qbittorrent
     environment:
       - PUID=${PUID}
@@ -50,7 +50,7 @@ services:
 
   # --- Extraction Manager ---
   unpackerr:
-    image: golift/unpackerr
+    image: golift/unpackerr@sha256:a9e7eb0d7b0ca16d2bdcb5af52eb4b544053ad6d915dd9b0f8383bc83f1df5cc
     container_name: unpackerr
     environment:
       - PUID=${PUID}
@@ -69,7 +69,7 @@ services:
 
   # --- The "Managers" ---
   radarr:
-    image: lscr.io/linuxserver/radarr:6.0.4
+    image: lscr.io/linuxserver/radarr:6.0.4@sha256:270f25698624b57b86ca119cc95399d7ff15be8297095b4e1223fd5b549b732c
     container_name: radarr
     environment:
       - PUID=${PUID}
@@ -85,7 +85,7 @@ services:
       - arr-net
 
   sonarr:
-    image: lscr.io/linuxserver/sonarr:4.0.16
+    image: lscr.io/linuxserver/sonarr:4.0.16@sha256:02b4d538d351d6e35882a021c08e8600fe95d28860fb1dd724b597166e7221ca
     container_name: sonarr
     environment:
       - PUID=${PUID}
@@ -101,7 +101,7 @@ services:
       - arr-net
 
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.3.0
+    image: lscr.io/linuxserver/prowlarr:2.3.0@sha256:d3e9307b320b6772749a2cf8fc2712e9e824c4930b034680ad4d08a9e2f25884
     container_name: prowlarr
     environment:
       - PUID=${PUID}
@@ -116,7 +116,7 @@ services:
       - arr-net
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr:1.5.4
+    image: lscr.io/linuxserver/bazarr:1.5.4@sha256:d6492cc79ca5e12fe617c7285e7ebd60d4e7f0e93ec7faa78338dba91f07a91e
     container_name: bazarr
     environment:
       - PUID=${PUID}
@@ -133,7 +133,7 @@ services:
 
   # --- Quality Profile Sync ---
   recyclarr:
-    image: ghcr.io/recyclarr/recyclarr:2.1.2
+    image: ghcr.io/recyclarr/recyclarr:2.1.2@sha256:84d3474d2bb6e8e99dac3748b6327301ac28c2d32bea4fa4b8e190c9c4b2ac77
     container_name: recyclarr
     user: ${PUID}:${PGID}
     volumes:
@@ -146,7 +146,7 @@ services:
 
   # --- Requests ---
   jellyseerr:
-    image: ghcr.io/fallenbagel/jellyseerr:2.7.3
+    image: ghcr.io/fallenbagel/jellyseerr:2.7.3@sha256:9cc9e9ee6cd5cf5a23feb45c37742ba34cfd6314d81d259cddb373a97ac92cdd
     container_name: jellyseerr
     environment:
       - PUID=${PUID}
