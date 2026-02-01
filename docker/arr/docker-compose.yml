@@ -42,7 +42,7 @@ services:
       - TZ=${TZ}
     volumes:
       - ./config/qbittorrent:/config
-      - ${HOST_DIR}:/downloads
+      - ${HOST_DIR}:/data
     network_mode: "service:gluetun"
     restart: unless-stopped
     healthcheck:
@@ -81,7 +81,7 @@ services:
       - UN_RADARR_0_API_KEY=${RADARR_API_KEY}
     volumes:
       - ./config/unpackerr:/config
-      - ${HOST_DIR}:/downloads
+      - ${HOST_DIR}:/data
     restart: unless-stopped
     networks:
       - arr-net
