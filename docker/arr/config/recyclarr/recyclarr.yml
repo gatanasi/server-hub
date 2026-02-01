@@ -52,7 +52,7 @@ sonarr:
           - 2016d1676f5ee13a5b7257ff86ac9a93 # SDR
         assign_scores_to:
           - name: WEB-2160p
-            # score: 0 # Uncomment this line to enable SDR releases
+            score: 0 # Uncomment this line to enable SDR releases
 
       # Optional
       - trash_ids:
@@ -123,7 +123,7 @@ radarr:
          - 9c38ebb7384dada637be8899efa68e6f # SDR
        assign_scores_to:
          - name: UHD Bluray + WEB
-           # score: 0 # Uncomment this line to allow SDR releases
+           score: 0 # Uncomment this line to allow SDR releases
 
      - trash_ids:
          - 9f6cbff8cfe4ebbc1bde14c7b7bec0de # IMAX Enhanced
