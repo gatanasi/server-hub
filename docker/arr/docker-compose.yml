@@ -178,6 +178,17 @@ services:
       - arr-net
     restart: unless-stopped
 
+  huntarr:
+    image: ghcr.io/plexguide/huntarr:9.1.6
+    container_name: huntarr
+    restart: always
+    volumes:
+      - ./config/huntarr:/config
+    environment:
+      - TZ=${TZ}
+    ports:
+      - 9705:9705
+
   # --- Requests ---
   jellyseerr:
     image: ghcr.io/fallenbagel/jellyseerr:2.7.3@sha256:9cc9e9ee6cd5cf5a23feb45c37742ba34cfd6314d81d259cddb373a97ac92cdd
