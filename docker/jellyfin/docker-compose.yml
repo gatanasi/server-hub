@@ -19,6 +19,7 @@ services:
       - /dev/dri/renderD128:/dev/dri/renderD128
     environment:
       - JELLYFIN_PublishedServerUrl=${JELLYFIN_URL}
+      - TZ=${TIMEZONE}
     restart: unless-stopped
     extra_hosts:
       - 'host.docker.internal:host-gateway'

@@ -13,8 +13,8 @@ services:
       - NODE_ENV=production
       - WEBHOOK_URL=https://${WEBHOOK_URL}
       - N8N_PROXY_HOPS=1
-      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
-      - TZ=${GENERIC_TIMEZONE}
+      - GENERIC_TIMEZONE=${TIMEZONE}
+      - TZ=${TIMEZONE}
     ports:
       - 8080:5678
     volumes:
