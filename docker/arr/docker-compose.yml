@@ -61,7 +61,7 @@ services:
       - UN_ERROR_STDERR=false
       - UN_ACTIVITY=false
       - UN_LOG_QUEUES=1m
-      - UN_LOG_FILE=/downloads/unpackerr.log
+      - UN_LOG_FILE=/config/unpackerr.log
       - UN_LOG_FILES=10
       - UN_LOG_FILE_MB=10
       - UN_LOG_FILE_MODE=0600
