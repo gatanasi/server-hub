@@ -114,15 +114,7 @@ all:
           ansible_user: arr
           ansible_host: arr.vm
           managed_apps:
-            - gluetun
-            - qbittorrent
-            - unpackerr
-            - prowlarr
-            - radarr
-            - sonarr
-            - bazarr
-            - recyclarr
-            - jellyseerr
+            - arr
         # Add more hosts as needed:
         # multi-app.vm:
         #   ansible_user: apps
