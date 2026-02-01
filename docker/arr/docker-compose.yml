@@ -149,7 +149,7 @@ services:
 
   # --- Quality Profile Sync ---
   recyclarr:
-    image: ghcr.io/recyclarr/recyclarr:2.1.2@sha256:84d3474d2bb6e8e99dac3748b6327301ac28c2d32bea4fa4b8e190c9c4b2ac77
+    image: ghcr.io/recyclarr/recyclarr:7.5.2@sha256:2550848d43a453f2c6adf3582f2198ac719f76670691d76de0819053103ef2fb
     container_name: recyclarr
     user: ${PUID}:${PGID}
     volumes:
