@@ -39,7 +39,7 @@ services:
       - TZ=${TZ}
     volumes:
       - ./config/qbittorrent:/config
-      - ${HOST_DIR}:/data
+      - ${HOST_DIR}:/downloads
     network_mode: "service:gluetun"
     restart: unless-stopped
     healthcheck:
