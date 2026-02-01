@@ -118,13 +118,6 @@
 		}
 	}
 
-	@jellyfin expression {host}.startsWith("jellyfin")
-	handle @jellyfin {
-		reverse_proxy http://jellyfin.vm:8080 {
-			import common_proxy_headers
-		}
-	}
-
 	@erpnext expression {host}.startsWith("erpnext")
 	handle @erpnext {
 		reverse_proxy http://erpnext.vm:8080 {
@@ -160,6 +153,15 @@
 
 	handle {
 		respond "Not Found" 404
+	}
+}
+
+jellyfin.home.{$DOMAIN_NAME} {
+	import tls_config
+	
+	reverse_proxy http://jellyfin.vm:8080 {
+		import common_proxy_headers
+		flush_interval -1
 	}
 }
 
