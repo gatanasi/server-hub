@@ -6,8 +6,9 @@ services:
     group_add:
       - "992"
     ports:
-      - 8080:8096/tcp
-      - 7359:7359/udp
+      - "8080:8096"
+      - "8080:8096/udp"
+      - "7359:7359/udp"
     volumes:
       - ./config:/config
       - ./cache:/cache
