@@ -93,7 +93,7 @@ enabled = true
 host = "http://arr.vm"
 port = 8080
 username = "admin"
-password = "admin"
+password = ""
 
 # Transmission settings
 [torrents.transmission]
