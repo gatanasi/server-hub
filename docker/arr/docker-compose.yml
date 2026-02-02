@@ -23,6 +23,7 @@ services:
       - WIREGUARD_PRESHARED_KEY=${WIREGUARD_PRESHARED_KEY}
       - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
       - WIREGUARD_MTU=1280
+      - FIREWALL_OUTBOUND_SUBNETS=172.18.0.0/16
     volumes:
       - ./config/gluetun:/gluetun
     healthcheck:
@@ -184,6 +185,8 @@ services:
       - TZ=${TZ}
     ports:
       - 9705:9705
+    networks:
+      - arr-net
 
   # --- Requests ---
   jellyseerr:
