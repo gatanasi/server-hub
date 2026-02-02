@@ -161,6 +161,22 @@ services:
     networks:
       - arr-net
 
+  recommendarr:
+    image: tannermiddleton/recommendarr:v1.4.4@sha256:c946dd24542ab3cf6b0d56ab1d69e1ea1ff1d84f8a293ceeeaf3f53f09e50db6
+    container_name: recommendarr
+    ports:
+      - 3000:3000
+    environment:
+      - NODE_ENV=production
+      - DOCKER_ENV=false 
+      - PORT=3000
+      - PUBLIC_URL=http://localhost:3000
+    volumes:
+      - ./config/recommendarr:/app/server/data
+    restart: unless-stopped
+    networks:
+      - arr-net
+
   # --- Quality Profile Sync ---
   recyclarr:
     image: ghcr.io/recyclarr/recyclarr:7.5.2@sha256:2550848d43a453f2c6adf3582f2198ac719f76670691d76de0819053103ef2fb
