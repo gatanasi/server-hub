@@ -132,6 +132,20 @@
 		}
 	}
 
+	@jellyseerr expression {host}.startsWith("jellyseerr")
+	handle @jellyseerr {
+		reverse_proxy http://arr.vm:5055 {
+			import common_proxy_headers
+		}
+	}
+
+	@mediamanager expression {host}.startsWith("mediamanager")
+	handle @mediamanager {
+		reverse_proxy http://mediamanager.vm:8080 {
+			import common_proxy_headers
+		}
+	}
+
 	@ghost expression {host}.startsWith("ghost")
 	handle @ghost {
 		handle /.ghost/activitypub/* {
