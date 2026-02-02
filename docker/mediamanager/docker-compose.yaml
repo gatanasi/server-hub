@@ -1,0 +1,33 @@
+services:
+  mediamanager:
+    container_name: mediamanager_server
+    image: ghcr.io/maxdorninger/mediamanager/mediamanager:1.12.1
+    ports:
+      - "8080:8000"
+    environment:
+      - CONFIG_DIR=/app/config
+    volumes:
+      # Mount your actual media directories here - these paths should match your config.toml
+      - /mnt/data/test/:/data/
+      # Config folder for application configuration
+      - ./config/:/app/config/
+      # Image folder
+      - ./images/:/data/images/
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    container_name: mediamanager_postgres
+    image: postgres:17.7
+    restart: unless-stopped
+    volumes:
+      - ./postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}

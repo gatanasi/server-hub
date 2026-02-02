@@ -110,6 +110,12 @@ all:
           managed_apps:
             - jellyfin
 
+        mediamanager.vm:
+          ansible_user: mediamanager
+          ansible_host: mediamanager.vm
+          managed_apps:
+            - mediamanager
+
         arr.vm:
           ansible_user: arr
           ansible_host: arr.vm
