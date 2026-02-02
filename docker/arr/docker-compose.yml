@@ -131,8 +131,7 @@ services:
     ports:
       - 9696:9696
     restart: unless-stopped
-    networks:
-      - arr-net
+    network_mode: "service:gluetun"
 
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:v3.4.6@sha256:7962759d99d7e125e108e0f5e7f3cdbcd36161776d058d1d9b7153b92ef1af9e
@@ -142,8 +141,7 @@ services:
     ports:
       - 8191:8191
     restart: unless-stopped
-    networks:
-      - arr-net
+    network_mode: "service:gluetun"
 
   bazarr:
     image: lscr.io/linuxserver/bazarr:1.5.5@sha256:f01f718d73be5b468da1ba03e6740c5584769df9d3fedef9f4a3c7eaf90c243f
@@ -179,7 +177,7 @@ services:
     restart: unless-stopped
 
   huntarr:
-    image: ghcr.io/plexguide/huntarr:9.1.6@sha256:06f5e079d05111bddd63fc979a59df30108a03e35de1f2d5a66254726b5a9e85
+    image: ghcr.io/plexguide/huntarr:9.1.8@sha256:05ca5d09a698fdbf4b39e1bafab9e76980cfb4647d8e4a11ae2445b2a01a0fb5
     container_name: huntarr
     restart: always
     volumes:
