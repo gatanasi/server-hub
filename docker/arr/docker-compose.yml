@@ -11,6 +11,8 @@ services:
       - 8080:8080 # qBittorrent WebUI
       - 6881:6881 # TCP Peering
       - 6881:6881/udp # UDP Peering
+      - 9696:9696 # Prowlarr
+      - 8191:8191 # FlareSolverr
     environment:
       - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER}
       - VPN_TYPE=${VPN_TYPE}
@@ -128,8 +130,6 @@ services:
       - TZ=${TZ}
     volumes:
       - ./config/prowlarr:/config
-    ports:
-      - 9696:9696
     restart: unless-stopped
     network_mode: "service:gluetun"
 
@@ -138,8 +138,6 @@ services:
     container_name: flaresolverr
     environment:
       - TZ=${TZ}
-    ports:
-      - 8191:8191
     restart: unless-stopped
     network_mode: "service:gluetun"
 
