@@ -1,11 +1,11 @@
 services:
   mediamanager:
-    container_name: mediamanager_server
+    container_name: mediamanager
     image: ghcr.io/maxdorninger/mediamanager/mediamanager:1.12.1@sha256:45b1e7c05135980135a4273a0a1143c85d67d295711e187d3c8240c3c9eb0d65
     ports:
       - "8080:8000"
-    environment:
-      - CONFIG_DIR=/app/config
+    env_file:
+      - .env
     volumes:
       # Mount your actual media directories here - these paths should match your config.toml
       - /mnt/data/test/:/data/
