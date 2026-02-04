@@ -20,7 +20,7 @@ services:
 
     certbot:
         container_name: certbot
-        image: certbot/dns-cloudflare:5.2.2@sha256:aba913370a75668cf63d74b50b7484401d3c6666fc4ba2f6fed6eeae1ea6cd3e
+        image: certbot/dns-cloudflare:5.3.0@sha256:4a44cf58dcedfe7ba2c97122a3ebe67e294b2fcf994d3852715cbb2f2798b0ad
         restart: unless-stopped
         volumes:
             - ${HOST_CERTBOT_DATA}:/etc/letsencrypt
