@@ -34,7 +34,7 @@ services:
 
   # --- Download Client ---
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:5.1.4@sha256:b8a08ffba8850e2e71153e153cf5eed2dedbf499ef9b123262735ce924b65586
+    image: lscr.io/linuxserver/qbittorrent:5.1.4@sha256:5b09709bb0eff4edb551f5b30029952ab4d67aa0d5ca3526889124173bd78a9c
     container_name: qbittorrent
     environment:
       - PUID=${PUID}
@@ -120,7 +120,7 @@ services:
       - arr-net
 
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.3.0@sha256:d3e9307b320b6772749a2cf8fc2712e9e824c4930b034680ad4d08a9e2f25884
+    image: lscr.io/linuxserver/prowlarr:2.3.0@sha256:5339e9050cfcc0cb5331e9c98610ed9d4ce70ef481a5461ea664a13dda3f1eb0
     container_name: prowlarr
     environment:
       - PUID=${PUID}
@@ -146,7 +146,7 @@ services:
       - arr-net
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr:1.5.5@sha256:f01f718d73be5b468da1ba03e6740c5584769df9d3fedef9f4a3c7eaf90c243f
+    image: lscr.io/linuxserver/bazarr:1.5.5@sha256:d40ee61030a9afafddfdd58d160281b865bfcad7cb66e920116fd6fd40668cbb
     container_name: bazarr
     environment:
       - PUID=${PUID}
@@ -195,7 +195,7 @@ services:
     restart: unless-stopped
 
   huntarr:
-    image: ghcr.io/plexguide/huntarr:9.1.8@sha256:05ca5d09a698fdbf4b39e1bafab9e76980cfb4647d8e4a11ae2445b2a01a0fb5
+    image: ghcr.io/plexguide/huntarr:9.1.11@sha256:c9e7c5f9bd74ae214a66c503798f1a57d9b6254acaf0d990213170ac6526fb3f
     container_name: huntarr
     restart: always
     volumes:
