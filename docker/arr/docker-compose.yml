@@ -195,7 +195,7 @@ services:
     restart: unless-stopped
 
   huntarr:
-    image: ghcr.io/plexguide/huntarr:9.1.11@sha256:c9e7c5f9bd74ae214a66c503798f1a57d9b6254acaf0d990213170ac6526fb3f
+    image: ghcr.io/plexguide/huntarr:9.2.1@sha256:380c751de500ed102bbc5f8f757c106817b84b26d3cdc0c4a5c74d26d4442140
     container_name: huntarr
     restart: always
     volumes:
