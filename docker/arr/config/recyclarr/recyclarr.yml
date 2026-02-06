@@ -23,48 +23,55 @@ sonarr:
     quality_profiles:
       - name: WEB-2160p
         min_format_score: 0
-        # Forces Sonarr to prefer the language of origin (e.g., English for US shows, Japanese for Anime)
-        language: Original
         # Explicitly list qualities to allow fallbacks while keeping upgrade preference
+        upgrade:
+          allowed: true
+          until_quality: WEBDL-2160p
         qualities:
-          - name: WEB 2160p
-          - name: WEB 1080p
+          - name: WEBDL-2160p
+          - name: WEBRip-2160p
+          - name: WEBDL-1080p
+          - name: WEBRip-1080p
+          
       - name: WEB-1080p
         min_format_score: 0
-        language: Original
+        upgrade:
+          allowed: true
+          until_quality: WEBDL-1080p
         qualities:
-          - name: WEB 1080p
-          - name: WEB 720p
+          - name: WEBDL-1080p
+          - name: WEBRip-1080p
+          - name: WEBDL-720p
+          - name: WEBRip-720p
 
     custom_formats:
-      - trash_ids:
-          - e23eff36d992d1720120188d3f18544d # Dolby Vision
-        assign_scores_to:
-          - name: WEB-2160p
-            score: 500 # Significant boost to prefer DV over HDR10
-
       - trash_ids:
           - 32b367365729d530ca1c124a0b180c64 # Bad Dual Groups
           - 82d40da2bc6923f41e14394075dd4b03 # No-RlsGroup
           - e1a997ddb54e3ecbfe06341ad323c458 # Obfuscated
           - 06d66ab109d4d2eddb2794d21526d140 # Retags
           - 1b3994c551cbb92a2c781af061f4ab44 # Scene
+          - 7c3a61a9c6cb04f52f1544be6d44a026 # DV Boost
         assign_scores_to:
           - name: WEB-2160p
           - name: WEB-1080p
+
+      # Language Enforcement
+      - trash_ids:
+          - ae575f95ab639ba5d15f663bf019e3e8 # Language: Not Original
+        assign_scores_to:
+          - name: WEB-2160p
+            score: -10000
+          - name: WEB-1080p
+            score: -10000
+
       - trash_ids:
           # Uncomment the next six lines to allow x265 HD releases with HDR/DV
           - 47435ece6b99a0b477caf360e79ba0bb # x265 (HD)
-        assign_scores_to:
-          - name: WEB-2160p
-            score: 0
-          - name: WEB-1080p
-            score: 0
-      - trash_ids:
           - 9b64dff695c2115facf1b6ea59c9bd07 # x265 (no HDR/DV)
         assign_scores_to:
           - name: WEB-2160p
-            score: 0 # ALLOWS 4K SDR (x265 without HDR)
+            score: 0
           - name: WEB-1080p
             score: 0
 
@@ -94,19 +101,10 @@ radarr:
     quality_profiles:
       - name: UHD Bluray + WEB
         min_format_score: 0
-        # In Radarr, this ensures the release matches the movie's original language
-        language: Original
       - name: HD Bluray + WEB
         min_format_score: 0
-        language: Original
 
     custom_formats:
-      - trash_ids:
-          - e23eff36d992d1720120188d3f18544d # Dolby Vision
-        assign_scores_to:
-          - name: UHD Bluray + WEB
-            score: 500 # Ensures DV releases beat standard HDR10
-
       # Audio
       - trash_ids:
           # Uncomment the next section to enable Advanced Audio Formats
@@ -135,6 +133,7 @@ radarr:
           - 7357cf5161efbf8c4d5d0c30b4815ee2 # Obfuscated
           - 5c44f52a8714fdd79bb4d98e2673be1f # Retags
           - f537cf427b64c38c8e36298f657e4828 # Scene
+          - b337d6812e06c200ec9a2d3cfa9d20a7 # DV Boost
         assign_scores_to:
           - name: UHD Bluray + WEB
           - name: HD Bluray + WEB
@@ -150,13 +149,9 @@ radarr:
 
       - trash_ids:
           - dc98083864ea246d05a42df0d05f81cc # x265 (HD)
-        assign_scores_to:
-          - name: UHD Bluray + WEB
-            score: 0
-          - name: HD Bluray + WEB
-            score: 0
-      - trash_ids:
           - 839bea857ed2c0a8e084f3cbdbd65ecb # x265 (no HDR/DV)
         assign_scores_to:
           - name: UHD Bluray + WEB
+            score: 0
           - name: HD Bluray + WEB
+            score: 0
