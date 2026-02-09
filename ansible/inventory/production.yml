@@ -121,6 +121,12 @@ all:
           ansible_host: arr.vm
           managed_apps:
             - arr
+
+        filebrowser.vm:
+          ansible_user: filebrowser
+          ansible_host: filebrowser.vm
+          managed_apps:
+            - filebrowser
         # Add more hosts as needed:
         # multi-app.vm:
         #   ansible_user: apps

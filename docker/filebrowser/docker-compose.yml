@@ -1,0 +1,12 @@
+services:
+  filebrowser:
+    image: filebrowser/filebrowser:v2.57.1@sha256:6ef368f5a0730ee1638886e4b77a94503fcc302569f7d2ae980b23d59072a700
+    container_name: filebrowser
+    user: 1000:1000
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - 'filebrowser_config:/config'
+      - 'filebrowser_database:/database'
+      - 'filebrowser_data:/srv'

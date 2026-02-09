@@ -139,6 +139,13 @@
 		}
 	}
 
+	@filebrowser expression {host}.startsWith("filebrowser")
+	handle @filebrowser {
+		reverse_proxy http://filebrowser.vm:8080 {
+			import common_proxy_headers
+		}
+	}
+
 	@mediamanager expression {host}.startsWith("mediamanager")
 	handle @mediamanager {
 		reverse_proxy http://mediamanager.vm:8080 {
