@@ -10,3 +10,8 @@ services:
       - 'filebrowser_config:/config'
       - 'filebrowser_database:/database'
       - 'filebrowser_data:/srv'
+
+volumes:
+  filebrowser_config:
+  filebrowser_database:
+  filebrowser_data:
