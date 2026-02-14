@@ -1,7 +1,7 @@
 services:
   # --- Network & VPN Gateway ---
   gluetun:
-    image: ghcr.io/qdm12/gluetun:v3.41.0@sha256:6b54856716d0de56e5bb00a77029b0adea57284cf5a466f23aad5979257d3045
+    image: ghcr.io/qdm12/gluetun:v3.41.1@sha256:1a5bf4b4820a879cdf8d93d7ef0d2d963af56670c9ebff8981860b6804ebc8ab
     container_name: gluetun
     cap_add:
       - NET_ADMIN
@@ -104,7 +104,7 @@ services:
       - arr-net
 
   sonarr:
-    image: lscr.io/linuxserver/sonarr:4.0.16@sha256:6f73bbba33391a338e20d836a60c86beaf2a865a89b706b339fc8cb0b8ce1559
+    image: lscr.io/linuxserver/sonarr:4.0.16@sha256:37be832b78548e3f55f69c45b50e3b14d18df1b6def2a4994258217e67efb1a1
     container_name: sonarr
     environment:
       - PUID=${PUID}
@@ -120,7 +120,7 @@ services:
       - arr-net
 
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.3.0@sha256:5339e9050cfcc0cb5331e9c98610ed9d4ce70ef481a5461ea664a13dda3f1eb0
+    image: lscr.io/linuxserver/prowlarr:2.3.0@sha256:e74a1e093dcc223d671d4b7061e2b4946f1989a4d3059654ff4e623b731c9134
     container_name: prowlarr
     environment:
       - PUID=${PUID}
@@ -146,7 +146,7 @@ services:
       - arr-net
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr:1.5.5@sha256:d40ee61030a9afafddfdd58d160281b865bfcad7cb66e920116fd6fd40668cbb
+    image: lscr.io/linuxserver/bazarr:1.5.5@sha256:18ff732dffcebd559d15a91845fc3360d49652ea01dccfbfd98b8248ceb86e38
     container_name: bazarr
     environment:
       - PUID=${PUID}
@@ -195,7 +195,7 @@ services:
     restart: unless-stopped
 
   huntarr:
-    image: ghcr.io/plexguide/huntarr:9.2.3@sha256:d23614d775dc8f9cc2c5d89c0d51ff1d2d6b692203897226993f76b2b43074ff
+    image: ghcr.io/plexguide/huntarr:9.2.4@sha256:ae4a435a4a2c68dbb03c0a6a30a7b9d8957d2e1653fef965c5f5d9cace991591
     container_name: huntarr
     restart: always
     volumes:
