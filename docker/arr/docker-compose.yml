@@ -208,17 +208,24 @@ services:
       - arr-net
 
   # --- Requests ---
-  jellyseerr:
-    image: ghcr.io/fallenbagel/jellyseerr:2.7.3@sha256:9cc9e9ee6cd5cf5a23feb45c37742ba34cfd6314d81d259cddb373a97ac92cdd
-    container_name: jellyseerr
+  seerr:
+    image: ghcr.io/seerr-team/seerr:v3.0.1@sha256:1b5fc1ea825631d9d165364472663b817a4c58ef6aa1013f58d82c1570d7c866
+    init: true
+    container_name: seerr
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
     volumes:
-      - ./config/jellyseerr:/app/config
+      - ./config/seerr:/app/config
     ports:
       - 5055:5055
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/status || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 3
     restart: unless-stopped
     networks:
       - arr-net

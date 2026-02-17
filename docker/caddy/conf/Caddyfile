@@ -139,6 +139,13 @@
 		}
 	}
 
+	@seerr expression {host}.startsWith("seerr")
+	handle @seerr {
+		reverse_proxy http://arr.vm:5055 {
+			import common_proxy_headers
+		}
+	}
+
 	@filebrowser expression {host}.startsWith("filebrowser")
 	handle @filebrowser {
 		reverse_proxy http://filebrowser.vm:8080 {
