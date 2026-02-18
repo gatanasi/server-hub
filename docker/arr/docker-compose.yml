@@ -146,7 +146,7 @@ services:
       - arr-net
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr:1.5.5@sha256:18ff732dffcebd559d15a91845fc3360d49652ea01dccfbfd98b8248ceb86e38
+    image: lscr.io/linuxserver/bazarr:1.5.5@sha256:1cf40186b1bc35bec87f4e4892d5d8c06086da331010be03e3459a86869c5e74
     container_name: bazarr
     environment:
       - PUID=${PUID}
@@ -195,7 +195,7 @@ services:
     restart: unless-stopped
 
   huntarr:
-    image: ghcr.io/plexguide/huntarr:9.3.1@sha256:d8a7eb64378ae0174706b43a9363e0819aaadf4cfad29b0717adbd2599167516
+    image: ghcr.io/plexguide/huntarr:9.3.6@sha256:364c91535efe085ce30397a8a7b5085feec70e9da7dccf1252427885d80392b4
     container_name: huntarr
     restart: always
     volumes:
