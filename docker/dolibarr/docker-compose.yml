@@ -1,6 +1,6 @@
 services:
     mariadb:
-        image: mariadb:12.2.2@sha256:3ba727e641ef0ea24054e47c72a831b1067da32d5139c0405b629c25b115eb89
+        image: mariadb:12.2.2@sha256:b1cb255a9939d28a1856815f0de6046c20c28c21b92a9f2696bc782b247a47ee
         environment:
             MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
             MYSQL_DATABASE: ${MYSQL_DATABASE:-dolidb}
@@ -10,7 +10,7 @@ services:
             - /home/dolibarr_mariadb:/var/lib/mysql
 
     web:
-        image: dolibarr/dolibarr:22.0.4@sha256:be9705d507a71d9728933c9b1dc07242f772e2ac51f51541773e9e8e73ec5902
+        image: dolibarr/dolibarr:22.0.4@sha256:383dc072a9650ffc85890b2ca1746b6ed994e55d5c513bb20d55988e0f1ad875
         environment:
             DOLI_INIT_DEMO: ${DOLI_INIT_DEMO:-0}
             DOLI_DB_HOST: ${DOLI_DB_HOST:-mariadb}
