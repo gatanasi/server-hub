@@ -34,7 +34,7 @@ services:
 
   # --- Download Client ---
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:5.1.4@sha256:065792d2b11f0facff340210fc1cf13623b029a94ecdf08b02d06d922205f618
+    image: lscr.io/linuxserver/qbittorrent:20.04.1@sha256:fc98c8af048936d0070dc5e5992feab08664f8a61a860d91be02f782f8721485
     container_name: qbittorrent
     environment:
       - PUID=${PUID}
@@ -179,7 +179,7 @@ services:
 
   # --- Quality Profile Sync ---
   recyclarr:
-    image: ghcr.io/recyclarr/recyclarr:7.5.2@sha256:2550848d43a453f2c6adf3582f2198ac719f76670691d76de0819053103ef2fb
+    image: ghcr.io/recyclarr/recyclarr:8.2.1@sha256:791bdc0d2a35b0f24b89a0b14159591269ef070f19fcccfc5fb518a863141373
     container_name: recyclarr
     user: ${PUID}:${PGID}
     volumes:
