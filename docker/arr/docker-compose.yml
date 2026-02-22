@@ -34,7 +34,7 @@ services:
 
   # --- Download Client ---
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:5.1.4@sha256:85eb27d2d09cd4cb748036a4c7f261321da516b6f88229176cf05a92ccd26815
+    image: lscr.io/linuxserver/qbittorrent:5.1.4@sha256:065792d2b11f0facff340210fc1cf13623b029a94ecdf08b02d06d922205f618
     container_name: qbittorrent
     environment:
       - PUID=${PUID}
@@ -195,7 +195,7 @@ services:
     restart: unless-stopped
 
   huntarr:
-    image: ghcr.io/plexguide/huntarr:9.3.6@sha256:364c91535efe085ce30397a8a7b5085feec70e9da7dccf1252427885d80392b4
+    image: ghcr.io/plexguide/huntarr:9.3.7@sha256:95e88b2595f71b1ec2e158a3b9461c573e192928c51ac2b0d9675f33d4cdba15
     container_name: huntarr
     restart: always
     volumes:
