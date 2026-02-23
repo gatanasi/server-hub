@@ -34,7 +34,7 @@ services:
 
   # --- Download Client ---
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:20.04.1@sha256:fc98c8af048936d0070dc5e5992feab08664f8a61a860d91be02f782f8721485
+    image: ghcr.io/linuxserver/qbittorrent:5.1.4-r2-ls442@sha256:95941f2d9663f841c5fa595d7b904403838dc29dbe20eb7646b02cda82eb16b7
     container_name: qbittorrent
     environment:
       - PUID=${PUID}
