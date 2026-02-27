@@ -14,8 +14,12 @@ jobs:
         with:
           scandir: './deploy'
 
+      - name: Install Ansible collections
+        run: |
+          pip install ansible-core
+          ansible-galaxy collection install --force -r ansible/requirements.yml -p ~/.ansible/collections
+
       - name: Ansible Lint
         uses: ansible/ansible-lint@19f673a091111d07688352cd2f19f0460055feba # v26.2.0
         with:
           working_directory: './ansible'
-          requirements_file: 'requirements.yml'
