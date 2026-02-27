@@ -194,19 +194,6 @@ services:
       - arr-net
     restart: unless-stopped
 
-  huntarr:
-    image: ghcr.io/plexguide/huntarr:9.3.7@sha256:95e88b2595f71b1ec2e158a3b9461c573e192928c51ac2b0d9675f33d4cdba15
-    container_name: huntarr
-    restart: always
-    volumes:
-      - ./config/huntarr:/config
-    environment:
-      - TZ=${TZ}
-    ports:
-      - 9705:9705
-    networks:
-      - arr-net
-
   # --- Requests ---
   seerr:
     image: ghcr.io/seerr-team/seerr:v3.0.1@sha256:1b5fc1ea825631d9d165364472663b817a4c58ef6aa1013f58d82c1570d7c866
