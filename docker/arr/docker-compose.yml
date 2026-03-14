@@ -53,7 +53,7 @@ services:
 
   # --- Extraction Manager ---
   unpackerr:
-    image: golift/unpackerr:0.15.1@sha256:0cf85db2763f776bdbbdae68826262f7464c641dd542bc8bded8c64de5539dae
+    image: golift/unpackerr:0.15.2@sha256:057e34740d26c34d81ec8e2faf8ec11f8dbfc77489b7a42826f52b37e5ee1b6c
     container_name: unpackerr
     user: ${PUID}:${PGID}
     environment:
@@ -120,7 +120,7 @@ services:
       - arr-net
 
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.3.0@sha256:a8fe7b9c502f979146b6d0f22438b825c38e068241bb8a708c473062dffdbb03
+    image: lscr.io/linuxserver/prowlarr:2.3.0@sha256:9ef5d8bf832edcacb6082f9262cb36087854e78eb7b1c3e1d4375056055b2d82
     container_name: prowlarr
     environment:
       - PUID=${PUID}
@@ -146,7 +146,7 @@ services:
       - arr-net
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr:1.5.6@sha256:94eee5e3e14430b7b144d4556be73963a7daf6f1bddc25586627f426465482ce
+    image: lscr.io/linuxserver/bazarr:1.5.6@sha256:05f9d5b24884f37120453dc1a008a47be244eebec32099ae1bd29032e75b67aa
     container_name: bazarr
     environment:
       - PUID=${PUID}
@@ -179,7 +179,7 @@ services:
 
   # --- Quality Profile Sync ---
   recyclarr:
-    image: ghcr.io/recyclarr/recyclarr:8.4.0@sha256:cf1afc960655fb7a4b2b84eba851df95407e57efb71eed8d0a173254b48d8335
+    image: ghcr.io/recyclarr/recyclarr:8.5.0@sha256:5da14297a11aa910582d800f0edcb8f9e9d488642083c01dc34950f6449d9214
     container_name: recyclarr
     user: ${PUID}:${PGID}
     volumes:
