@@ -88,7 +88,7 @@ services:
 
   # --- The "Managers" ---
   radarr:
-    image: lscr.io/linuxserver/radarr:6.1.1@sha256:581f159c2b67436863cb4da30e158ef6f6b8878472abbba79ee5d5f7e6b7d28d
+    image: lscr.io/linuxserver/radarr:6.1.1@sha256:cd70546fc97169788530386b42cf47ba1b16d091b4dc2264cd54099dd13c6f7f
     container_name: radarr
     environment:
       - PUID=${PUID}
@@ -120,7 +120,7 @@ services:
       - arr-net
 
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.3.0@sha256:e50f3b188a7d1771b61f395c4203e35476bd3047683508740305e830e15bacf7
+    image: lscr.io/linuxserver/prowlarr:2.3.5@sha256:35f48abb3e976fcf077fae756866c582e4a90f8b24810ae4067b3558f7cdbbdf
     container_name: prowlarr
     environment:
       - PUID=${PUID}
