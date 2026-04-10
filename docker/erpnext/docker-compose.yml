@@ -14,8 +14,6 @@ services:
     environment:
       DB_HOST: db
       DB_PORT: "3306"
-      MYSQL_ROOT_PASSWORD: admin
-      MARIADB_ROOT_PASSWORD: admin
 
   configurator:
     image: frappe/erpnext:v16.13.0@sha256:d956e13cde1e3c09c52cffcbfd0476afdcf13fc9b8902cfd7205da650054e8dc
@@ -56,6 +54,12 @@ services:
     volumes:
       - sites:/home/frappe/frappe-bench/sites
       - logs:/home/frappe/frappe-bench/logs
+    environment:
+      ERP_SITE_ADMIN_PASSWORD: ${ERP_SITE_ADMIN_PASSWORD:?ERP_SITE_ADMIN_PASSWORD environment variable is required}
+      ERP_DB_ROOT_PASSWORD: ${ERP_DB_ROOT_PASSWORD:?ERP_DB_ROOT_PASSWORD environment variable is required}
+    depends_on:
+      db:
+        condition: service_healthy
     entrypoint:
       - bash
       - -c
@@ -77,14 +81,14 @@ services:
           fi
         done;
         echo "sites/common_site_config.json found";
-        bench new-site --mariadb-user-host-login-scope='%' --admin-password=admin --db-root-username=root --db-root-password=admin --install-app erpnext --set-default frontend;
+        bench new-site --mariadb-user-host-login-scope='%' --admin-password="$$ERP_SITE_ADMIN_PASSWORD" --db-root-username=root --db-root-password="$$ERP_DB_ROOT_PASSWORD" --install-app erpnext --set-default frontend;
 
   db:
     image: mariadb:12.2@sha256:b3af559fc38e013c50dd5b5993bfbbb21125c1a62d976b3b0a14d9c4acaae578
     networks:
       - frappe_network
     healthcheck:
-      test: mysqladmin ping -h localhost --password=admin
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h localhost"]
       interval: 1s
       retries: 20
     deploy:
@@ -96,8 +100,8 @@ services:
       - --skip-character-set-client-handshake
       - --skip-innodb-read-only-compressed # Temporary fix for MariaDB 10.6
     environment:
-      MYSQL_ROOT_PASSWORD: admin
-      MARIADB_ROOT_PASSWORD: admin
+      MYSQL_ROOT_PASSWORD: ${ERP_DB_ROOT_PASSWORD:?ERP_DB_ROOT_PASSWORD environment variable is required}
+      MARIADB_ROOT_PASSWORD: ${ERP_DB_ROOT_PASSWORD:?ERP_DB_ROOT_PASSWORD environment variable is required}
     volumes:
       - db-data:/var/lib/mysql
 

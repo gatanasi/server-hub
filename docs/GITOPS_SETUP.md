@@ -547,12 +547,10 @@ creation_rules:
 wget -qO /tmp/sops.deb https://github.com/getsops/sops/releases/download/v3.9.4/sops_3.9.4_amd64.deb
 sudo dpkg -i /tmp/sops.deb
 
-# Create age key directory (if not exists)
+# Generate a new age key
+sudo apt-get install age
 mkdir -p ~/.config/sops/age
-
-# The age private key should be placed at:
-# ~/.config/sops/age/keys.txt
-# Format: AGE-SECRET-KEY-1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+age-keygen -o ~/.config/sops/age/keys.txt
 ```
 
 ### Managing Secrets

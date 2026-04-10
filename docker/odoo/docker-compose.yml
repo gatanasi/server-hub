@@ -15,7 +15,7 @@ services:
       - PGDATABASE=${POSTGRES_DB}
       - PGUSER=${POSTGRES_USER}
       - PGPASSWORD=${POSTGRES_PASSWORD}
-    command: --init base --db-filter=.* # Default username: admin, password: admin
+    command: --init base --db-filter=.*
     restart: unless-stopped
     networks:
       - odoo_net

@@ -9,6 +9,23 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Block tracked plaintext .env files
+        run: |
+          tracked_env_files=$(git ls-files | grep -E '(^|/)\.env$' || true)
+          if [ -n "$tracked_env_files" ]; then
+            echo "::error::Tracked plaintext .env files are not allowed:"
+            echo "$tracked_env_files"
+            exit 1
+          fi
+
+      - name: Block hardcoded default credentials
+        run: |
+          if grep -RInE --include='docker-compose.yml' \
+            '(MYSQL_ROOT_PASSWORD:[[:space:]]*admin|MARIADB_ROOT_PASSWORD:[[:space:]]*admin|--admin-password=admin|--db-root-password=admin|Default username:[[:space:]]*admin,[[:space:]]*password:[[:space:]]*admin|:-[[:space:]]*(admin|root)[\}"]?)' docker; then
+            echo "::error::Found hardcoded default credentials in compose files."
+            exit 1
+          fi
+
       - name: ShellCheck
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
