@@ -2,10 +2,10 @@ services:
     mariadb:
         image: mariadb:12.2.2@sha256:b3af559fc38e013c50dd5b5993bfbbb21125c1a62d976b3b0a14d9c4acaae578
         environment:
-            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD environment variable is required}
             MYSQL_DATABASE: ${MYSQL_DATABASE:-dolidb}
             MYSQL_USER: ${MYSQL_USER:-dolidbuser}
-            MYSQL_PASSWORD: ${MYSQL_PASSWORD:-dolidbpass}
+            MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD environment variable is required}
         volumes:
             - /home/dolibarr_mariadb:/var/lib/mysql
 
@@ -16,12 +16,12 @@ services:
             DOLI_DB_HOST: ${DOLI_DB_HOST:-mariadb}
             DOLI_DB_NAME: ${DOLI_DB_NAME:-dolidb}
             DOLI_DB_USER: ${DOLI_DB_USER:-dolidbuser}
-            DOLI_DB_PASSWORD: ${DOLI_DB_PASSWORD:-dolidbpass}
+            DOLI_DB_PASSWORD: ${DOLI_DB_PASSWORD:?DOLI_DB_PASSWORD environment variable is required}
             DOLI_URL_ROOT: "${DOLI_URL_ROOT:-http://0.0.0.0}"
-            DOLI_ADMIN_LOGIN: "${DOLI_ADMIN_LOGIN:-admin}"
-            DOLI_ADMIN_PASSWORD: "${DOLI_ADMIN_PASSWORD:-admin}"
+            DOLI_ADMIN_LOGIN: "${DOLI_ADMIN_LOGIN:?DOLI_ADMIN_LOGIN environment variable is required}"
+            DOLI_ADMIN_PASSWORD: "${DOLI_ADMIN_PASSWORD:?DOLI_ADMIN_PASSWORD environment variable is required}"
             DOLI_CRON: ${DOLI_CRON:-0}
-            DOLI_CRON_KEY: ${DOLI_CRON_KEY:-mycronsecurekey}
+            DOLI_CRON_KEY: ${DOLI_CRON_KEY:?DOLI_CRON_KEY environment variable is required}
             DOLI_COMPANY_NAME: ${DOLI_COMPANY_NAME:-MyBigCompany}
             WWW_USER_ID: ${WWW_USER_ID:-1000}
             WWW_GROUP_ID: ${WWW_GROUP_ID:-1000}
