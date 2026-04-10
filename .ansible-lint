@@ -1,6 +1,5 @@
 profile: production
 
-
 # We want to catch everything, but exclude some non-ansible stuff if needed
 exclude_paths:
   - .github/
@@ -9,9 +8,4 @@ exclude_paths:
   - docker/
   - proxmox/
 
-# Mock modules if they are not available locally (e.g. community.docker if not installed)
-# mock_modules:
-#   - community.docker.docker_compose_v2
-
-# Configure verbosity
 verbosity: 1

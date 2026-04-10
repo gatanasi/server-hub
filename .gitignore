@@ -1,4 +1,5 @@
 .DS_Store
 *.decrypted.*
+# Local plaintext env files must never be committed
 .env
 ansible.log
