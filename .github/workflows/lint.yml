@@ -12,7 +12,7 @@ jobs:
       - name: Block tracked plaintext .env files
         run: |
           tracked_env_files=$(git ls-files | grep -E '(^|/)\.env$' || true)
-          if [[ -n "$tracked_env_files" ]]; then
+          if [ -n "$tracked_env_files" ]; then
             echo "::error::Tracked plaintext .env files are not allowed:"
             echo "$tracked_env_files"
             exit 1
@@ -21,7 +21,7 @@ jobs:
       - name: Block hardcoded default credentials
         run: |
           if grep -RInE --include='docker-compose.yml' \
-            '(MYSQL_ROOT_PASSWORD:\s*admin|MARIADB_ROOT_PASSWORD:\s*admin|--admin-password=admin|--db-root-password=admin|Default username:\s*admin,\s*password:\s*admin)' docker; then
+            '(MYSQL_ROOT_PASSWORD:[[:space:]]*admin|MARIADB_ROOT_PASSWORD:[[:space:]]*admin|--admin-password=admin|--db-root-password=admin|Default username:[[:space:]]*admin,[[:space:]]*password:[[:space:]]*admin)' docker; then
             echo "::error::Found hardcoded default credentials in compose files."
             exit 1
           fi
