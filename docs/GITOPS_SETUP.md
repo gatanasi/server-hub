@@ -8,8 +8,8 @@ This document describes how to set up and configure the GitOps deployment pipeli
 
 ```mermaid
 flowchart TD
-    A["GitHub.com<br/>(push to main, docker-compose.yml changes)"] --> B["github-runner.vm<br/>(self-hosted)<br/>User: runner"]
-    B -- "SSH with forced command<br/>(can only trigger deploy)" --> C["deployer.vm<br/>User: deployer<br/>- Ansible<br/>- SSH keys to VMs"]
+    A["GitHub.com<br/>(push to main, docker-compose.yml changes)"] --> B["github-runner.vm<br/>(self-hosted)"]
+    B -- "SSH with forced command<br/>(can only trigger deploy)" --> C["deployer.vm<br/>- Ansible<br/>- SSH keys to VMs"]
     C -- "Ansible via SSH" --> D["Target VMs<br/>(n8n.vm, etc.)"]
 ```
 
