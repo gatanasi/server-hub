@@ -10,23 +10,18 @@ All persistent data is stored in **Docker named volumes** on each host. A centra
 
 ```mermaid
 flowchart TD
-    subgraph VM1[n8n.vm]
-        n8n_data["postgres<br/>n8n_data<br/>redis"]
+    subgraph VM1[app1.vm]
+        app1_data["postgres<br/>app1_data<br/>redis"]
     end
-    
-    subgraph VM2[odoo.vm]
-        odoo_data["postgres<br/>odoo_data"]
+
+    subgraph VM2[app2.vm]
+        app2_data["app2_data"]
     end
-    
-    subgraph VM3[pdf.vm]
-        pdf_data["stirling<br/>data"]
-    end
-    
-    Backups["<b>/mnt/backups</b><br/>(NFS/SMB Share)<br/><br/>├── n8n/<br/>│   ├── db_storage_*.tar.gz<br/>│   ├── n8n_storage_*.tar.gz<br/>│   └── redis_storage_*.tar.gz<br/>├── odoo/<br/>│   ├── db_data_*.tar.gz<br/>│   └── odoo_data_*.tar.gz<br/>└── stirling-pdf/<br/>    └── data_*.tar.gz"]
-    
-    VM1 --> Backups
-    VM2 --> Backups
-    VM3 --> Backups
+
+    Backups["<b>/mnt/backups</b><br/>(NFS/SMB Share)<br/><br/>├── app1/<br/>│&nbsp;&nbsp;&nbsp;├── db_storage_*.tar.gz<br/>│&nbsp;&nbsp;&nbsp;├── app1_storage_*.tar.gz<br/>│&nbsp;&nbsp;&nbsp;└── redis_storage_*.tar.gz<br/>└── app2/<br/>&nbsp;&nbsp;&nbsp;&nbsp;└── app2_data_*.tar.gz"]
+
+    app1_data --> Backups
+    app2_data --> Backups
 ```
 
 ## Backup Playbook
