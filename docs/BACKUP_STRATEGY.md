@@ -10,18 +10,26 @@ All persistent data is stored in **Docker named volumes** on each host. A centra
 
 ```mermaid
 flowchart TD
-    subgraph VM1[app1.vm]
-        app1_data["postgres<br/>app1_data<br/>redis"]
+    subgraph AppVMs [Application VMs]
+        data["Service Data & Configs"]
     end
 
-    subgraph VM2[app2.vm]
-        app2_data["app2_data"]
-    end
+    data --> Backups["<b>/mnt/backups</b><br/>(NFS/SMB Share)"]
+```
 
-    Backups["<b>/mnt/backups</b><br/>(NFS/SMB Share)<br/><br/>├── app1/<br/>│&nbsp;&nbsp;&nbsp;├── db_storage_*.tar.gz<br/>│&nbsp;&nbsp;&nbsp;├── app1_storage_*.tar.gz<br/>│&nbsp;&nbsp;&nbsp;└── redis_storage_*.tar.gz<br/>└── app2/<br/>&nbsp;&nbsp;&nbsp;&nbsp;└── app2_data_*.tar.gz"]
+### Directory Structure Example
 
-    app1_data --> Backups
-    app2_data --> Backups
+```text
+/mnt/backups/
+├── n8n/
+│   ├── db_storage_*.tar.gz
+│   ├── n8n_storage_*.tar.gz
+│   └── redis_storage_*.tar.gz
+├── odoo/
+│   ├── db_data_*.tar.gz
+│   └── odoo_data_*.tar.gz
+└── stirling-pdf/
+    └── data_*.tar.gz
 ```
 
 ## Backup Playbook
