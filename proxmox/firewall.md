@@ -19,6 +19,7 @@ local-network 10.10.0.0/24
 mac-mini 10.10.0.50
 pve-01 10.10.10.10
 vm-network 10.10.10.0/24
+vpn-arg 10.10.10.249
 
 [IPSET allowed-ssh]
 
@@ -42,9 +43,8 @@ GROUP common-logging
 
 IN ACCEPT -source dc/vm-network -p tcp -dport 8080,8989,7878,8686,8787,9696,5055,6767,8191,3000 -log nolog
 OUT ACCEPT -dest dc/jellyfin -p tcp -dport 8080 -log nolog
-OUT ACCEPT -dest 10.10.10.249 -log nolog
+OUT ACCEPT -dest dc/vpn-arg -log nolog
 OUT Web(ACCEPT) -dest dc/caddy -log nolog
-OUT ACCEPT -dest dc/caddy -p udp -sport 443 -log nolog
 
 [group common-allow]
 
@@ -100,8 +100,8 @@ IN ACCEPT -p udp -dport 443 -log nolog # Web UDP
 OUT ACCEPT -dest dc/gateway-vm -log nolog
 IN RDP(ACCEPT) -source dc/local-network -log nolog
 OUT ACCEPT -dest dc/caddy -log nolog
-OUT DROP -dest dc/vm-network -log debug
-OUT DROP -dest dc/local-network -log debug
+OUT DROP -dest dc/vm-network -log nolog
+OUT DROP -dest dc/local-network -log nolog
 
 [group wireguard]
 
