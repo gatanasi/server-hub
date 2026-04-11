@@ -117,10 +117,10 @@ To avoid documentation drift, this README does not duplicate app name lists.
 
 1. Create `docker/<app-name>/docker-compose.yml`.
 2. Add a `healthcheck` block so deployment verification and rollback work
-  correctly.
+   correctly.
 3. Add `docker/<app-name>/.env.enc` if secrets are required.
 4. Map the app under a host's `managed_apps` in
-  [ansible/inventory/production.yml](ansible/inventory/production.yml).
+   [ansible/inventory/production.yml](ansible/inventory/production.yml).
 
 ## Documentation Index
 

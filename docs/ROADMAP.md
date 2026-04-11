@@ -14,15 +14,10 @@ For the current operational baseline, see [README.md](../README.md) and
 
 ## Completed Foundation
 
-- [x] DuckDNS
-- [x] WireGuard (`wg-easy`)
-- [x] Cloudflare Tunnel
-- [x] Tailscale
-- [x] Caddy
-- [x] OpenSpeedTest (`openspeedtest`)
-- [x] Video Converter (`video-converter`)
-- [x] Stirling PDF (`stirling-pdf`)
-- [x] ConvertX (`convertx`)
+For the authoritative deployed-service list, use `managed_apps` in
+[ansible/inventory/production.yml](../ansible/inventory/production.yml).
+
+This avoids duplicating app inventories across documents.
 
 ## Staged But Not Mapped Yet
 
