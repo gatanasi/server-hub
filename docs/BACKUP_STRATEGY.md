@@ -8,32 +8,25 @@ All persistent data is stored in **Docker named volumes** on each host. A centra
 
 ### Architecture
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│    n8n.vm       │     │    odoo.vm      │     │   pdf.vm        │
-│  ┌───────────┐  │     │  ┌───────────┐  │     │  ┌───────────┐  │
-│  │ postgres  │  │     │  │ postgres  │  │     │  │ stirling  │  │
-│  │ n8n_data  │  │     │  │ odoo_data │  │     │  │   data    │  │
-│  │ redis     │  │     │  └───────────┘  │     │  └───────────┘  │
-│  └───────────┘  │     │                 │     │                 │
-└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                    ┌────────────▼────────────┐
-                    │     /mnt/backups        │
-                    │   (NFS/SMB Share)       │
-                    │                         │
-                    │  ├── n8n/               │
-                    │  │   ├── db_storage_*.tar.gz
-                    │  │   ├── n8n_storage_*.tar.gz
-                    │  │   └── redis_storage_*.tar.gz
-                    │  ├── odoo/              │
-                    │  │   ├── db_data_*.tar.gz
-                    │  │   └── odoo_data_*.tar.gz
-                    │  └── stirling-pdf/      │
-                    │       └── data_*.tar.gz │
-                    └─────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph VM1[n8n.vm]
+        n8n_data["postgres<br/>n8n_data<br/>redis"]
+    end
+    
+    subgraph VM2[odoo.vm]
+        odoo_data["postgres<br/>odoo_data"]
+    end
+    
+    subgraph VM3[pdf.vm]
+        pdf_data["stirling<br/>data"]
+    end
+    
+    Backups["<b>/mnt/backups</b><br/>(NFS/SMB Share)<br/><br/>├── n8n/<br/>│   ├── db_storage_*.tar.gz<br/>│   ├── n8n_storage_*.tar.gz<br/>│   └── redis_storage_*.tar.gz<br/>├── odoo/<br/>│   ├── db_data_*.tar.gz<br/>│   └── odoo_data_*.tar.gz<br/>└── stirling-pdf/<br/>    └── data_*.tar.gz"]
+    
+    VM1 --> Backups
+    VM2 --> Backups
+    VM3 --> Backups
 ```
 
 ## Backup Playbook

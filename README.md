@@ -17,19 +17,11 @@ GitHub Actions through a restricted SSH entrypoint.
 
 ## Architecture At A Glance
 
-```text
-Git push (main)
-  |
-  v
-GitHub Actions / self-hosted runner
-  |
-  | SSH forced command (restricted)
-  v
-deployer VM (Ansible + repo checkout + SOPS)
-  |
-  | SSH
-  v
-target Docker VMs (one or more apps)
+```mermaid
+flowchart TD
+    A["Git push (main)"] --> B["GitHub Actions / self-hosted runner"]
+    B -- "SSH forced command (restricted)" --> C["deployer VM (Ansible + repo checkout + SOPS)"]
+    C -- "SSH" --> D["target Docker VMs (one or more apps)"]
 ```
 
 For the full pipeline setup and hardening details, see [docs/GITOPS_SETUP.md](docs/GITOPS_SETUP.md).
