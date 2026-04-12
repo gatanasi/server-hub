@@ -1,4 +1,4 @@
-# Javascript Action: Setup SSH for Deployer VM
+# JavaScript Action: Setup SSH for Deployer VM
 #
 # This action sets up SSH configuration for connecting to the deployer VM.
 # It creates the ~/.ssh directory, configures known_hosts, and writes the

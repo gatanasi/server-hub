@@ -32,16 +32,29 @@ function getRequiredNormalizedInput(inputName, rawValue) {
   return normalizedValue;
 }
 
-function getActionInput(underscoreEnvName, hyphenEnvName) {
-  if (typeof process.env[underscoreEnvName] === 'string') {
-    return process.env[underscoreEnvName];
+function getActionInput(inputName) {
+  const normalizedInputName = inputName.toUpperCase();
+  const primaryEnvName = `INPUT_${normalizedInputName.replace(/-/g, '_')}`;
+  const hyphenatedEnvName = `INPUT_${normalizedInputName}`;
+
+  if (typeof process.env[primaryEnvName] === 'string') {
+    return process.env[primaryEnvName];
   }
 
-  if (typeof process.env[hyphenEnvName] === 'string') {
-    return process.env[hyphenEnvName];
+  if (typeof process.env[hyphenatedEnvName] === 'string') {
+    return process.env[hyphenatedEnvName];
   }
 
   return undefined;
+}
+
+function saveActionState(name, value) {
+  const stateFilePath = process.env.GITHUB_STATE;
+  if (typeof stateFilePath !== 'string' || stateFilePath.length === 0) {
+    return;
+  }
+
+  fs.appendFileSync(stateFilePath, `${name}=${value}\n`);
 }
 
 const sshDir = path.join(os.homedir(), '.ssh');
@@ -51,13 +64,16 @@ if (!fs.existsSync(sshDir)) {
 fs.chmodSync(sshDir, SSH_DIR_MODE);
 
 const knownHostsPath = path.join(sshDir, 'known_hosts');
+const knownHostsExistedBefore = fs.existsSync(knownHostsPath);
+saveActionState('KNOWN_HOSTS_EXISTED_BEFORE', knownHostsExistedBefore ? '1' : '0');
+
 const normalizedKnownHosts = getRequiredNormalizedInput(
   'ssh-known-hosts',
-  getActionInput('INPUT_SSH_KNOWN_HOSTS', 'INPUT_SSH-KNOWN-HOSTS')
+  getActionInput('ssh-known-hosts')
 );
 
 let existingContent = '';
-if (fs.existsSync(knownHostsPath)) {
+if (knownHostsExistedBefore) {
   existingContent = fs.readFileSync(knownHostsPath, 'utf8');
   existingContent = removeManagedKnownHostsBlock(existingContent);
 }
@@ -77,7 +93,7 @@ fs.chmodSync(knownHostsPath, KNOWN_HOSTS_MODE);
 const keyPath = path.join(sshDir, 'deploy_key');
 const normalizedPrivateKey = getRequiredNormalizedInput(
   'ssh-private-key',
-  getActionInput('INPUT_SSH_PRIVATE_KEY', 'INPUT_SSH-PRIVATE-KEY')
+  getActionInput('ssh-private-key')
 );
 
 fs.writeFileSync(keyPath, `${normalizedPrivateKey}\n`, { mode: PRIVATE_KEY_MODE });

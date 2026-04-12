@@ -13,6 +13,7 @@ on:
   workflow_dispatch:
 jobs:
   test:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -48,22 +49,16 @@ jobs:
           echo "Simulating failure to exercise cleanup behavior"
           exit 1
 
+      - name: Setup Node.js for cleanup verification
+        if: always()
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
+        with:
+          node-version: '20'
+
       - name: Verify cleanup script behavior
         if: always()
         run: |
-          if command -v node >/dev/null 2>&1; then
-            NODE_BIN="$(command -v node)"
-          else
-            RUNNER_ROOT="$(dirname "$(dirname "$RUNNER_TEMP")")"
-            NODE_BIN="$RUNNER_ROOT/externals/node20/bin/node"
-          fi
-
-          if [ ! -x "$NODE_BIN" ]; then
-            echo "Unable to locate Node.js runtime for cleanup verification"
-            exit 1
-          fi
-
-          "$NODE_BIN" .github/actions/setup-ssh/post.js
+          node .github/actions/setup-ssh/post.js
 
           if [ -f ~/.ssh/deploy_key ]; then
             echo "deploy_key should be removed by cleanup"
