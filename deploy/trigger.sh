@@ -10,9 +10,6 @@
 #   ssh deployer@deployer.vm backup <app-name> [options]
 #   ssh deployer@deployer.vm restore <app-name> <operation> [options]
 #
-# Legacy usage (for backward compatibility):
-#   ssh deployer@deployer.vm <app-name>
-#
 # Security:
 #   - This script is referenced by the forced command in authorized_keys
 #   - It validates the operation before dispatching
@@ -22,6 +19,28 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# ============================================================================
+# Usage
+# ============================================================================
+
+usage() {
+    echo "Usage: $0 <operation> [args...]" >&2
+    echo "" >&2
+    echo "Operations:" >&2
+    echo "  deploy <app-name>                     Deploy an application" >&2
+    echo "  backup <app-name> [options]           Backup application volumes" >&2
+    echo "  restore <app-name> <op> [options]     Restore application volumes" >&2
+    echo "" >&2
+    echo "For detailed help, run:" >&2
+    echo "  $0 deploy --help" >&2
+    echo "  $0 backup --help" >&2
+    echo "  $0 restore --help" >&2
+}
+
+# ============================================================================
+# Main
+# ============================================================================
 
 # Handle arguments from SSH_ORIGINAL_COMMAND or direct invocation
 if [[ -n "${SSH_ORIGINAL_COMMAND:-}" ]]; then
@@ -50,21 +69,12 @@ case "${OPERATION}" in
         exec "${SCRIPT_DIR}/trigger-restore.sh" "$@"
         ;;
     "")
-        echo "Usage: $0 <operation> [args...]"
-        echo ""
-        echo "Operations:"
-        echo "  deploy <app-name>                     Deploy an application"
-        echo "  backup <app-name> [options]           Backup application volumes"
-        echo "  restore <app-name> <op> [options]     Restore application volumes"
-        echo ""
-        echo "For detailed help, run:"
-        echo "  $0 deploy --help"
-        echo "  $0 backup --help"
-        echo "  $0 restore --help"
+        usage
         exit 1
         ;;
     *)
-        # Legacy mode: assume it's an app name for deployment
-        exec "${SCRIPT_DIR}/trigger-deploy.sh" "$@"
+        printf "Unknown operation: %s\n" "${OPERATION}" >&2
+        usage
+        exit 1
         ;;
 esac

@@ -3,13 +3,14 @@
 # trigger-deploy.sh - Main deployment trigger script
 #
 # This script is executed on deployer.vm when triggered by the GitHub Actions runner.
-# It is called via SSH forced command, so arguments come from SSH_ORIGINAL_COMMAND.
+# It is called by trigger.sh (the SSH forced command dispatcher) with pre-parsed
+# positional arguments — it does NOT parse SSH_ORIGINAL_COMMAND itself.
 #
-# Usage (when called directly for testing):
+# Usage:
 #   ./trigger-deploy.sh <app-name>
 #
-# Usage (when called via forced SSH command):
-#   ssh deployer@deployer.vm <app-name>
+# Invoked via SSH (handled by trigger.sh):
+#   ssh deployer@deployer.vm deploy <app-name>
 #
 
 set -euo pipefail
@@ -76,24 +77,23 @@ run_ansible_playbook() {
 # ============================================================================
 
 main() {
-    local app_name=""
-
-    # Handle arguments: either direct args or SSH_ORIGINAL_COMMAND
-    if [[ -n "${SSH_ORIGINAL_COMMAND:-}" ]]; then
-        # Called via forced SSH command
-        # shellcheck disable=SC2086
-        set -- ${SSH_ORIGINAL_COMMAND}
-        app_name="${1:-}"
-    else
-        # Called directly (for testing)
-        app_name="${1:-}"
-    fi
+    local app_name="${1:-}"
 
     # Validate we have an app name
     if [[ -z "${app_name}" ]]; then
-        echo "Usage: $0 <app-name>"
-        echo "Available apps:"
-        find "${REPO_DIR}/docker/" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null || echo "  (none found)"
+        echo "Usage: $0 <app-name>" >&2
+        echo "Available apps:" >&2
+        { find "${REPO_DIR}/docker/" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sed 's|.*/||' | sort | grep . || echo "  (none found)"; } >&2
+        exit 1
+    fi
+
+    # Validate app name
+    validate_app_name "${app_name}"
+
+    # Reject unexpected extra arguments
+    if [[ $# -gt 1 ]]; then
+        printf "Error: unexpected extra arguments: %s\n" "${*:2}" >&2
+        echo "Usage: $0 <app-name>" >&2
         exit 1
     fi
 
@@ -107,10 +107,7 @@ main() {
     # Step 1: Pull latest code from git
     pull_latest_repo
 
-    # Step 2: Validate app name (security check)
-    validate_app_name "${app_name}"
-
-    # Step 3: Run Ansible playbook
+    # Step 2: Run Ansible playbook
     run_ansible_playbook "${app_name}"
 
     log "=========================================="

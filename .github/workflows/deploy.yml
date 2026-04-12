@@ -20,6 +20,9 @@
 
 name: Deploy Docker Apps
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:
@@ -56,19 +59,22 @@ jobs:
 
       - name: Detect changed files
         id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_APP_NAME: ${{ github.event.inputs.app_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
             # Manual trigger - use input
-            APPS='["${{ github.event.inputs.app_name }}"]'
-            echo "Manual deployment requested for: ${{ github.event.inputs.app_name }}"
+            APPS=$(jq -n -c --arg app "$INPUT_APP_NAME" '[$app]')
+            echo "Manual deployment requested for: ${INPUT_APP_NAME}"
           else
             # Push trigger - detect changed files
             echo "Detecting changed files..."
 
             # Use github.event.before to compare ALL pushed commits, not just the last one
             # This handles batch pushes correctly (e.g., pushing 5 commits at once)
-            BEFORE_SHA="${{ github.event.before }}"
-            AFTER_SHA="${{ github.sha }}"
 
             echo "Comparing commits: $BEFORE_SHA...$AFTER_SHA"
 
@@ -112,8 +118,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Validate app name
+        env:
+          APP: ${{ matrix.app }}
         run: |
-          APP="${{ matrix.app }}"
           if [[ ! "$APP" =~ ^[a-zA-Z0-9_-]+$ ]]; then
             echo "::error::Invalid app name: $APP"
             exit 1
@@ -129,27 +136,32 @@ jobs:
 
       - name: Trigger deployment
         id: deploy
+        env:
+          SSH_KEY_PATH: ${{ steps.setup_ssh.outputs['ssh-key-path'] }}
+          DEPLOYER_USER: ${{ secrets.DEPLOYER_USER }}
+          DEPLOYER_HOST: ${{ secrets.DEPLOYER_HOST }}
+          APP: ${{ matrix.app }}
         run: |
           echo "::group::Triggering deployment on deployer.vm"
 
           # SSH to deployer.vm - the forced command will execute trigger-deploy.sh
           # We pass the app name as part of the SSH command
           # Notifications are handled by the deployer VM scripts
-            ssh -i "${{ steps.setup_ssh.outputs['ssh-key-path'] }}" \
+            ssh -i "${SSH_KEY_PATH}" \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
-              "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
-              "${{ matrix.app }}"
+              "${DEPLOYER_USER}@${DEPLOYER_HOST}" \
+              "deploy ${APP}"
 
           DEPLOY_EXIT=$?
 
           echo "::endgroup::"
 
           if [[ $DEPLOY_EXIT -eq 0 ]]; then
-            echo "✅ Deployment successful for ${{ matrix.app }}"
+            echo "✅ Deployment successful for ${APP}"
           else
-            echo "::error::Deployment failed for ${{ matrix.app }}"
+            echo "::error::Deployment failed for ${APP}"
             exit $DEPLOY_EXIT
           fi
 

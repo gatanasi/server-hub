@@ -163,6 +163,9 @@ main() {
         exit 1
     fi
     
+    # Validate inputs using common functions
+    validate_app_name "${app_name}" "true"  # allow 'all' for backups
+    
     # Create log directory
     mkdir -p "${LOG_DIR}" 2>/dev/null || true
     
@@ -173,8 +176,7 @@ main() {
     # Pull latest code
     pull_latest_repo
 
-    # Validate inputs using common functions
-    validate_app_name "${app_name}" "true"  # allow 'all' for backups
+    # Validate remaining inputs
     validate_path "${backup_dest}" "backup destination"
     validate_hostname "${target_host}"
    

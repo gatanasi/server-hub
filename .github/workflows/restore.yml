@@ -21,6 +21,9 @@
 
 name: Restore Docker Volumes
 
+permissions:
+  contents: read
+
 on:
   # Manual trigger only
   workflow_dispatch:
@@ -70,11 +73,12 @@ jobs:
 
     steps:
       - name: Validate inputs
+        env:
+          APP: ${{ github.event.inputs.app_name }}
+          OP: ${{ github.event.inputs.operation }}
+          TIMESTAMP: ${{ github.event.inputs.backup_timestamp }}
+          BACKUP_SRC: ${{ github.event.inputs.backup_source }}
         run: |
-          APP="${{ github.event.inputs.app_name }}"
-          OP="${{ github.event.inputs.operation }}"
-          TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
-          BACKUP_SRC="${{ github.event.inputs.backup_source }}"
 
           # Validate app name
           if [[ ! "$APP" =~ ^[a-zA-Z0-9_-]+$ ]]; then
@@ -119,13 +123,16 @@ jobs:
 
       - name: Run restore via deployer.vm
         id: restore
+        env:
+          SSH_KEY_PATH: ${{ steps.setup_ssh.outputs['ssh-key-path'] }}
+          DEPLOYER_USER: ${{ secrets.DEPLOYER_USER }}
+          DEPLOYER_HOST: ${{ secrets.DEPLOYER_HOST }}
+          APP_NAME: ${{ github.event.inputs.app_name }}
+          OPERATION: ${{ github.event.inputs.operation }}
+          TIMESTAMP: ${{ github.event.inputs.backup_timestamp }}
+          BACKUP_SRC: ${{ github.event.inputs.backup_source }}
         run: |
           echo "::group::Running restore on deployer.vm"
-
-          APP_NAME="${{ github.event.inputs.app_name }}"
-          OPERATION="${{ github.event.inputs.operation }}"
-          TIMESTAMP="${{ github.event.inputs.backup_timestamp }}"
-          BACKUP_SRC="${{ github.event.inputs.backup_source }}"
 
           # Build the restore command
           # Format: restore <app> <operation> [--source path] [--timestamp TIMESTAMP]
@@ -137,11 +144,11 @@ jobs:
 
           # SSH to deployer.vm
           # Notifications are handled by the deployer VM scripts
-            ssh -i "${{ steps.setup_ssh.outputs['ssh-key-path'] }}" \
+            ssh -i "${SSH_KEY_PATH}" \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
-              "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
+              "${DEPLOYER_USER}@${DEPLOYER_HOST}" \
               "${RESTORE_CMD}"
 
           RESTORE_EXIT=$?
