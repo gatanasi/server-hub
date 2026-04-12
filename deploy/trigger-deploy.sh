@@ -83,13 +83,13 @@ main() {
     if [[ -z "${app_name}" ]]; then
         echo "Usage: $0 <app-name>" >&2
         echo "Available apps:" >&2
-        find "${REPO_DIR}/docker/" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null || echo "  (none found)" >&2
+        { find "${REPO_DIR}/docker/" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort | grep . || echo "  (none found)"; } >&2
         exit 1
     fi
 
     # Reject unexpected extra arguments
     if [[ $# -gt 1 ]]; then
-        echo "Error: unexpected extra arguments: ${*:2}" >&2
+        printf "Error: unexpected extra arguments: %s\n" "${*:2}" >&2
         echo "Usage: $0 <app-name>" >&2
         exit 1
     fi

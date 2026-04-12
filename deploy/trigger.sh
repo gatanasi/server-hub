@@ -73,7 +73,7 @@ case "${OPERATION}" in
         exit 1
         ;;
     *)
-        echo "Unknown operation: ${OPERATION}" >&2
+        printf "Unknown operation: %s\n" "${OPERATION}" >&2
         usage
         exit 1
         ;;

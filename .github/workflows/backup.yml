@@ -90,7 +90,7 @@ jobs:
           fi
 
           # Validate target host if provided
-          if [[ -n "$TARGET_HOST" && ! "$TARGET_HOST" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+          if [[ -n "$TARGET_HOST" && ! "$TARGET_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]*$ ]]; then
             echo "::error::Invalid target_host: $TARGET_HOST"
             exit 1
           fi
