@@ -119,7 +119,7 @@ jobs:
 
           # SSH to deployer.vm
           # Notifications are handled by the deployer VM scripts
-            ssh -i "${{ steps.setup_ssh.outputs.ssh-key-path }}" \
+            ssh -i "${{ steps.setup_ssh.outputs['ssh-key-path'] }}" \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \

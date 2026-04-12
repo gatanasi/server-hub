@@ -25,7 +25,7 @@ flowchart TD
    - `no-agent-forwarding`: Prevents SSH agent forwarding
    - `no-pty`: Prevents pseudo-terminal allocation
 
-4. **Ephemeral Runner SSH Material**: Workflows use the local `.github/actions/setup-ssh` JavaScript action. It writes `~/.ssh/deploy_key` and a managed block in `~/.ssh/known_hosts`, then removes them during post-job cleanup.
+4. **Ephemeral Runner SSH Material**: Workflows use the local `.github/actions/setup-ssh` JavaScript action. It writes the private key to an action-managed temporary directory under `RUNNER_TEMP`/`os.tmpdir()`, exposes the resolved path via the `ssh-key-path` output, manages a block in `~/.ssh/known_hosts`, and removes the generated SSH material during post-job cleanup. Workflows must use the output path instead of assuming a fixed location such as `~/.ssh/deploy_key`.
 
 ---
 
