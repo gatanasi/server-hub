@@ -10,6 +10,9 @@ const {
 const SSH_DIR_MODE = 0o700;
 const PRIVATE_KEY_MODE = 0o600;
 const KNOWN_HOSTS_MODE = 0o644;
+const READ_FILE_OPEN_FLAGS =
+  fs.constants.O_RDONLY |
+  (typeof fs.constants.O_NOFOLLOW === 'number' ? fs.constants.O_NOFOLLOW : 0);
 const FILE_OPEN_FLAGS =
   fs.constants.O_WRONLY |
   fs.constants.O_CREAT |
@@ -96,6 +99,33 @@ function assertSafeRegularFileOrAbsent(filePath, label) {
   return true;
 }
 
+function readSecureUtf8File(filePath, label) {
+  let fileDescriptor;
+  try {
+    fileDescriptor = fs.openSync(filePath, READ_FILE_OPEN_FLAGS);
+  } catch (err) {
+    if (err && err.code === 'ELOOP') {
+      throw new Error(`${label} at ${filePath} must not be a symlink`);
+    }
+
+    throw err;
+  }
+
+  try {
+    const descriptorStats = fs.fstatSync(fileDescriptor);
+    if (!descriptorStats.isFile()) {
+      throw new Error(`${label} at ${filePath} must be a regular file`);
+    }
+
+    return {
+      content: fs.readFileSync(fileDescriptor, 'utf8'),
+      mode: descriptorStats.mode & 0o777,
+    };
+  } finally {
+    fs.closeSync(fileDescriptor);
+  }
+}
+
 function writeSecureFile(filePath, content, mode, label) {
   assertSafeRegularFileOrAbsent(filePath, label);
 
@@ -136,8 +166,11 @@ const normalizedKnownHosts = getRequiredNormalizedInput(
 );
 
 let existingContent = '';
+let knownHostsMode = KNOWN_HOSTS_MODE;
 if (knownHostsExistedBefore) {
-  existingContent = fs.readFileSync(knownHostsPath, 'utf8');
+  const existingKnownHosts = readSecureUtf8File(knownHostsPath, 'known_hosts');
+  existingContent = existingKnownHosts.content;
+  knownHostsMode = existingKnownHosts.mode;
   existingContent = removeManagedKnownHostsBlock(existingContent);
 }
 
@@ -151,7 +184,7 @@ const managedBlock =
 writeSecureFile(
   knownHostsPath,
   `${existingWithTrailingNewline}${managedBlock}`,
-  KNOWN_HOSTS_MODE,
+  knownHostsMode,
   'known_hosts'
 );
 
