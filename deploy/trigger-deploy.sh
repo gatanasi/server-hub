@@ -83,7 +83,7 @@ main() {
     if [[ -z "${app_name}" ]]; then
         echo "Usage: $0 <app-name>" >&2
         echo "Available apps:" >&2
-        { find "${REPO_DIR}/docker/" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | sort | grep . || echo "  (none found)"; } >&2
+        { find "${REPO_DIR}/docker/" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sed 's|.*/||' | sort | grep . || echo "  (none found)"; } >&2
         exit 1
     fi
 
