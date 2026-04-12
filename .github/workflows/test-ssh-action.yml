@@ -1,19 +1,59 @@
 name: Test SSH Action
 on:
+  pull_request:
+    paths:
+      - .github/actions/setup-ssh/**
+      - .github/workflows/test-ssh-action.yml
   push:
     branches:
-      - chore/harden-runner-vm
+      - main
+    paths:
+      - .github/actions/setup-ssh/**
+      - .github/workflows/test-ssh-action.yml
+  workflow_dispatch:
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Setup SSH
         uses: ./.github/actions/setup-ssh
         with:
-          ssh-private-key: "test-key"
-          ssh-known-hosts: "test-known-hosts"
-      - name: Verify Key Exists
-        run: ls -l ~/.ssh/deploy_key
-      - name: Run something else
-        run: echo "Doing other things"
+          ssh-private-key: |
+            -----BEGIN OPENSSH PRIVATE KEY-----
+            test-key
+            -----END OPENSSH PRIVATE KEY-----
+          ssh-known-hosts: |
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItestKnownHostsKeyMaterial
+      - name: Verify SSH files were created securely
+        run: |
+          test -f ~/.ssh/deploy_key
+          test -f ~/.ssh/known_hosts
+
+          test "$(stat -f '%A' ~/.ssh)" = "700"
+          test "$(stat -f '%A' ~/.ssh/deploy_key)" = "600"
+          test "$(stat -f '%A' ~/.ssh/known_hosts)" = "644"
+
+          grep -q 'BEGIN managed by setup-ssh action' ~/.ssh/known_hosts
+          grep -q 'END managed by setup-ssh action' ~/.ssh/known_hosts
+
+      - name: Simulate downstream failure
+        continue-on-error: true
+        run: |
+          echo "Simulating failure to exercise cleanup behavior"
+          exit 1
+
+      - name: Verify cleanup script behavior
+        if: always()
+        run: |
+          node .github/actions/setup-ssh/post.js
+
+          if [ -f ~/.ssh/deploy_key ]; then
+            echo "deploy_key should be removed by cleanup"
+            exit 1
+          fi
+
+          if [ -f ~/.ssh/known_hosts ] && grep -q 'BEGIN managed by setup-ssh action' ~/.ssh/known_hosts; then
+            echo "Action-managed known_hosts entries should be removed"
+            exit 1
+          fi
