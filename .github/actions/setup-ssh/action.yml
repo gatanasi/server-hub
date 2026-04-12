@@ -1,22 +1,3 @@
-# Composite Action: Setup SSH for Deployer VM
-#
-# This action sets up SSH configuration for connecting to the deployer VM.
-# It creates the ~/.ssh directory, configures known_hosts, and writes the
-# private key with proper permissions.
-#
-# Security Model:
-# - The SSH key is scoped to deployer.vm with a forced command
-# - The runner cannot get a shell on deployer.vm
-# - Key is cleaned up automatically after the job completes
-#
-# Usage:
-#   - name: Setup SSH
-#     uses: ./.github/actions/setup-ssh
-#     with:
-#       ssh-private-key: ${{ secrets.DEPLOYER_SSH_KEY }}
-#       ssh-known-hosts: ${{ secrets.DEPLOYER_SSH_KNOWN_HOSTS }}
-#
-
 name: 'Setup SSH'
 description: 'Configure SSH for deployer.vm access with forced command security model'
 
@@ -52,3 +33,9 @@ runs:
       run: |
         echo "${SSH_PRIVATE_KEY}" > ~/.ssh/deploy_key
         chmod 600 ~/.ssh/deploy_key
+
+    - name: Cleanup SSH key
+      uses: gacts/run-and-post-run@v1
+      with:
+        post: |
+          rm -f ~/.ssh/deploy_key ~/.ssh/known_hosts
