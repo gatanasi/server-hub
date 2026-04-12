@@ -28,6 +28,10 @@ inputs:
     description: 'SSH known_hosts entry for deployer.vm'
     required: true
 
+outputs:
+  ssh-key-path:
+    description: 'Path to the action-managed temporary SSH private key'
+
 runs:
   using: 'node24'
   main: 'main.js'

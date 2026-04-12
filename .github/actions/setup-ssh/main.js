@@ -6,18 +6,15 @@ const {
   KNOWN_HOSTS_BLOCK_START,
   removeManagedKnownHostsBlock,
 } = require('./known-hosts-utils');
+const {
+  assertSafeRegularFileOrAbsent,
+  readSafeUtf8File,
+  writeSafeUtf8File,
+} = require('./secure-file-utils');
 
 const SSH_DIR_MODE = 0o700;
 const PRIVATE_KEY_MODE = 0o600;
 const KNOWN_HOSTS_MODE = 0o644;
-const READ_FILE_OPEN_FLAGS =
-  fs.constants.O_RDONLY |
-  (typeof fs.constants.O_NOFOLLOW === 'number' ? fs.constants.O_NOFOLLOW : 0);
-const FILE_OPEN_FLAGS =
-  fs.constants.O_WRONLY |
-  fs.constants.O_CREAT |
-  fs.constants.O_TRUNC |
-  (typeof fs.constants.O_NOFOLLOW === 'number' ? fs.constants.O_NOFOLLOW : 0);
 
 function normalizeMultilineInput(value) {
   return value
@@ -65,6 +62,15 @@ function saveActionState(name, value) {
   fs.appendFileSync(stateFilePath, `${name}=${value}\n`);
 }
 
+function saveActionOutput(name, value) {
+  const outputFilePath = process.env.GITHUB_OUTPUT;
+  if (typeof outputFilePath !== 'string' || outputFilePath.length === 0) {
+    return;
+  }
+
+  fs.appendFileSync(outputFilePath, `${name}=${value}\n`);
+}
+
 function ensureSafeSshDirectory(sshDirectoryPath) {
   if (fs.existsSync(sshDirectoryPath)) {
     const stats = fs.lstatSync(sshDirectoryPath);
@@ -82,77 +88,6 @@ function ensureSafeSshDirectory(sshDirectoryPath) {
   fs.chmodSync(sshDirectoryPath, SSH_DIR_MODE);
 }
 
-function assertSafeRegularFileOrAbsent(filePath, label) {
-  if (!fs.existsSync(filePath)) {
-    return false;
-  }
-
-  const stats = fs.lstatSync(filePath);
-  if (stats.isSymbolicLink()) {
-    throw new Error(`${label} at ${filePath} must not be a symlink`);
-  }
-
-  if (!stats.isFile()) {
-    throw new Error(`${label} at ${filePath} must be a regular file`);
-  }
-
-  return true;
-}
-
-function readSecureUtf8File(filePath, label) {
-  let fileDescriptor;
-  try {
-    fileDescriptor = fs.openSync(filePath, READ_FILE_OPEN_FLAGS);
-  } catch (err) {
-    if (err && err.code === 'ELOOP') {
-      throw new Error(`${label} at ${filePath} must not be a symlink`);
-    }
-
-    throw err;
-  }
-
-  try {
-    const descriptorStats = fs.fstatSync(fileDescriptor);
-    if (!descriptorStats.isFile()) {
-      throw new Error(`${label} at ${filePath} must be a regular file`);
-    }
-
-    return {
-      content: fs.readFileSync(fileDescriptor, 'utf8'),
-      mode: descriptorStats.mode & 0o777,
-    };
-  } finally {
-    fs.closeSync(fileDescriptor);
-  }
-}
-
-function writeSecureFile(filePath, content, mode, label) {
-  assertSafeRegularFileOrAbsent(filePath, label);
-
-  let fileDescriptor;
-  try {
-    fileDescriptor = fs.openSync(filePath, FILE_OPEN_FLAGS, mode);
-  } catch (err) {
-    if (err && err.code === 'ELOOP') {
-      throw new Error(`${label} at ${filePath} must not be a symlink`);
-    }
-
-    throw err;
-  }
-
-  try {
-    const descriptorStats = fs.fstatSync(fileDescriptor);
-    if (!descriptorStats.isFile()) {
-      throw new Error(`${label} at ${filePath} must be a regular file`);
-    }
-
-    fs.fchmodSync(fileDescriptor, mode);
-    fs.writeFileSync(fileDescriptor, content, { encoding: 'utf8' });
-  } finally {
-    fs.closeSync(fileDescriptor);
-  }
-}
-
 const sshDir = path.join(os.homedir(), '.ssh');
 ensureSafeSshDirectory(sshDir);
 
@@ -168,7 +103,7 @@ const normalizedKnownHosts = getRequiredNormalizedInput(
 let existingContent = '';
 let knownHostsMode = KNOWN_HOSTS_MODE;
 if (knownHostsExistedBefore) {
-  const existingKnownHosts = readSecureUtf8File(knownHostsPath, 'known_hosts');
+  const existingKnownHosts = readSafeUtf8File(knownHostsPath, 'known_hosts');
   existingContent = existingKnownHosts.content;
   knownHostsMode = existingKnownHosts.mode;
   existingContent = removeManagedKnownHostsBlock(existingContent);
@@ -181,17 +116,27 @@ const managedBlock =
   `${normalizedKnownHosts}\n` +
   `${KNOWN_HOSTS_BLOCK_END}\n`;
 
-writeSecureFile(
+writeSafeUtf8File(
   knownHostsPath,
   `${existingWithTrailingNewline}${managedBlock}`,
   knownHostsMode,
-  'known_hosts'
+  'known_hosts',
+  KNOWN_HOSTS_MODE
 );
 
-const keyPath = path.join(sshDir, 'deploy_key');
 const normalizedPrivateKey = getRequiredNormalizedInput(
   'ssh-private-key',
   getActionInput('ssh-private-key')
 );
 
-writeSecureFile(keyPath, `${normalizedPrivateKey}\n`, PRIVATE_KEY_MODE, 'deploy_key');
+const runnerTempDir = process.env.RUNNER_TEMP || os.tmpdir();
+const actionTempDir = fs.mkdtempSync(path.join(runnerTempDir, 'setup-ssh-'));
+fs.chmodSync(actionTempDir, SSH_DIR_MODE);
+const keyPath = path.join(actionTempDir, 'deploy_key');
+
+writeSafeUtf8File(keyPath, `${normalizedPrivateKey}\n`, PRIVATE_KEY_MODE, 'deploy_key', PRIVATE_KEY_MODE);
+
+saveActionState('DEPLOY_KEY_PATH', keyPath);
+saveActionState('DEPLOY_KEY_TEMP_DIR', actionTempDir);
+saveActionState('DEPLOY_KEY_CREATED', '1');
+saveActionOutput('ssh-key-path', keyPath);
