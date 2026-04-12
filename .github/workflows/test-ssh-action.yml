@@ -1,5 +1,8 @@
 name: Test SSH Action
-on: [workflow_dispatch]
+on:
+  push:
+    branches:
+      - chore/harden-runner-vm
 jobs:
   test:
     runs-on: ubuntu-latest
