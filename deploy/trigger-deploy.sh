@@ -76,18 +76,7 @@ run_ansible_playbook() {
 # ============================================================================
 
 main() {
-    local app_name=""
-
-    # Handle arguments: either direct args or SSH_ORIGINAL_COMMAND
-    if [[ -n "${SSH_ORIGINAL_COMMAND:-}" ]]; then
-        # Called via forced SSH command
-        # shellcheck disable=SC2086
-        set -- ${SSH_ORIGINAL_COMMAND}
-        app_name="${1:-}"
-    else
-        # Called directly (for testing)
-        app_name="${1:-}"
-    fi
+    local app_name="${1:-}"
 
     # Validate we have an app name
     if [[ -z "${app_name}" ]]; then

@@ -19,6 +19,9 @@
 
 name: Backup Docker Volumes
 
+permissions:
+  contents: read
+
 on:
   # Manual trigger only
   workflow_dispatch:
@@ -63,10 +66,11 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Validate inputs
+        env:
+          APP: ${{ github.event.inputs.app_name }}
+          BACKUP_DEST: ${{ github.event.inputs.backup_destination }}
+          TARGET_HOST: ${{ github.event.inputs.target_host }}
         run: |
-          APP="${{ github.event.inputs.app_name }}"
-          BACKUP_DEST="${{ github.event.inputs.backup_destination }}"
-          TARGET_HOST="${{ github.event.inputs.target_host }}"
 
           # Validate app name
           if [[ ! "$APP" =~ ^[a-zA-Z0-9_-]+$ ]]; then
@@ -102,12 +106,15 @@ jobs:
 
       - name: Run backup via deployer.vm
         id: backup
+        env:
+          SSH_KEY_PATH: ${{ steps.setup_ssh.outputs['ssh-key-path'] }}
+          DEPLOYER_USER: ${{ secrets.DEPLOYER_USER }}
+          DEPLOYER_HOST: ${{ secrets.DEPLOYER_HOST }}
+          APP_NAME: ${{ github.event.inputs.app_name }}
+          TARGET_HOST: ${{ github.event.inputs.target_host }}
+          BACKUP_DEST: ${{ github.event.inputs.backup_destination }}
         run: |
           echo "::group::Running backup on deployer.vm"
-
-          APP_NAME="${{ github.event.inputs.app_name }}"
-          TARGET_HOST="${{ github.event.inputs.target_host }}"
-          BACKUP_DEST="${{ github.event.inputs.backup_destination }}"
 
           # Build the backup command
           # Format: backup <app> [--destination path] [--host hostname]
@@ -119,11 +126,11 @@ jobs:
 
           # SSH to deployer.vm
           # Notifications are handled by the deployer VM scripts
-            ssh -i "${{ steps.setup_ssh.outputs['ssh-key-path'] }}" \
+            ssh -i "${SSH_KEY_PATH}" \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
-              "${{ secrets.DEPLOYER_USER }}@${{ secrets.DEPLOYER_HOST }}" \
+              "${DEPLOYER_USER}@${DEPLOYER_HOST}" \
               "${BACKUP_CMD}"
 
           BACKUP_EXIT=$?
@@ -131,9 +138,9 @@ jobs:
           echo "::endgroup::"
 
           if [[ $BACKUP_EXIT -eq 0 ]]; then
-            echo "✅ Backup successful for ${{ github.event.inputs.app_name }}"
+            echo "✅ Backup successful for ${APP_NAME}"
           else
-            echo "::error::Backup failed for ${{ github.event.inputs.app_name }}"
+            echo "::error::Backup failed for ${APP_NAME}"
             exit $BACKUP_EXIT
           fi
 

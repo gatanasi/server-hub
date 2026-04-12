@@ -64,7 +64,8 @@ case "${OPERATION}" in
         exit 1
         ;;
     *)
-        # Legacy mode: assume it's an app name for deployment
-        exec "${SCRIPT_DIR}/trigger-deploy.sh" "$@"
+        echo "Unknown operation: ${OPERATION}" >&2
+        echo "Valid operations: deploy, backup, restore" >&2
+        exit 1
         ;;
 esac
