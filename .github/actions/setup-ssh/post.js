@@ -1,16 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-
-const KNOWN_HOSTS_BLOCK_START = '# BEGIN managed by setup-ssh action';
-const KNOWN_HOSTS_BLOCK_END = '# END managed by setup-ssh action';
-
-function removeManagedKnownHostsBlock(content) {
-  const escapedStart = KNOWN_HOSTS_BLOCK_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const escapedEnd = KNOWN_HOSTS_BLOCK_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const blockRegex = new RegExp(`${escapedStart}\\n[\\s\\S]*?\\n${escapedEnd}\\n?`, 'g');
-  return content.replace(blockRegex, '');
-}
+const { removeManagedKnownHostsBlock } = require('./known-hosts-utils');
 
 const sshDir = path.join(os.homedir(), '.ssh');
 const keyPath = path.join(sshDir, 'deploy_key');
@@ -22,6 +13,7 @@ try {
 } catch (err) {
   if (err.code !== 'ENOENT') {
     console.error('Error deleting deploy_key:', err);
+    process.exitCode = 1;
   }
 }
 
@@ -48,5 +40,6 @@ try {
 } catch (err) {
   if (err.code !== 'ENOENT') {
     console.error('Error deleting known_hosts:', err);
+    process.exitCode = 1;
   }
 }

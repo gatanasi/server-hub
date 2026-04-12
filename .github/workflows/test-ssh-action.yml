@@ -19,20 +19,25 @@ jobs:
       - name: Setup SSH
         uses: ./.github/actions/setup-ssh
         with:
-          ssh-private-key: |
-            -----BEGIN OPENSSH PRIVATE KEY-----
-            test-key
-            -----END OPENSSH PRIVATE KEY-----
+          ssh-private-key: fake-test-private-key-content
           ssh-known-hosts: |
             github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItestKnownHostsKeyMaterial
       - name: Verify SSH files were created securely
         run: |
+          get_mode() {
+            if stat -c '%a' "$1" >/dev/null 2>&1; then
+              stat -c '%a' "$1"
+            else
+              stat -f '%A' "$1"
+            fi
+          }
+
           test -f ~/.ssh/deploy_key
           test -f ~/.ssh/known_hosts
 
-          test "$(stat -f '%A' ~/.ssh)" = "700"
-          test "$(stat -f '%A' ~/.ssh/deploy_key)" = "600"
-          test "$(stat -f '%A' ~/.ssh/known_hosts)" = "644"
+          test "$(get_mode ~/.ssh)" = "700"
+          test "$(get_mode ~/.ssh/deploy_key)" = "600"
+          test "$(get_mode ~/.ssh/known_hosts)" = "644"
 
           grep -q 'BEGIN managed by setup-ssh action' ~/.ssh/known_hosts
           grep -q 'END managed by setup-ssh action' ~/.ssh/known_hosts
@@ -46,7 +51,19 @@ jobs:
       - name: Verify cleanup script behavior
         if: always()
         run: |
-          node .github/actions/setup-ssh/post.js
+          if command -v node >/dev/null 2>&1; then
+            NODE_BIN="$(command -v node)"
+          else
+            RUNNER_ROOT="$(dirname "$(dirname "$RUNNER_TEMP")")"
+            NODE_BIN="$RUNNER_ROOT/externals/node20/bin/node"
+          fi
+
+          if [ ! -x "$NODE_BIN" ]; then
+            echo "Unable to locate Node.js runtime for cleanup verification"
+            exit 1
+          fi
+
+          "$NODE_BIN" .github/actions/setup-ssh/post.js
 
           if [ -f ~/.ssh/deploy_key ]; then
             echo "deploy_key should be removed by cleanup"

@@ -1,12 +1,15 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const {
+  KNOWN_HOSTS_BLOCK_END,
+  KNOWN_HOSTS_BLOCK_START,
+  removeManagedKnownHostsBlock,
+} = require('./known-hosts-utils');
 
 const SSH_DIR_MODE = 0o700;
 const PRIVATE_KEY_MODE = 0o600;
 const KNOWN_HOSTS_MODE = 0o644;
-const KNOWN_HOSTS_BLOCK_START = '# BEGIN managed by setup-ssh action';
-const KNOWN_HOSTS_BLOCK_END = '# END managed by setup-ssh action';
 
 function normalizeMultilineInput(value) {
   return value
@@ -16,11 +19,17 @@ function normalizeMultilineInput(value) {
     .trim();
 }
 
-function removeManagedKnownHostsBlock(content) {
-  const escapedStart = KNOWN_HOSTS_BLOCK_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const escapedEnd = KNOWN_HOSTS_BLOCK_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const blockRegex = new RegExp(`${escapedStart}\\n[\\s\\S]*?\\n${escapedEnd}\\n?`, 'g');
-  return content.replace(blockRegex, '');
+function getRequiredNormalizedInput(inputName, rawValue) {
+  if (typeof rawValue !== 'string') {
+    throw new Error(`Missing required input: ${inputName}`);
+  }
+
+  const normalizedValue = normalizeMultilineInput(rawValue);
+  if (!normalizedValue) {
+    throw new Error(`Input ${inputName} is required and cannot be empty`);
+  }
+
+  return normalizedValue;
 }
 
 const sshDir = path.join(os.homedir(), '.ssh');
@@ -29,39 +38,29 @@ if (!fs.existsSync(sshDir)) {
 }
 fs.chmodSync(sshDir, SSH_DIR_MODE);
 
-const knownHosts = process.env.INPUT_SSH_KNOWN_HOSTS;
-if (knownHosts) {
-  const knownHostsPath = path.join(sshDir, 'known_hosts');
-  const normalizedKnownHosts = normalizeMultilineInput(knownHosts);
+const knownHostsPath = path.join(sshDir, 'known_hosts');
+const normalizedKnownHosts = getRequiredNormalizedInput('ssh-known-hosts', process.env.INPUT_SSH_KNOWN_HOSTS);
 
-  if (normalizedKnownHosts) {
-    let existingContent = '';
-    if (fs.existsSync(knownHostsPath)) {
-      existingContent = fs.readFileSync(knownHostsPath, 'utf8');
-      existingContent = removeManagedKnownHostsBlock(existingContent);
-    }
-
-    const existingWithTrailingNewline =
-      existingContent && !existingContent.endsWith('\n') ? `${existingContent}\n` : existingContent;
-    const managedBlock =
-      `${KNOWN_HOSTS_BLOCK_START}\n` +
-      `${normalizedKnownHosts}\n` +
-      `${KNOWN_HOSTS_BLOCK_END}\n`;
-
-    fs.writeFileSync(knownHostsPath, `${existingWithTrailingNewline}${managedBlock}`, {
-      mode: KNOWN_HOSTS_MODE,
-    });
-    fs.chmodSync(knownHostsPath, KNOWN_HOSTS_MODE);
-  }
+let existingContent = '';
+if (fs.existsSync(knownHostsPath)) {
+  existingContent = fs.readFileSync(knownHostsPath, 'utf8');
+  existingContent = removeManagedKnownHostsBlock(existingContent);
 }
 
-const privateKey = process.env.INPUT_SSH_PRIVATE_KEY;
-if (privateKey) {
-  const keyPath = path.join(sshDir, 'deploy_key');
-  const normalizedPrivateKey = normalizeMultilineInput(privateKey);
+const existingWithTrailingNewline =
+  existingContent && !existingContent.endsWith('\n') ? `${existingContent}\n` : existingContent;
+const managedBlock =
+  `${KNOWN_HOSTS_BLOCK_START}\n` +
+  `${normalizedKnownHosts}\n` +
+  `${KNOWN_HOSTS_BLOCK_END}\n`;
 
-  if (normalizedPrivateKey) {
-    fs.writeFileSync(keyPath, `${normalizedPrivateKey}\n`, { mode: PRIVATE_KEY_MODE });
-    fs.chmodSync(keyPath, PRIVATE_KEY_MODE);
-  }
-}
+fs.writeFileSync(knownHostsPath, `${existingWithTrailingNewline}${managedBlock}`, {
+  mode: KNOWN_HOSTS_MODE,
+});
+fs.chmodSync(knownHostsPath, KNOWN_HOSTS_MODE);
+
+const keyPath = path.join(sshDir, 'deploy_key');
+const normalizedPrivateKey = getRequiredNormalizedInput('ssh-private-key', process.env.INPUT_SSH_PRIVATE_KEY);
+
+fs.writeFileSync(keyPath, `${normalizedPrivateKey}\n`, { mode: PRIVATE_KEY_MODE });
+fs.chmodSync(keyPath, PRIVATE_KEY_MODE);
