@@ -3,13 +3,14 @@
 # trigger-deploy.sh - Main deployment trigger script
 #
 # This script is executed on deployer.vm when triggered by the GitHub Actions runner.
-# It is called via SSH forced command, so arguments come from SSH_ORIGINAL_COMMAND.
+# It is called by trigger.sh (the SSH forced command dispatcher) with pre-parsed
+# positional arguments — it does NOT parse SSH_ORIGINAL_COMMAND itself.
 #
-# Usage (when called directly for testing):
+# Usage:
 #   ./trigger-deploy.sh <app-name>
 #
-# Usage (when called via forced SSH command):
-#   ssh deployer@deployer.vm <app-name>
+# Invoked via SSH (handled by trigger.sh):
+#   ssh deployer@deployer.vm deploy <app-name>
 #
 
 set -euo pipefail

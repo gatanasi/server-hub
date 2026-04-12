@@ -10,9 +10,6 @@
 #   ssh deployer@deployer.vm backup <app-name> [options]
 #   ssh deployer@deployer.vm restore <app-name> <operation> [options]
 #
-# Legacy usage (for backward compatibility):
-#   ssh deployer@deployer.vm <app-name>
-#
 # Security:
 #   - This script is referenced by the forced command in authorized_keys
 #   - It validates the operation before dispatching
@@ -65,7 +62,7 @@ case "${OPERATION}" in
         ;;
     *)
         echo "Unknown operation: ${OPERATION}" >&2
-        echo "Valid operations: deploy, backup, restore" >&2
+        echo "Usage: deploy <app-name> | backup <app-name> [options] | restore <app-name> <op> [options]" >&2
         exit 1
         ;;
 esac

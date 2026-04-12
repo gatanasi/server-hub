@@ -67,7 +67,7 @@ jobs:
         run: |
           if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
             # Manual trigger - use input
-            APPS="[\"${INPUT_APP_NAME}\"]"
+            APPS=$(jq -n -c --arg app "$INPUT_APP_NAME" '[$app]')
             echo "Manual deployment requested for: ${INPUT_APP_NAME}"
           else
             # Push trigger - detect changed files
@@ -152,7 +152,7 @@ jobs:
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
               "${DEPLOYER_USER}@${DEPLOYER_HOST}" \
-              "${APP}"
+              "deploy ${APP}"
 
           DEPLOY_EXIT=$?
 
