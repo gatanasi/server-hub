@@ -5,13 +5,15 @@ Proxmox.
 
 This repository manages Docker-based applications with Ansible, secure
 secret handling (SOPS + age), and automated deployments triggered from
-GitHub Actions through a restricted SSH entrypoint.
+GitHub Actions through a restricted SSH entrypoint and a hardened local
+SSH setup action with post-job cleanup.
 
 ## Highlights
 
 - GitOps deployment flow from repository changes to target VMs
 - App-to-host mapping through a single Ansible inventory source of truth
 - SOPS-encrypted environment files (`.env.enc`) with runtime decryption on deployer
+- Hardened local setup-ssh action with automatic key and known_hosts cleanup
 - Healthcheck-aware deployments with rollback support
 - Backup and restore playbooks for Docker named volumes
 
@@ -29,6 +31,7 @@ For the full pipeline setup and hardening details, see [docs/GITOPS_SETUP.md](do
 ## Repository Layout
 
 ```text
+.github/   Workflows and local setup-ssh GitHub Action
 ansible/   Playbooks, tasks, and production inventory
 deploy/    Trigger scripts used by GitHub Actions and manual operations
 docker/    Per-application Docker Compose definitions

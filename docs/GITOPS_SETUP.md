@@ -8,7 +8,7 @@ This document describes how to set up and configure the GitOps deployment pipeli
 
 ```mermaid
 flowchart TD
-    A["GitHub.com<br/>(push to main, docker-compose.yml changes)"] --> B["github-runner.vm<br/>(self-hosted)"]
+    A["GitHub.com<br/>(push to main, docker/** changes)"] --> B["github-runner.vm<br/>(self-hosted)"]
     B -- "SSH with forced command<br/>(can only trigger deploy)" --> C["deployer.vm<br/>- Ansible<br/>- SSH keys to VMs"]
     C -- "Ansible via SSH" --> D["Target VMs<br/>(n8n.vm, etc.)"]
 ```
@@ -24,6 +24,8 @@ flowchart TD
    - `no-X11-forwarding`: Prevents X11 forwarding
    - `no-agent-forwarding`: Prevents SSH agent forwarding
    - `no-pty`: Prevents pseudo-terminal allocation
+
+4. **Ephemeral Runner SSH Material**: Workflows use the local `.github/actions/setup-ssh` JavaScript action. It writes `~/.ssh/deploy_key` and a managed block in `~/.ssh/known_hosts`, then removes them during post-job cleanup.
 
 ---
 
@@ -345,7 +347,7 @@ Follow Part 5 above for the new VM.
 
 The deployment workflow triggers on:
 
-1. **Push to main**: When any `docker/**/docker-compose.yml` file changes
+1. **Push to main**: When any file under `docker/**` changes
 2. **Manual dispatch**: Actions → Deploy Docker Apps → Run workflow
 
 ---
@@ -610,10 +612,17 @@ ssh <user>@<target>.vm echo "OK"
 ```
 .
 ├── .github/
+│   ├── actions/
+│   │   └── setup-ssh/
+│   │       ├── action.yml              # Local JavaScript action definition
+│   │       ├── main.js                 # SSH setup + secure file writes
+│   │       ├── post.js                 # Post-job cleanup for key/known_hosts
+│   │       └── known-hosts-utils.js    # Managed known_hosts block helpers
 │   └── workflows/
 │       ├── deploy.yml              # GitHub Actions deploy workflow
 │       ├── backup.yml              # GitHub Actions backup workflow
-│       └── restore.yml             # GitHub Actions restore workflow
+│       ├── restore.yml             # GitHub Actions restore workflow
+│       └── lint.yml                # PR linting and security checks
 ├── ansible/
 │   ├── ansible.cfg                 # Ansible configuration
 │   ├── inventory/
