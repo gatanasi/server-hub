@@ -1,0 +1,16 @@
+name: Test SSH Action
+on: [workflow_dispatch]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key: "test-key"
+          ssh-known-hosts: "test-known-hosts"
+      - name: Verify Key Exists
+        run: ls -l ~/.ssh/deploy_key
+      - name: Run something else
+        run: echo "Doing other things"
