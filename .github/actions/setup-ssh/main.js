@@ -97,10 +97,7 @@ function assertSafeRegularFileOrAbsent(filePath, label) {
 }
 
 function writeSecureFile(filePath, content, mode, label) {
-  if (assertSafeRegularFileOrAbsent(filePath, label)) {
-    // Tighten permissions before writing in case the file already existed.
-    fs.chmodSync(filePath, mode);
-  }
+  assertSafeRegularFileOrAbsent(filePath, label);
 
   let fileDescriptor;
   try {
@@ -114,6 +111,11 @@ function writeSecureFile(filePath, content, mode, label) {
   }
 
   try {
+    const descriptorStats = fs.fstatSync(fileDescriptor);
+    if (!descriptorStats.isFile()) {
+      throw new Error(`${label} at ${filePath} must be a regular file`);
+    }
+
     fs.fchmodSync(fileDescriptor, mode);
     fs.writeFileSync(fileDescriptor, content, { encoding: 'utf8' });
   } finally {
