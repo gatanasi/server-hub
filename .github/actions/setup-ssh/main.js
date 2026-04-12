@@ -38,7 +38,7 @@ function getRequiredNormalizedInput(inputName, rawValue) {
 }
 
 function getActionInput(inputName) {
-  const envName = `INPUT_${inputName.toUpperCase().replace(/-/g, '_')}`;
+  const envName = `INPUT_${inputName.toUpperCase().replace(/ /g, '_')}`;
   const value = process.env[envName];
   return typeof value === 'string' ? value : undefined;
 }
