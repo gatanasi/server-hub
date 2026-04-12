@@ -27,20 +27,17 @@ try {
 
     if (updatedKnownHostsContent === knownHostsContent) {
       console.log('No setup-ssh managed known_hosts block found; leaving file unchanged');
-    } else if (updatedKnownHostsContent.trim().length === 0) {
+    } else if (updatedKnownHostsContent.length === 0) {
       if (knownHostsExistedBefore) {
-        fs.writeFileSync(knownHostsPath, '\n');
-        console.log('Removed setup-ssh managed entries and preserved pre-existing ~/.ssh/known_hosts');
+        fs.writeFileSync(knownHostsPath, '');
+        console.log('Removed setup-ssh managed entries and preserved pre-existing empty ~/.ssh/known_hosts');
       } else {
         fs.unlinkSync(knownHostsPath);
         console.log('Removed setup-ssh known_hosts entries and deleted action-created ~/.ssh/known_hosts');
       }
     } else {
-      const normalizedContent = updatedKnownHostsContent.endsWith('\n')
-        ? updatedKnownHostsContent
-        : `${updatedKnownHostsContent}\n`;
-      fs.writeFileSync(knownHostsPath, normalizedContent);
-      console.log('Removed setup-ssh managed entries from ~/.ssh/known_hosts');
+      fs.writeFileSync(knownHostsPath, updatedKnownHostsContent);
+      console.log('Removed setup-ssh managed entries from ~/.ssh/known_hosts while preserving remaining content');
     }
   }
 } catch (err) {

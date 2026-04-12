@@ -10,6 +10,11 @@ const {
 const SSH_DIR_MODE = 0o700;
 const PRIVATE_KEY_MODE = 0o600;
 const KNOWN_HOSTS_MODE = 0o644;
+const FILE_OPEN_FLAGS =
+  fs.constants.O_WRONLY |
+  fs.constants.O_CREAT |
+  fs.constants.O_TRUNC |
+  (typeof fs.constants.O_NOFOLLOW === 'number' ? fs.constants.O_NOFOLLOW : 0);
 
 function normalizeMultilineInput(value) {
   return value
@@ -57,14 +62,70 @@ function saveActionState(name, value) {
   fs.appendFileSync(stateFilePath, `${name}=${value}\n`);
 }
 
-const sshDir = path.join(os.homedir(), '.ssh');
-if (!fs.existsSync(sshDir)) {
-  fs.mkdirSync(sshDir, { recursive: true });
+function ensureSafeSshDirectory(sshDirectoryPath) {
+  if (fs.existsSync(sshDirectoryPath)) {
+    const stats = fs.lstatSync(sshDirectoryPath);
+    if (stats.isSymbolicLink()) {
+      throw new Error(`SSH directory at ${sshDirectoryPath} must not be a symlink`);
+    }
+
+    if (!stats.isDirectory()) {
+      throw new Error(`SSH directory at ${sshDirectoryPath} must be a directory`);
+    }
+  } else {
+    fs.mkdirSync(sshDirectoryPath, { recursive: true, mode: SSH_DIR_MODE });
+  }
+
+  fs.chmodSync(sshDirectoryPath, SSH_DIR_MODE);
 }
-fs.chmodSync(sshDir, SSH_DIR_MODE);
+
+function assertSafeRegularFileOrAbsent(filePath, label) {
+  if (!fs.existsSync(filePath)) {
+    return false;
+  }
+
+  const stats = fs.lstatSync(filePath);
+  if (stats.isSymbolicLink()) {
+    throw new Error(`${label} at ${filePath} must not be a symlink`);
+  }
+
+  if (!stats.isFile()) {
+    throw new Error(`${label} at ${filePath} must be a regular file`);
+  }
+
+  return true;
+}
+
+function writeSecureFile(filePath, content, mode, label) {
+  if (assertSafeRegularFileOrAbsent(filePath, label)) {
+    // Tighten permissions before writing in case the file already existed.
+    fs.chmodSync(filePath, mode);
+  }
+
+  let fileDescriptor;
+  try {
+    fileDescriptor = fs.openSync(filePath, FILE_OPEN_FLAGS, mode);
+  } catch (err) {
+    if (err && err.code === 'ELOOP') {
+      throw new Error(`${label} at ${filePath} must not be a symlink`);
+    }
+
+    throw err;
+  }
+
+  try {
+    fs.fchmodSync(fileDescriptor, mode);
+    fs.writeFileSync(fileDescriptor, content, { encoding: 'utf8' });
+  } finally {
+    fs.closeSync(fileDescriptor);
+  }
+}
+
+const sshDir = path.join(os.homedir(), '.ssh');
+ensureSafeSshDirectory(sshDir);
 
 const knownHostsPath = path.join(sshDir, 'known_hosts');
-const knownHostsExistedBefore = fs.existsSync(knownHostsPath);
+const knownHostsExistedBefore = assertSafeRegularFileOrAbsent(knownHostsPath, 'known_hosts');
 saveActionState('KNOWN_HOSTS_EXISTED_BEFORE', knownHostsExistedBefore ? '1' : '0');
 
 const normalizedKnownHosts = getRequiredNormalizedInput(
@@ -85,10 +146,12 @@ const managedBlock =
   `${normalizedKnownHosts}\n` +
   `${KNOWN_HOSTS_BLOCK_END}\n`;
 
-fs.writeFileSync(knownHostsPath, `${existingWithTrailingNewline}${managedBlock}`, {
-  mode: KNOWN_HOSTS_MODE,
-});
-fs.chmodSync(knownHostsPath, KNOWN_HOSTS_MODE);
+writeSecureFile(
+  knownHostsPath,
+  `${existingWithTrailingNewline}${managedBlock}`,
+  KNOWN_HOSTS_MODE,
+  'known_hosts'
+);
 
 const keyPath = path.join(sshDir, 'deploy_key');
 const normalizedPrivateKey = getRequiredNormalizedInput(
@@ -96,5 +159,4 @@ const normalizedPrivateKey = getRequiredNormalizedInput(
   getActionInput('ssh-private-key')
 );
 
-fs.writeFileSync(keyPath, `${normalizedPrivateKey}\n`, { mode: PRIVATE_KEY_MODE });
-fs.chmodSync(keyPath, PRIVATE_KEY_MODE);
+writeSecureFile(keyPath, `${normalizedPrivateKey}\n`, PRIVATE_KEY_MODE, 'deploy_key');

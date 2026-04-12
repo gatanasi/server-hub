@@ -69,3 +69,54 @@ jobs:
             echo "Action-managed known_hosts entries should be removed"
             exit 1
           fi
+
+      - name: Prepare pre-existing known_hosts
+        if: always()
+        run: |
+          mkdir -p ~/.ssh
+          cat <<'EOF' > ~/.ssh/known_hosts
+          # existing known_hosts content
+
+          EOF
+
+      - name: Setup SSH with pre-existing known_hosts
+        if: always()
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key: fake-test-private-key-content
+          ssh-known-hosts: |
+            github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAItestKnownHostsKeyMaterial
+
+      - name: Verify managed entries were appended to pre-existing known_hosts
+        if: always()
+        run: |
+          test -f ~/.ssh/deploy_key
+          test -f ~/.ssh/known_hosts
+          grep -q '^# existing known_hosts content$' ~/.ssh/known_hosts
+          grep -q 'BEGIN managed by setup-ssh action' ~/.ssh/known_hosts
+          grep -q 'END managed by setup-ssh action' ~/.ssh/known_hosts
+
+      - name: Verify cleanup preserves pre-existing known_hosts content
+        if: always()
+        run: |
+          STATE_KNOWN_HOSTS_EXISTED_BEFORE=1 node .github/actions/setup-ssh/post.js
+
+          if [ -f ~/.ssh/deploy_key ]; then
+            echo "deploy_key should be removed by cleanup"
+            exit 1
+          fi
+
+          if [ ! -f ~/.ssh/known_hosts ]; then
+            echo "known_hosts should be preserved when it existed before the action"
+            exit 1
+          fi
+
+          if grep -q 'BEGIN managed by setup-ssh action' ~/.ssh/known_hosts; then
+            echo "Action-managed known_hosts entries should be removed from pre-existing file"
+            exit 1
+          fi
+
+          if ! grep -q '^# existing known_hosts content$' ~/.ssh/known_hosts; then
+            echo "Pre-existing known_hosts content should be preserved"
+            exit 1
+          fi
