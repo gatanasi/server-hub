@@ -32,6 +32,18 @@ function getRequiredNormalizedInput(inputName, rawValue) {
   return normalizedValue;
 }
 
+function getActionInput(underscoreEnvName, hyphenEnvName) {
+  if (typeof process.env[underscoreEnvName] === 'string') {
+    return process.env[underscoreEnvName];
+  }
+
+  if (typeof process.env[hyphenEnvName] === 'string') {
+    return process.env[hyphenEnvName];
+  }
+
+  return undefined;
+}
+
 const sshDir = path.join(os.homedir(), '.ssh');
 if (!fs.existsSync(sshDir)) {
   fs.mkdirSync(sshDir, { recursive: true });
@@ -39,7 +51,10 @@ if (!fs.existsSync(sshDir)) {
 fs.chmodSync(sshDir, SSH_DIR_MODE);
 
 const knownHostsPath = path.join(sshDir, 'known_hosts');
-const normalizedKnownHosts = getRequiredNormalizedInput('ssh-known-hosts', process.env.INPUT_SSH_KNOWN_HOSTS);
+const normalizedKnownHosts = getRequiredNormalizedInput(
+  'ssh-known-hosts',
+  getActionInput('INPUT_SSH_KNOWN_HOSTS', 'INPUT_SSH-KNOWN-HOSTS')
+);
 
 let existingContent = '';
 if (fs.existsSync(knownHostsPath)) {
@@ -60,7 +75,10 @@ fs.writeFileSync(knownHostsPath, `${existingWithTrailingNewline}${managedBlock}`
 fs.chmodSync(knownHostsPath, KNOWN_HOSTS_MODE);
 
 const keyPath = path.join(sshDir, 'deploy_key');
-const normalizedPrivateKey = getRequiredNormalizedInput('ssh-private-key', process.env.INPUT_SSH_PRIVATE_KEY);
+const normalizedPrivateKey = getRequiredNormalizedInput(
+  'ssh-private-key',
+  getActionInput('INPUT_SSH_PRIVATE_KEY', 'INPUT_SSH-PRIVATE-KEY')
+);
 
 fs.writeFileSync(keyPath, `${normalizedPrivateKey}\n`, { mode: PRIVATE_KEY_MODE });
 fs.chmodSync(keyPath, PRIVATE_KEY_MODE);
