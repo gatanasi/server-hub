@@ -176,6 +176,9 @@ main() {
         exit 1
     fi
     
+    # Validate app name first to prevent injection in subsequent logic
+    validate_app_name "${app_name}"  # 'all' not allowed for restore
+    
     if [[ -z "${restore_op}" ]]; then
         echo "Error: Operation is required"
         show_help
@@ -189,9 +192,6 @@ main() {
     log "Starting restore for app: ${app_name}"
     log "Operation: ${restore_op}"
     log "=========================================="
-    
-    # Validate inputs using common functions
-    validate_app_name "${app_name}"  # 'all' not allowed for restore
     
     # Validate restore operation
     if [[ ! "${restore_op}" =~ ^(list_backups|restore_latest|restore_specific)$ ]]; then

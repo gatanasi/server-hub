@@ -87,6 +87,9 @@ main() {
         exit 1
     fi
 
+    # Validate app name
+    validate_app_name "${app_name}"
+
     # Reject unexpected extra arguments
     if [[ $# -gt 1 ]]; then
         printf "Error: unexpected extra arguments: %s\n" "${*:2}" >&2
@@ -104,10 +107,7 @@ main() {
     # Step 1: Pull latest code from git
     pull_latest_repo
 
-    # Step 2: Validate app name (security check)
-    validate_app_name "${app_name}"
-
-    # Step 3: Run Ansible playbook
+    # Step 2: Run Ansible playbook
     run_ansible_playbook "${app_name}"
 
     log "=========================================="
