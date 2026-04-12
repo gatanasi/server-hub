@@ -36,13 +36,11 @@ if (!deployKeyCreated) {
 
 if (deployKeyCreated && typeof deployKeyTempDir === 'string' && deployKeyTempDir.length > 0) {
   try {
-    fs.rmSync(deployKeyTempDir, { recursive: false, force: false });
+    fs.rmSync(deployKeyTempDir, { recursive: true, force: false });
     console.log(`Removed setup-ssh temporary directory ${deployKeyTempDir}`);
   } catch (err) {
     if (err.code === 'ENOENT') {
       console.log('Skipping setup-ssh temporary directory cleanup because it does not exist');
-    } else if (err.code === 'ENOTEMPTY') {
-      console.log('Leaving setup-ssh temporary directory in place because it is not empty');
     } else {
       console.error('Error removing setup-ssh temporary directory:', err);
       process.exitCode = 1;

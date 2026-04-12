@@ -38,19 +38,9 @@ function getRequiredNormalizedInput(inputName, rawValue) {
 }
 
 function getActionInput(inputName) {
-  const normalizedInputName = inputName.toUpperCase();
-  const primaryEnvName = `INPUT_${normalizedInputName.replace(/-/g, '_')}`;
-  const hyphenatedEnvName = `INPUT_${normalizedInputName}`;
-
-  if (typeof process.env[primaryEnvName] === 'string') {
-    return process.env[primaryEnvName];
-  }
-
-  if (typeof process.env[hyphenatedEnvName] === 'string') {
-    return process.env[hyphenatedEnvName];
-  }
-
-  return undefined;
+  const envName = `INPUT_${inputName.toUpperCase().replace(/-/g, '_')}`;
+  const value = process.env[envName];
+  return typeof value === 'string' ? value : undefined;
 }
 
 function saveActionState(name, value) {
@@ -134,9 +124,11 @@ const actionTempDir = fs.mkdtempSync(path.join(runnerTempDir, 'setup-ssh-'));
 fs.chmodSync(actionTempDir, SSH_DIR_MODE);
 const keyPath = path.join(actionTempDir, 'deploy_key');
 
-writeSafeUtf8File(keyPath, `${normalizedPrivateKey}\n`, PRIVATE_KEY_MODE, 'deploy_key', PRIVATE_KEY_MODE);
-
+// Persist cleanup state before writing so post.js can recover from mid-step failures.
 saveActionState('DEPLOY_KEY_PATH', keyPath);
 saveActionState('DEPLOY_KEY_TEMP_DIR', actionTempDir);
 saveActionState('DEPLOY_KEY_CREATED', '1');
+
+writeSafeUtf8File(keyPath, `${normalizedPrivateKey}\n`, PRIVATE_KEY_MODE, 'deploy_key', PRIVATE_KEY_MODE);
+
 saveActionOutput('ssh-key-path', keyPath);
