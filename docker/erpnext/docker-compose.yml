@@ -2,7 +2,7 @@ version: "3"
 
 services:
   backend:
-    image: frappe/erpnext:v16.13.0@sha256:d956e13cde1e3c09c52cffcbfd0476afdcf13fc9b8902cfd7205da650054e8dc
+    image: frappe/erpnext:v16.13.3@sha256:0b83f7ff7b3db1f356989adec9cb0779b9278f17751ea60722b4f33348c3cb4d
     networks:
       - frappe_network
     deploy:
@@ -16,7 +16,7 @@ services:
       DB_PORT: "3306"
 
   configurator:
-    image: frappe/erpnext:v16.13.0@sha256:d956e13cde1e3c09c52cffcbfd0476afdcf13fc9b8902cfd7205da650054e8dc
+    image: frappe/erpnext:v16.13.3@sha256:0b83f7ff7b3db1f356989adec9cb0779b9278f17751ea60722b4f33348c3cb4d
     networks:
       - frappe_network
     deploy:
@@ -45,7 +45,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   create-site:
-    image: frappe/erpnext:v16.13.0@sha256:d956e13cde1e3c09c52cffcbfd0476afdcf13fc9b8902cfd7205da650054e8dc
+    image: frappe/erpnext:v16.13.3@sha256:0b83f7ff7b3db1f356989adec9cb0779b9278f17751ea60722b4f33348c3cb4d
     networks:
       - frappe_network
     deploy:
@@ -106,7 +106,7 @@ services:
       - db-data:/var/lib/mysql
 
   frontend:
-    image: frappe/erpnext:v16.13.0@sha256:d956e13cde1e3c09c52cffcbfd0476afdcf13fc9b8902cfd7205da650054e8dc
+    image: frappe/erpnext:v16.13.3@sha256:0b83f7ff7b3db1f356989adec9cb0779b9278f17751ea60722b4f33348c3cb4d
     networks:
       - frappe_network
     depends_on:
@@ -132,7 +132,7 @@ services:
       - "8080:8080"
 
   queue-long:
-    image: frappe/erpnext:v16.13.0@sha256:d956e13cde1e3c09c52cffcbfd0476afdcf13fc9b8902cfd7205da650054e8dc
+    image: frappe/erpnext:v16.13.3@sha256:0b83f7ff7b3db1f356989adec9cb0779b9278f17751ea60722b4f33348c3cb4d
     networks:
       - frappe_network
     deploy:
@@ -151,7 +151,7 @@ services:
       FRAPPE_REDIS_QUEUE: redis://redis-queue:6379
 
   queue-short:
-    image: frappe/erpnext:v16.13.0@sha256:d956e13cde1e3c09c52cffcbfd0476afdcf13fc9b8902cfd7205da650054e8dc
+    image: frappe/erpnext:v16.13.3@sha256:0b83f7ff7b3db1f356989adec9cb0779b9278f17751ea60722b4f33348c3cb4d
     networks:
       - frappe_network
     deploy:
@@ -188,7 +188,7 @@ services:
         condition: on-failure
 
   scheduler:
-    image: frappe/erpnext:v16.13.0@sha256:d956e13cde1e3c09c52cffcbfd0476afdcf13fc9b8902cfd7205da650054e8dc
+    image: frappe/erpnext:v16.13.3@sha256:0b83f7ff7b3db1f356989adec9cb0779b9278f17751ea60722b4f33348c3cb4d
     networks:
       - frappe_network
     deploy:
@@ -202,7 +202,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   websocket:
-    image: frappe/erpnext:v16.13.0@sha256:d956e13cde1e3c09c52cffcbfd0476afdcf13fc9b8902cfd7205da650054e8dc
+    image: frappe/erpnext:v16.13.3@sha256:0b83f7ff7b3db1f356989adec9cb0779b9278f17751ea60722b4f33348c3cb4d
     networks:
       - frappe_network
     deploy:
