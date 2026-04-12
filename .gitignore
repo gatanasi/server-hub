@@ -2,3 +2,4 @@
 *.decrypted.*
 .env
 ansible.log
+tasks
