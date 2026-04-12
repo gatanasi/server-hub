@@ -16,9 +16,9 @@
 - [x] Preserve known_hosts semantics during post cleanup when the file pre-existed.
 - [x] Apply copy/wording polish fixes requested in review comments.
 - [x] Validate changed workflow and action scripts.
-- [ ] Commit and push branch updates.
-- [ ] Reply on each unresolved thread with resolution details.
-- [ ] Resolve all addressed review threads in PR.
+- [x] Commit and push branch updates.
+- [x] Reply on each unresolved thread with resolution details.
+- [x] Resolve all addressed review threads in PR.
 
 ## Review Notes
 
@@ -27,3 +27,6 @@
   - known_hosts absent before setup -> post cleanup deletes action-created known_hosts.
   - known_hosts pre-existing but whitespace-only -> post cleanup preserves file.
   - known_hosts pre-existing with comment -> post cleanup preserves comment content.
+- Pushed fix commit: `128e9b2` on branch `chore/harden-runner-vm`.
+- Replied to all 8 previously unresolved review comments.
+- Resolved all 8 previously unresolved review threads (remaining unresolved: 0).
