@@ -121,6 +121,7 @@ jobs:
           echo "Deploying app: $APP"
 
       - name: Setup SSH
+        id: setup_ssh
         uses: ./.github/actions/setup-ssh
         with:
           ssh-private-key: ${{ secrets.DEPLOYER_SSH_KEY }}
@@ -134,7 +135,7 @@ jobs:
           # SSH to deployer.vm - the forced command will execute trigger-deploy.sh
           # We pass the app name as part of the SSH command
           # Notifications are handled by the deployer VM scripts
-          ssh -i ~/.ssh/deploy_key \
+            ssh -i "${{ steps.setup_ssh.outputs['ssh-key-path'] }}" \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
@@ -152,8 +153,3 @@ jobs:
             exit $DEPLOY_EXIT
           fi
 
-      - name: Cleanup SSH keys
-        if: always()
-        run: |
-          rm -f ~/.ssh/deploy_key
-          # Keep known_hosts for future runs

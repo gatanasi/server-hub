@@ -111,6 +111,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup SSH
+        id: setup_ssh
         uses: ./.github/actions/setup-ssh
         with:
           ssh-private-key: ${{ secrets.DEPLOYER_SSH_KEY }}
@@ -136,7 +137,7 @@ jobs:
 
           # SSH to deployer.vm
           # Notifications are handled by the deployer VM scripts
-          ssh -i ~/.ssh/deploy_key \
+            ssh -i "${{ steps.setup_ssh.outputs['ssh-key-path'] }}" \
               -o BatchMode=yes \
               -o ConnectTimeout=30 \
               -o StrictHostKeyChecking=yes \
@@ -154,7 +155,3 @@ jobs:
             exit $RESTORE_EXIT
           fi
 
-      - name: Cleanup SSH keys
-        if: always()
-        run: |
-          rm -f ~/.ssh/deploy_key

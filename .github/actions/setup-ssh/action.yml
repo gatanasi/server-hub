@@ -1,4 +1,4 @@
-# Composite Action: Setup SSH for Deployer VM
+# JavaScript Action: Setup SSH for Deployer VM
 #
 # This action sets up SSH configuration for connecting to the deployer VM.
 # It creates the ~/.ssh directory, configures known_hosts, and writes the
@@ -7,7 +7,7 @@
 # Security Model:
 # - The SSH key is scoped to deployer.vm with a forced command
 # - The runner cannot get a shell on deployer.vm
-# - Key is cleaned up automatically after the job completes
+# - Key is cleaned up automatically after the job completes via post.js
 #
 # Usage:
 #   - name: Setup SSH
@@ -28,27 +28,11 @@ inputs:
     description: 'SSH known_hosts entry for deployer.vm'
     required: true
 
+outputs:
+  ssh-key-path:
+    description: 'Path to the action-managed temporary SSH private key'
+
 runs:
-  using: 'composite'
-  steps:
-    - name: Create SSH directory
-      shell: bash
-      run: |
-        mkdir -p ~/.ssh
-        chmod 700 ~/.ssh
-
-    - name: Configure SSH known_hosts
-      shell: bash
-      env:
-        SSH_KNOWN_HOSTS: ${{ inputs.ssh-known-hosts }}
-      run: |
-        echo "${SSH_KNOWN_HOSTS}" >> ~/.ssh/known_hosts
-        chmod 644 ~/.ssh/known_hosts
-
-    - name: Write SSH private key
-      shell: bash
-      env:
-        SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
-      run: |
-        echo "${SSH_PRIVATE_KEY}" > ~/.ssh/deploy_key
-        chmod 600 ~/.ssh/deploy_key
+  using: 'node24'
+  main: 'main.js'
+  post: 'post.js'
