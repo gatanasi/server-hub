@@ -129,6 +129,9 @@ GROUP common-logging
 ```text
 GROUP common-noise
 GROUP common-allow
+OUT DNS(ACCEPT) -log nolog
+OUT Web(ACCEPT) -log nolog
+OUT ACCEPT -dest dc/deployer -log nolog
 GROUP common-logging
 ```
 
