@@ -1,5 +1,5 @@
 .DS_Store
 *.decrypted.*
 .env
-ansible.log
+*.log
 /tasks
