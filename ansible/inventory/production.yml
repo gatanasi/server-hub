@@ -71,6 +71,12 @@ all:
           managed_apps:
             - video-converter
 
+        car-price-tracker.vm:
+          ansible_user: tracker
+          ansible_host: car-price-tracker.vm
+          managed_apps:
+            - car-price-tracker
+
         stirling-pdf.vm:
           ansible_user: stirling
           ansible_host: stirling-pdf.vm

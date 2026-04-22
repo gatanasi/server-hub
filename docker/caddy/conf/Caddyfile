@@ -61,11 +61,17 @@
 		}
 	}
 
+	@car-price-tracker expression {host}.startsWith("car-price-tracker")
+	handle @car-price-tracker {
+		reverse_proxy http://car-price-tracker.vm:8080 {
+			import common_proxy_headers
+		}
+	}
+
 	@insights expression {host}.startsWith("insights")
 	handle @insights {
 		reverse_proxy http://insights.vm:8080 {
 			import common_proxy_headers
-			flush_interval -1
 		}
 	}
 
