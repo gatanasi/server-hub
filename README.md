@@ -58,7 +58,7 @@ ansible-galaxy collection install -r ansible/requirements.yml
 ### Validate A Compose Definition
 
 ```bash
-docker compose -f docker/n8n/docker-compose.yml config
+docker compose -f docker/n8n/compose.yaml config
 ```
 
 ### Trigger A Deployment Manually
@@ -110,7 +110,7 @@ To avoid documentation drift, this README does not duplicate app name lists.
 
 ## Adding A New Application
 
-1. Create `docker/<app-name>/docker-compose.yml`.
+1. Create `docker/<app-name>/compose.yaml`.
 2. Add a `healthcheck` block so deployment verification and rollback work
    correctly.
 3. Add `docker/<app-name>/.env.enc` if secrets are required.

@@ -1,6 +1,6 @@
 # GitHub Actions Workflow: Deploy Docker Compose Applications
 #
-# This workflow triggers on changes to any docker-compose.yml file in the docker/ directory.
+# This workflow triggers on changes to any compose.yaml file in the docker/ directory.
 # It runs on a self-hosted runner and triggers deployment via SSH to the deployer VM.
 #
 # Security Model:

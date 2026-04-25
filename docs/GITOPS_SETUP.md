@@ -334,7 +334,7 @@ docker_hosts:
 
 ```bash
 mkdir -p docker/new-app
-# Create docker-compose.yml in that directory
+# Create compose.yaml in that directory
 ```
 
 ### 3. Prepare Target VM
@@ -386,7 +386,7 @@ The deployment playbook automatically verifies container health using Docker's n
 
 ### Docker Healthcheck Requirements
 
-Every service in `docker-compose.yml` is **strongly recommended** to define a healthcheck block. The Ansible playbooks leverage these healthchecks to determine deployment success and to compute per-service timeouts. If a service does **not** define a healthcheck, the playbooks fall back to a fixed default timeout and have less precise insight into that service's readiness and health during deployment and rollback.
+Every service in `compose.yaml` is **strongly recommended** to define a healthcheck block. The Ansible playbooks leverage these healthchecks to determine deployment success and to compute per-service timeouts. If a service does **not** define a healthcheck, the playbooks fall back to a fixed default timeout and have less precise insight into that service's readiness and health during deployment and rollback.
 
 **Standard healthcheck configuration:**
 
@@ -423,7 +423,7 @@ services:
 ### How It Works
 
 1. **Backup Phase**: Before deployment, the playbook backs up:
-   - Current `docker-compose.yml`
+   - Current `compose.yaml`
    - Current `.env` file
    - Current image information
 
@@ -435,7 +435,7 @@ services:
 
 3. **Rollback Phase**: If health check fails:
    - Stops the failed containers
-   - Restores `docker-compose.yml` and `.env` from backup
+   - Restores `compose.yaml` and `.env` from backup
    - Restarts with previous configuration
    - Sends Telegram notification
 
@@ -646,9 +646,9 @@ ssh <user>@<target>.vm echo "OK"
 │   └── BACKUP_STRATEGY.md          # Backup/restore documentation
 └── docker/
     ├── n8n/
-    │   └── docker-compose.yml
+    │   └── compose.yaml
     ├── odoo/
-    │   └── docker-compose.yml
+    │   └── compose.yaml
     └── ...
 ```
 

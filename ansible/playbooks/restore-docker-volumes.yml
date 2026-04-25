@@ -188,7 +188,7 @@
     # === STOP SERVICES ===
     - name: Check if app is running
       ansible.builtin.stat:
-        path: "{{ app_dir }}/docker-compose.yml"
+        path: "{{ app_dir }}/compose.yaml"
       register: compose_exists
 
     - name: Stop application stack
@@ -241,7 +241,7 @@
           changed_when: true
 
         # === START SERVICES ===
-        # Note: docker-compose.yml is NOT restored from backup as it's in GitHub.
+        # Note: compose.yaml is NOT restored from backup as it's in GitHub.
         # Use the deploy playbook to restore configuration files.
         - name: Start application stack
           community.docker.docker_compose_v2:

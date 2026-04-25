@@ -4,7 +4,7 @@
 # Robustly extracts the version/tag from a docker-compose dictionary structure.
 #
 # Inputs:
-#   compose_content: (dict) Parsed docker-compose.yml content
+#   compose_content: (dict) Parsed compose.yaml content
 #   app_name: (string) The application name to search for
 #   output_fact: (string) The name of the fact to set with the found version
 #

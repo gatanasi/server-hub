@@ -17,7 +17,7 @@
 
 - name: Check if app directory exists for {{ current_app }}
   ansible.builtin.stat:
-    path: "{{ app_dir }}/docker-compose.yml"
+    path: "{{ app_dir }}/compose.yaml"
   register: app_compose_file
 
 - name: Skip if app not deployed for {{ current_app }}
@@ -117,7 +117,7 @@
       changed_when: true
 
     # === RESTART SERVICES ===
-    # Note: docker-compose.yml and .env files are NOT backed up by this task;
+    # Note: compose.yaml and .env files are NOT backed up by this task;
     # they are stored in GitHub (with SOPS encryption for .env) and restored
     # by re-running the deploy playbook. In a disaster recovery scenario,
     # first run the deploy playbook to recreate the application config and

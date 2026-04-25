@@ -110,9 +110,9 @@
           User: {{ ansible_user }}
 
     # === VERSION INFO & NOTIFICATION ===
-    - name: Read source docker-compose.yml
+    - name: Read source compose.yaml
       ansible.builtin.slurp:
-        src: "{{ app_source_dir }}/docker-compose.yml"
+        src: "{{ app_source_dir }}/compose.yaml"
       delegate_to: localhost
       register: source_compose_file
 
@@ -139,14 +139,14 @@
             output_fact: "new_version"
           when: source_dockerfile.content is defined
 
-    - name: Check if target docker-compose.yml exists
+    - name: Check if target compose.yaml exists
       ansible.builtin.stat:
-        path: "{{ app_target_dir }}/docker-compose.yml"
+        path: "{{ app_target_dir }}/compose.yaml"
       register: target_compose_stat
 
-    - name: Read target docker-compose.yml
+    - name: Read target compose.yaml
       ansible.builtin.slurp:
-        src: "{{ app_target_dir }}/docker-compose.yml"
+        src: "{{ app_target_dir }}/compose.yaml"
       register: target_compose_file
       when: target_compose_stat.stat.exists
 
@@ -198,10 +198,10 @@
         state: directory
         mode: '0700'
 
-    - name: Backup current docker-compose.yml
+    - name: Backup current compose.yaml
       ansible.builtin.copy:
-        src: "{{ app_target_dir }}/docker-compose.yml"
-        dest: "{{ backup_dir }}/docker-compose.yml.bak"
+        src: "{{ app_target_dir }}/compose.yaml"
+        dest: "{{ backup_dir }}/compose.yaml.bak"
         remote_src: true
         mode: '0644'
       when: target_compose_stat.stat.exists
@@ -307,10 +307,10 @@
         # === ROLLBACK ===
         - name: Attempt rollback steps
           block:
-            - name: Restore docker-compose.yml from backup
+            - name: Restore compose.yaml from backup
               ansible.builtin.copy:
-                src: "{{ backup_dir }}/docker-compose.yml.bak"
-                dest: "{{ app_target_dir }}/docker-compose.yml"
+                src: "{{ backup_dir }}/compose.yaml.bak"
+                dest: "{{ app_target_dir }}/compose.yaml"
                 remote_src: true
                 mode: '0644'
               when: target_compose_stat.stat.exists

@@ -62,9 +62,9 @@ For each application:
 
 | Item | Description |
 |------|-------------|
-| Docker Volumes | All named volumes defined in docker-compose.yml |
+| Docker Volumes | All named volumes defined in compose.yaml |
 
-> **Note:** Configuration files (`docker-compose.yml` and `.env`) are **NOT** backed up by this playbook. They are stored in GitHub (with [SOPS](https://github.com/getsops/sops) encryption for `.env`). To restore config files, use the deploy playbook.
+> **Note:** Configuration files (`compose.yaml` and `.env`) are **NOT** backed up by this playbook. They are stored in GitHub (with [SOPS](https://github.com/getsops/sops) encryption for `.env`). To restore config files, use the deploy playbook.
 
 ### Retention Policy
 

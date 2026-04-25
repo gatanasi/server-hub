@@ -77,9 +77,9 @@ validate_app_name() {
         fi
     fi
     
-    # Check if docker-compose.yml exists for this app
-    if [[ ! -f "${REPO_DIR}/docker/${app}/docker-compose.yml" ]]; then
-        error "No docker-compose.yml found for app: ${app}"
+    # Check if compose.yaml exists for this app
+    if [[ ! -f "${REPO_DIR}/docker/${app}/compose.yaml" ]]; then
+        error "No compose.yaml found for app: ${app}"
     fi
 }
 
