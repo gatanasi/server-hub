@@ -44,10 +44,10 @@ flowchart TD
 ssh deployer@deployer.vm
 
 # Update system
-sudo apt-get update
+sudo apt get update
 
 # Install Ansible and dependencies
-sudo apt-get install -y ansible git curl
+sudo apt get install -y ansible git curl
 
 # Install required Ansible collection
 ansible-galaxy collection install ansible.posix --force
@@ -244,8 +244,8 @@ sudo ./svc.sh start
 # Install git and jq (REQUIRED for workflow)
 # - git: detects changed files in commits
 # - jq: parses JSON for matrix strategy
-sudo apt-get update
-sudo apt-get install -y git jq
+sudo apt get update
+sudo apt get install -y git jq
 
 # Verify installations
 git --version
@@ -297,13 +297,13 @@ On deployer.vm:
 ssh-copy-id -i ~/.ssh/id_ed25519.pub <app-name>@<app-name>.vm
 ```
 
-### Step 5.5: Install jq (Recommended)
+### Step 5.5: Install jq and rsync
 
-For better health check monitoring, install jq on target VMs:
+Install jq on target VMs:
 
 ```bash
 # On the target VM (as root or with sudo)
-apt-get install -y jq
+apt get install -y jq rsync
 ```
 
 > **Note**: The playbook works without jq but provides more detailed health monitoring with it.
@@ -531,7 +531,7 @@ wget -qO /tmp/sops.deb https://github.com/getsops/sops/releases/download/v3.9.4/
 sudo dpkg -i /tmp/sops.deb
 
 # Generate a new age key
-sudo apt-get install age
+sudo apt get install age
 mkdir -p ~/.config/sops/age
 age-keygen -o ~/.config/sops/age/keys.txt
 ```

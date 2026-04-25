@@ -66,10 +66,10 @@ install_ansible() {
     log "Installing Ansible..."
     
     # Detect package manager
-    if command -v apt-get &> /dev/null; then
+    if command -v apt get &> /dev/null; then
         # Debian/Ubuntu
-        sudo apt-get update
-        sudo apt-get install -y ansible rsync
+        sudo apt get update
+        sudo apt get install -y ansible rsync
     elif command -v dnf &> /dev/null; then
         # Fedora/RHEL
         sudo dnf install -y ansible rsync

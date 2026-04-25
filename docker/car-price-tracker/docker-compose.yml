@@ -28,7 +28,7 @@ services:
           memory: 512M
 
   car-price-tracker:
-    image: ghcr.io/gatanasi/car-price-tracker:v1.2.6
+    image: ghcr.io/gatanasi/car-price-tracker:v1.2.7
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
