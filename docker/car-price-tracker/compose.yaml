@@ -13,8 +13,8 @@ services:
     networks:
       - database-internal
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
       timeout: 5s
       retries: 5
     logging:
@@ -29,7 +29,7 @@ services:
           memory: 512M
 
   car-price-tracker:
-    image: ghcr.io/gatanasi/car-price-tracker:v1.4.1@sha256:b477c2017d8a97cfadfab3272ae32241ff6bf09197cd2a270a17b31c5bf42fc6
+    image: ghcr.io/gatanasi/car-price-tracker:v1.4.2
     restart: unless-stopped
     environment:
       TZ: ${TIMEZONE}
