@@ -31,7 +31,7 @@ services:
           memory: 512M
 
   car-price-tracker:
-    image: ghcr.io/gatanasi/car-price-tracker:v1.6.1@sha256:b1345fefb0371fa87c5e36d4cf64c46230e29be5967351a2b20f5d19a40eab36
+    image: ghcr.io/gatanasi/car-price-tracker:v1.6.2@sha256:526a9d577706b4f15c7e1da4a274b652cca9ecaa40f224f19418b3d75cc4bfe8
     restart: unless-stopped
     environment:
       TZ: ${TIMEZONE}
