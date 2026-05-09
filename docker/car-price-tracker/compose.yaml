@@ -65,9 +65,10 @@ services:
   adminer:
     container_name: car-price-tracker-adminer
     image: adminer:5.4.2
-    restart: always
+    restart: unless-stopped
     environment:
       ADMINER_DEFAULT_SERVER: car-price-tracker-db
+      TZ: ${TIMEZONE}
     ports:
       - "8081:8080"
     networks:
@@ -81,5 +82,4 @@ networks:
 
 volumes:
   pgdata:
-    external: true
-    name: car-price-tracker-pgdata
+    name: car-price-tracker_pgdata
