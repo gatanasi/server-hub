@@ -60,6 +60,15 @@ services:
           cpus: '1.0'
           memory: 1G
 
+  adminer:
+    image: adminer:5.4.2
+    ports:
+      - "8081:8080"
+    networks:
+      - database-internal
+    depends_on:
+      - db
+
 networks:
   database-internal:
     internal: true
