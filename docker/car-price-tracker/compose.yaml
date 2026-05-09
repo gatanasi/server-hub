@@ -68,10 +68,10 @@ services:
     restart: unless-stopped
     environment:
       ADMINER_DEFAULT_SERVER: car-price-tracker-db
-      TZ: ${TIMEZONE}
     ports:
       - "8081:8080"
     networks:
+      - default
       - database-internal
     depends_on:
       - db
