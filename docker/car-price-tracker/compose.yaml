@@ -1,5 +1,6 @@
 services:
   db:
+    container_name: car-price-tracker-db
     image: postgres:18-alpine@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7
     restart: unless-stopped
     environment:
@@ -31,6 +32,7 @@ services:
           memory: 512M
 
   car-price-tracker:
+    container_name: car-price-tracker
     image: ghcr.io/gatanasi/car-price-tracker:v1.6.3@sha256:accd0a04aa3badf308a466f329ec81956a08e6573c9ee9c8c018abcf6176f760
     restart: unless-stopped
     environment:
@@ -61,7 +63,11 @@ services:
           memory: 1G
 
   adminer:
+    container_name: car-price-tracker-adminer
     image: adminer:5.4.2
+    restart: always
+    environment:
+      ADMINER_DEFAULT_SERVER: car-price-tracker-db
     ports:
       - "8081:8080"
     networks:
@@ -75,3 +81,5 @@ networks:
 
 volumes:
   pgdata:
+    external: true
+    name: car-price-tracker-pgdata
