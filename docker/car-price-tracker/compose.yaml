@@ -33,7 +33,7 @@ services:
 
   car-price-tracker:
     container_name: car-price-tracker
-    image: ghcr.io/gatanasi/car-price-tracker:v1.8.0@sha256:cd7873dd842202388104985a1f2f109b0a16d58b6deb74ec747ffc5e90010a28
+    image: ghcr.io/gatanasi/car-price-tracker:v1.9.0
     restart: unless-stopped
     environment:
       TZ: ${TIMEZONE}
@@ -48,6 +48,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     networks:
       - default
       - database-internal
