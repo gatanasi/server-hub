@@ -1,7 +1,7 @@
 services:
   db:
     container_name: car-price-tracker-db
-    image: postgres:18-alpine@sha256:54451ecb8ab38c24c3ec123f2fd501303a3a1856a5c66e98cecf2460d5e1e9d7
+    image: postgres:18-alpine@sha256:fa206fb6391c039c6d3ac69791f60536d79ff19d1dc32eac7818f39fa5a4aa2e
     restart: unless-stopped
     environment:
       TZ: ${TIMEZONE}
@@ -33,7 +33,7 @@ services:
 
   car-price-tracker:
     container_name: car-price-tracker
-    image: ghcr.io/gatanasi/car-price-tracker:v1.9.2@sha256:83c274fddbd122be77536dcdfc4181a6ea1978aeb00204269b2f9eca5475bc3f
+    image: ghcr.io/gatanasi/car-price-tracker:v1.9.4@sha256:ba7e0aa350ec5bdabd5ae0ad7b54ee85c4f56bdb20d88bbef6e018ac6dab313d
     restart: unless-stopped
     environment:
       TZ: ${TIMEZONE}
