@@ -88,7 +88,7 @@ services:
 
   # --- The "Managers" ---
   radarr:
-    image: lscr.io/linuxserver/radarr:6.1.1@sha256:15417a594ebda4c660a9fa9748e7199d33e2d17b31bbc5ad7ba2e86f0b414763
+    image: lscr.io/linuxserver/radarr:6.1.1@sha256:079e48870584baf2a3e7e43e7ba6d3c834555931851a59c82c51cc792d285caf
     container_name: radarr
     environment:
       - PUID=${PUID}
@@ -104,7 +104,7 @@ services:
       - arr-net
 
   sonarr:
-    image: lscr.io/linuxserver/sonarr:4.0.17@sha256:60f3b6b5c7647ba2bafd81163acfe34b11117b9b834ebd7fbcc3e5f1b309c7ef
+    image: lscr.io/linuxserver/sonarr:4.0.17@sha256:0b5c4803f92456fb9b65bae8375716ea120b4ea17b3cced7da32b63f0085782b
     container_name: sonarr
     environment:
       - PUID=${PUID}
@@ -120,7 +120,7 @@ services:
       - arr-net
 
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.3.5@sha256:a89f252d6a22bd25af14a5380aec0adcc3c3af2e3282164f981680e6844070f3
+    image: lscr.io/linuxserver/prowlarr:2.3.5@sha256:c9fe528f34b1fd3715438b6f6d6991d64e2965f2c055db36398bc66a0e7eab01
     container_name: prowlarr
     environment:
       - PUID=${PUID}
@@ -146,7 +146,7 @@ services:
       - arr-net
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr:1.5.6@sha256:4b7bb6d861c08bbf0c388b936ada8b2ba57669ca9974323f504e974577d19d63
+    image: lscr.io/linuxserver/bazarr:1.5.6@sha256:95f27692c3de6dbe130cd035d342d8138ec74ade7b62cfc52e11ae222c52c855
     container_name: bazarr
     environment:
       - PUID=${PUID}
