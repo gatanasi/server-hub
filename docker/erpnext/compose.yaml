@@ -2,7 +2,7 @@ version: "3"
 
 services:
   backend:
-    image: frappe/erpnext:v16.20.0@sha256:0515daf0d095172776f3acf7f122d48d62c5e8d8d8e67b527c2594610d207431
+    image: frappe/erpnext:v16.21.1@sha256:e1479ded7bfd78cd76015e62da703311a50c16ecca0ef381e851cfa52f0aab16
     networks:
       - frappe_network
     deploy:
@@ -16,7 +16,7 @@ services:
       DB_PORT: "3306"
 
   configurator:
-    image: frappe/erpnext:v16.20.0@sha256:0515daf0d095172776f3acf7f122d48d62c5e8d8d8e67b527c2594610d207431
+    image: frappe/erpnext:v16.21.1@sha256:e1479ded7bfd78cd76015e62da703311a50c16ecca0ef381e851cfa52f0aab16
     networks:
       - frappe_network
     deploy:
@@ -45,7 +45,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   create-site:
-    image: frappe/erpnext:v16.20.0@sha256:0515daf0d095172776f3acf7f122d48d62c5e8d8d8e67b527c2594610d207431
+    image: frappe/erpnext:v16.21.1@sha256:e1479ded7bfd78cd76015e62da703311a50c16ecca0ef381e851cfa52f0aab16
     networks:
       - frappe_network
     deploy:
@@ -84,7 +84,7 @@ services:
         bench new-site --mariadb-user-host-login-scope='%' --admin-password="$$ERP_SITE_ADMIN_PASSWORD" --db-root-username=root --db-root-password="$$ERP_DB_ROOT_PASSWORD" --install-app erpnext --set-default frontend;
 
   db:
-    image: mariadb:12.2@sha256:6a4c4bbf0447c2247801309513fcc0dd17c3f35390368139ce419387fdd1144d
+    image: mariadb:12.3@sha256:b1c7bf836e64ed9406a8984af29509f40089d55cea14b32f12c4726a1f17104b
     networks:
       - frappe_network
     healthcheck:
@@ -106,7 +106,7 @@ services:
       - db-data:/var/lib/mysql
 
   frontend:
-    image: frappe/erpnext:v16.20.0@sha256:0515daf0d095172776f3acf7f122d48d62c5e8d8d8e67b527c2594610d207431
+    image: frappe/erpnext:v16.21.1@sha256:e1479ded7bfd78cd76015e62da703311a50c16ecca0ef381e851cfa52f0aab16
     networks:
       - frappe_network
     depends_on:
@@ -132,7 +132,7 @@ services:
       - "8080:8080"
 
   queue-long:
-    image: frappe/erpnext:v16.20.0@sha256:0515daf0d095172776f3acf7f122d48d62c5e8d8d8e67b527c2594610d207431
+    image: frappe/erpnext:v16.21.1@sha256:e1479ded7bfd78cd76015e62da703311a50c16ecca0ef381e851cfa52f0aab16
     networks:
       - frappe_network
     deploy:
@@ -151,7 +151,7 @@ services:
       FRAPPE_REDIS_QUEUE: redis://redis-queue:6379
 
   queue-short:
-    image: frappe/erpnext:v16.20.0@sha256:0515daf0d095172776f3acf7f122d48d62c5e8d8d8e67b527c2594610d207431
+    image: frappe/erpnext:v16.21.1@sha256:e1479ded7bfd78cd76015e62da703311a50c16ecca0ef381e851cfa52f0aab16
     networks:
       - frappe_network
     deploy:
@@ -188,7 +188,7 @@ services:
         condition: on-failure
 
   scheduler:
-    image: frappe/erpnext:v16.20.0@sha256:0515daf0d095172776f3acf7f122d48d62c5e8d8d8e67b527c2594610d207431
+    image: frappe/erpnext:v16.21.1@sha256:e1479ded7bfd78cd76015e62da703311a50c16ecca0ef381e851cfa52f0aab16
     networks:
       - frappe_network
     deploy:
@@ -202,7 +202,7 @@ services:
       - logs:/home/frappe/frappe-bench/logs
 
   websocket:
-    image: frappe/erpnext:v16.20.0@sha256:0515daf0d095172776f3acf7f122d48d62c5e8d8d8e67b527c2594610d207431
+    image: frappe/erpnext:v16.21.1@sha256:e1479ded7bfd78cd76015e62da703311a50c16ecca0ef381e851cfa52f0aab16
     networks:
       - frappe_network
     deploy:
