@@ -41,7 +41,7 @@ services:
       HOST: 0.0.0.0
       TIMEOUT: ${BROWSERLESS_TIMEOUT_MS}
       CONCURRENT: ${BROWSERLESS_CONCURRENT}
-      DEBUG: -browserless*,-**:trace,-**:verbose
+      DEBUG: "browserless*,-**:trace,-**:debug"
     shm_size: "2g"
     networks:
       - default
