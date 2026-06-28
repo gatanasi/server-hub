@@ -39,8 +39,9 @@ services:
       TZ: ${TIMEZONE}
       TOKEN: ${BROWSERLESS_TOKEN}
       HOST: 0.0.0.0
-      TIMEOUT: ${BROWSERLESS_TIMEOUT_MS:-3600000}
-      CONCURRENT: ${BROWSERLESS_CONCURRENT:-1}
+      TIMEOUT: ${BROWSERLESS_TIMEOUT_MS}
+      CONCURRENT: ${BROWSERLESS_CONCURRENT}
+      DEBUG: -browserless*,-**:trace,-**:verbose
     shm_size: "2g"
     networks:
       - default
