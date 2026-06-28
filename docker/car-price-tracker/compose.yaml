@@ -31,9 +31,39 @@ services:
           cpus: '0.5'
           memory: 512M
 
+  browserless:
+    container_name: car-price-tracker-browserless
+    image: ghcr.io/browserless/chromium:v2.54.1@sha256:5a0b8ffa43426549e9df7c822c68505e70f3817192ed111f81bd587a2a9e7229
+    restart: unless-stopped
+    environment:
+      TZ: ${TIMEZONE}
+      TOKEN: ${BROWSERLESS_TOKEN}
+      HOST: 0.0.0.0
+      TIMEOUT: ${BROWSERLESS_TIMEOUT_MS:-3600000}
+      CONCURRENT: ${BROWSERLESS_CONCURRENT:-1}
+    shm_size: "2g"
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS \"http://localhost:3000/pressure?token=$$TOKEN\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
   car-price-tracker:
     container_name: car-price-tracker
-    image: ghcr.io/gatanasi/car-price-tracker:v1.18.2@sha256:bc36c162104cc284007d8954177754c6661157f4d8119c828076fec3b97b88c8
+    image: ghcr.io/gatanasi/car-price-tracker:v2.1.0@sha256:602f3a89072d658fa92b3a5b73881d8cf11a61f3847f0711f184b39ccf5262c6
     restart: unless-stopped
     environment:
       TZ: ${TIMEZONE}
@@ -43,10 +73,13 @@ services:
       SCRAPE_INTERVAL_HOURS: ${SCRAPE_INTERVAL_HOURS}
       RETRY_INTERVAL_HOURS: ${RETRY_INTERVAL_HOURS}
       MAX_PAGES_PER_FILTER: ${MAX_PAGES_PER_FILTER}
+      CDP_ENDPOINT: ws://browserless:3000/chromium?token=${BROWSERLESS_TOKEN}
     ports:
       - "8080:8080"
     depends_on:
       db:
+        condition: service_healthy
+      browserless:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
@@ -66,7 +99,7 @@ services:
       resources:
         limits:
           cpus: '1.0'
-          memory: 1G
+          memory: 512M
 
   adminer:
     container_name: car-price-tracker-adminer
@@ -81,6 +114,16 @@ services:
       - database-internal
     depends_on:
       - db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
 
 networks:
   database-internal:
