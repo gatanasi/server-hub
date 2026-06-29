@@ -33,7 +33,7 @@ services:
 
   browserless:
     container_name: car-price-tracker-browserless
-    image: ghcr.io/browserless/chromium:v2.54.1@sha256:5a0b8ffa43426549e9df7c822c68505e70f3817192ed111f81bd587a2a9e7229
+    image: ghcr.io/browserless/chromium:v2.54.2@sha256:8da772c56e5b64937a48447e988d1d42319809dd562098b0d08ee3c0f259d619
     restart: unless-stopped
     environment:
       TZ: ${TIMEZONE}
@@ -64,7 +64,7 @@ services:
 
   car-price-tracker:
     container_name: car-price-tracker
-    image: ghcr.io/gatanasi/car-price-tracker:v2.1.0@sha256:602f3a89072d658fa92b3a5b73881d8cf11a61f3847f0711f184b39ccf5262c6
+    image: ghcr.io/gatanasi/car-price-tracker:v2.2.0@sha256:2d94fa2f9169010ba557888ff92d61ec8c9bec7c9052c6ef63c8c61fd5c20fe5
     restart: unless-stopped
     environment:
       TZ: ${TIMEZONE}
