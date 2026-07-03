@@ -33,7 +33,7 @@ services:
 
   car-price-tracker:
     container_name: car-price-tracker
-    image: ghcr.io/gatanasi/car-price-tracker:v2.4.1
+    image: ghcr.io/gatanasi/car-price-tracker:v2.4.2@sha256:15b3e137e1f7a5d981b2248aa361a8a78dfbb8fcc9c816dd2a72dbcda53cfdee
     restart: unless-stopped
     environment:
       TZ: ${TIMEZONE}
