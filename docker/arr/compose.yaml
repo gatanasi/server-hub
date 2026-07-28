@@ -120,7 +120,7 @@ services:
       - arr-net
 
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.4.0@sha256:4fd7a166c8f46dd3370a871c250ee577d6c2ae97a0dbe0e3614b5ef736205620
+    image: lscr.io/linuxserver/prowlarr:2.5.2@sha256:2f3d31307beba3ba2dd226d191f5f5c14ee3b4d8b49277c64683f5ed97083179
     container_name: prowlarr
     environment:
       - PUID=${PUID}
@@ -146,7 +146,7 @@ services:
       - arr-net
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr:1.6.0@sha256:4c30dc0bb9a5d223075e7f5d12c77bd293c4b460f86d696dbe64763104c1e88c
+    image: lscr.io/linuxserver/bazarr:1.6.0@sha256:ab401a0f361cfad328e444838b13d5b334b189d0f556fc91a3623eb581df36df
     container_name: bazarr
     environment:
       - PUID=${PUID}
@@ -196,7 +196,7 @@ services:
 
   # --- Requests ---
   seerr:
-    image: ghcr.io/seerr-team/seerr:v3.3.0@sha256:c92d2dc117f62185e7bcb88cd56efd374ea79210eaf433275449e8d5988eb5a8
+    image: ghcr.io/seerr-team/seerr:v3.4.0@sha256:d206d9e4056bb90178297df58047791196e7721e6dc19384579b0530702fe086
     init: true
     container_name: seerr
     environment:
