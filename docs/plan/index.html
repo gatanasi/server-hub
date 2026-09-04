@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talos GitOps Migration — Plan Index</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, securityLevel: "strict", theme: "base",
+    themeVariables: { fontFamily: "inherit", fontSize: "14px", primaryColor: "#1c1917",
+      primaryTextColor: "#e7e5e4", primaryBorderColor: "#a16207", lineColor: "#a8a29e",
+      secondaryColor: "#152747", tertiaryColor: "#111113", clusterBkg: "#0c0a09",
+      clusterBorder: "#44403c", edgeLabelBackground: "#09090b", titleColor: "#e7e5e4" } });
+</script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, li, td, th, .badge) { overflow-wrap: anywhere; }
+  .kicker { letter-spacing: .14em; text-transform: uppercase; font-size: .72rem; font-weight: 700; opacity: .65; }
+  .codeblock { background: var(--color-base-200); border-radius: var(--radius-box); padding: 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; }
+  .mermaid-wrap { overflow-x: auto; } .mermaid-wrap .mermaid { min-width: 480px; }
+  html { scroll-behavior: smooth; } section { scroll-margin-top: 4.5rem; }
+</style>
+</head>
+<body class="bg-base-100 text-base-content">
+
+<div class="navbar bg-base-200/95 backdrop-blur sticky top-0 z-50 shadow-sm px-4">
+  <div class="navbar-start font-bold">Talos GitOps · <span class="text-primary ml-1">Plan</span></div>
+  <div class="navbar-end hidden md:flex gap-1 text-sm">
+    <a class="btn btn-ghost btn-xs" href="phase-0.html">P0</a><a class="btn btn-ghost btn-xs" href="phase-1.html">P1</a>
+    <a class="btn btn-ghost btn-xs" href="phase-2.html">P2</a><a class="btn btn-ghost btn-xs" href="phase-3.html">P3</a>
+    <a class="btn btn-ghost btn-xs" href="phase-4.html">P4</a><a class="btn btn-ghost btn-xs" href="phase-5.html">P5</a>
+    <a class="btn btn-ghost btn-xs" href="phase-6.html">P6</a>
+  </div>
+</div>
+
+<main class="mx-auto max-w-5xl p-4 lg:p-8 space-y-14">
+
+<section class="space-y-5">
+  <div class="hero bg-base-200 rounded-box"><div class="hero-content text-center py-8"><div class="max-w-3xl space-y-3">
+    <p class="kicker">server-hub · approved 2026-07-19 · branch <span class="font-mono">talos-migration</span></p>
+    <h1 class="text-3xl lg:text-4xl font-bold">Talos GitOps migration — the working plan</h1>
+    <p class="text-base-content/70">Decisions are locked (see <a class="link" href="../adr/README.md">ADRs</a>). Seven phase runbooks below; each is a checklist you can follow end-to-end. Checkbox state persists in your browser.</p>
+  </div></div></div>
+
+  <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
+    <div class="card card-border bg-base-100"><div class="card-body p-4"><span class="badge badge-primary badge-soft badge-sm">R1</span><p><b>Repeatability.</b> Fresh server → production, data restored, in &lt; 4 h.</p></div></div>
+    <div class="card card-border bg-base-100"><div class="card-body p-4"><span class="badge badge-primary badge-soft badge-sm">R2</span><p><b>PR-merge deploys.</b> Merging on GitHub is the only deploy action.</p></div></div>
+    <div class="card card-border bg-base-100"><div class="card-body p-4"><span class="badge badge-primary badge-soft badge-sm">R3</span><p><b>Elastic topology.</b> Node counts are OpenTofu variables (CP 1↔3, workers N).</p></div></div>
+    <div class="card card-border bg-base-100"><div class="card-body p-4"><span class="badge badge-primary badge-soft badge-sm">R4</span><p><b>One repo.</b> New <span class="font-mono">tofu/</span> + <span class="font-mono">k8s/</span> dirs beside the existing tree.</p></div></div>
+  </div>
+
+  <div role="alert" class="alert alert-soft alert-info text-sm"><span><b>Exposure model:</b> nothing is public. All services are LAN-only or reached via your own VPN (wg-easy, kept on its VM — ADR 0005). Certificates still use Let's Encrypt DNS-01 wildcards, which never require an open port; no port-forwards exist on the UCG-Fiber.</span></div>
+</section>
+
+<!-- ===== DECISIONS ===== -->
+<section id="decisions" class="space-y-4">
+  <div><p class="kicker">Locked decisions</p><h2 class="text-2xl font-bold">What we're building with, and why</h2></div>
+  <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
+    <table class="table table-sm table-zebra">
+      <thead><tr><th>#</th><th>Decision</th><th>One-line rationale</th><th>ADR</th></tr></thead>
+      <tbody>
+        <tr><td>D1</td><td><b>OpenTofu</b> (<span class="font-mono">bpg/proxmox</span> + <span class="font-mono">siderolabs/talos</span> providers)</td><td>Terraform-compatible, MPL-licensed, state encryption built in</td><td><a class="link" href="../adr/0001-use-opentofu.md">0001</a></td></tr>
+        <tr><td>D2</td><td><b>Flux</b></td><td>Native SOPS+age (existing workflow carries over), monorepo-first, lightest</td><td><a class="link" href="../adr/0002-use-flux.md">0002</a></td></tr>
+        <tr><td>D3</td><td><b>1 control plane + 2 workers</b>, VIP endpoint</td><td>RAM- and fsync-lean; HA practiced via scale drills, not paid for permanently</td><td><a class="link" href="../adr/0003-topology-1cp-2-workers.md">0003</a></td></tr>
+        <tr><td>D4</td><td><b>local-path-provisioner + VolSync (restic)</b>; NFS for media</td><td>Minimal write path on consumer NVMe; durability from 3-2-1 backups, not replication</td><td><a class="link" href="../adr/0004-storage-local-path-volsync.md">0004</a></td></tr>
+        <tr><td>D5</td><td><b>Keep wg-easy on its VM</b></td><td>VPN stays outside the failure domain it exists to reach</td><td><a class="link" href="../adr/0005-keep-wg-easy-vpn.md">0005</a></td></tr>
+        <tr><td>D6</td><td><b>Hybrid end-state</b>: cluster + selected dedicated VMs + ollama LXC</td><td>Right workload, right platform — per-app call at each wave checkpoint</td><td><a class="link" href="../adr/0006-hybrid-vm-strategy.md">0006</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===== ARCHITECTURE ===== -->
+<section id="architecture" class="space-y-4">
+  <div><p class="kicker">Target architecture</p><h2 class="text-2xl font-bold">One box, honest layers</h2></div>
+  <div class="card card-border bg-base-100"><div class="card-body"><div class="mermaid-wrap bg-base-200 rounded-box p-3">
+    <pre class="mermaid">
+flowchart TD
+  ucg["UniFi UCG-Fiber<br/>DNS · VLANs · (VPN fallback)"] --- pve
+  subgraph pve["Beelink SER9 MAX — Proxmox VE · Ryzen 8745HS · 64 GB"]
+    subgraph talos["Talos cluster (OpenTofu-provisioned)"]
+      cp1["talos-cp-1<br/>4 vCPU / 8 GB"]
+      w1["talos-w-1<br/>6 vCPU / 16 GB"]
+      w2["talos-w-2<br/>6 vCPU / 16 GB"]
+    end
+    vms["Dedicated VMs (permanent)<br/>wg-easy · per ADR 0006 checkpoints"]
+    ollama["ollama LXC (iGPU)"]
+  end
+  nas[("NAS — NFS<br/>media · restic backup repo")] --- pve
+    </pre>
+  </div></div></div>
+  <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-sm">
+    <div class="card bg-base-200"><div class="card-body p-4"><p class="kicker">Layer 0</p><h4 class="font-bold">OpenTofu</h4><p class="text-base-content/70">Proxmox VMs from a Talos Image Factory image; machine configs, bootstrap, kubeconfig — one <span class="font-mono">tofu apply</span>.</p></div></div>
+    <div class="card bg-base-200"><div class="card-body p-4"><p class="kicker">Layer 1</p><h4 class="font-bold">Talos Linux</h4><p class="text-base-content/70">Immutable, API-only. Factory schematic below; extensions swappable later via in-place upgrade.</p></div></div>
+    <div class="card bg-base-200"><div class="card-body p-4"><p class="kicker">Layer 2</p><h4 class="font-bold">Cilium + Flux</h4><p class="text-base-content/70">Cilium CNI (kube-proxy replacement, L2-announced LAN VIPs); Flux reconciling <span class="font-mono">k8s/</span> with SOPS.</p></div></div>
+    <div class="card bg-base-200"><div class="card-body p-4"><p class="kicker">Layer 3</p><h4 class="font-bold">Platform</h4><p class="text-base-content/70">ingress-nginx · cert-manager (DNS-01) · local-path-provisioner · VolSync · NFS CSI · kube-prometheus-stack.</p></div></div>
+  </div>
+
+  <div class="card card-border bg-base-100"><div class="card-body">
+    <h3 class="card-title text-base">RAM budget</h3>
+    <div class="overflow-x-auto rounded-box border border-base-content/5"><table class="table table-sm table-zebra">
+      <thead><tr><th>Allocation</th><th>vCPU</th><th>RAM</th><th>Disk</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td class="font-mono">talos-cp-1</td><td>4</td><td>8 GB</td><td>100 GB</td><td>etcd + control plane, no workloads</td></tr>
+        <tr><td class="font-mono">talos-w-1</td><td>6</td><td>16 GB</td><td>150 GB</td><td>general workloads + local-path PVs</td></tr>
+        <tr><td class="font-mono">talos-w-2</td><td>6</td><td>16 GB</td><td>150 GB</td><td>general workloads + local-path PVs</td></tr>
+        <tr><td>Proxmox host + ollama LXC</td><td>—</td><td>~6 GB</td><td>—</td><td>host overhead + LLM runtime</td></tr>
+        <tr class="text-base-content/60"><td>Headroom for legacy + permanent VMs</td><td>—</td><td>~18 GB</td><td>—</td><td>shrinks as waves complete; freed RAM can grow workers via tofu</td></tr>
+      </tbody>
+    </table></div>
+    <p class="text-sm text-base-content/60 mt-2">CPU overcommit on 8C/16T is fine; RAM is the ceiling. Node sizes are tofu variables — resizing is a one-line diff + reboot.</p>
+  </div></div>
+</section>
+
+<!-- ===== TALOS IMAGE ===== -->
+<section id="image" class="space-y-4">
+  <div><p class="kicker">Talos Image Factory</p><h2 class="text-2xl font-bold">The image spec — decide once, upgrade in place forever</h2></div>
+  <div class="grid gap-4 lg:grid-cols-2">
+    <div class="space-y-3">
+      <p class="text-sm text-base-content/80"><b>First, the pressure release:</b> a schematic choice is <i>not</i> permanent. Changing extensions later is an in-place <span class="font-mono">talosctl upgrade --image factory.talos.dev/installer/&lt;new-id&gt;:&lt;version&gt;</span> — the node reboots into the new image with data intact. No reinstall, ever. So choose a sensible baseline and move on.</p>
+      <div class="codeblock"><pre><code># schematic.yaml — same schematic for all nodes
+customization:
+  systemExtensions:
+    officialExtensions:
+      - siderolabs/qemu-guest-agent
+      - siderolabs/iscsi-tools
+      - siderolabs/util-linux-tools</code></pre></div>
+      <div class="codeblock"><pre><code># Upload once; the returned ID is content-addressed — record it in tofu vars
+curl -s -X POST --data-binary @schematic.yaml \
+  https://factory.talos.dev/schematics
+# → {"id":"&lt;SCHEMATIC_ID&gt;"}
+
+# Boot ISO (Phase 1) and installer image (machine config):
+# https://factory.talos.dev/image/&lt;SCHEMATIC_ID&gt;/&lt;VERSION&gt;/metal-amd64.iso
+# factory.talos.dev/installer/&lt;SCHEMATIC_ID&gt;:&lt;VERSION&gt;</code></pre></div>
+    </div>
+    <div class="space-y-3 text-sm">
+      <div class="card card-border bg-base-100"><div class="card-body p-4">
+        <h4 class="font-bold">Why these three</h4>
+        <ul class="space-y-1 text-base-content/80">
+          <li><b>qemu-guest-agent</b> — required. Proxmox (and the tofu provider) uses it for IP discovery and clean shutdown.</li>
+          <li><b>iscsi-tools + util-linux-tools</b> — not needed by local-path today; a few MB of insurance that keeps iSCSI-based storage (Longhorn et al.) bootable without an upgrade cycle if you ever experiment.</li>
+        </ul>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body p-4">
+        <h4 class="font-bold">Deliberately excluded</h4>
+        <ul class="space-y-1 text-base-content/80">
+          <li><b>amd-ucode</b> — microcode is applied by the Proxmox <i>host</i>; useless inside a VM.</li>
+          <li><b>amdgpu firmware</b> — only needed on the one worker that would receive iGPU passthrough (Phase 5), and only if you go that route; apply it then, to that node only, via per-node in-place upgrade.</li>
+          <li><b>zfs / btrfs / nvidia / wifi firmware</b> — guest disks are virtual, no such hardware in the VM.</li>
+        </ul>
+      </div></div>
+      <div class="card card-border bg-base-100"><div class="card-body p-4">
+        <h4 class="font-bold">Everything else is machine config, not image</h4>
+        <p class="text-base-content/80">Static IPs, the control-plane VIP, <span class="font-mono">cni: none</span> + <span class="font-mono">proxy.disabled</span> (for Cilium), kubelet extraMounts for local-path, install disk — all live in Talos machine-config patches in <span class="font-mono">tofu/</span>, applied without image changes. See <a class="link" href="phase-1.html">Phase 1</a>.</p>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== NVME ===== -->
+<section id="nvme" class="space-y-4">
+  <div><p class="kicker">NVMe endurance</p><h2 class="text-2xl font-bold">Write-amplification playbook</h2>
+  <p class="text-sm text-base-content/70 max-w-3xl mt-1">The design already makes the two biggest cuts: <b>one etcd member</b> (ADR 0003) and <b>no replicated block storage</b> (ADR 0004). The rest is host and workload hygiene, applied in <a class="link" href="phase-1.html">Phase 1</a>/<a class="link" href="phase-6.html">Phase 6</a>:</p></div>
+  <div class="grid gap-3 md:grid-cols-2 text-sm">
+    <div class="card card-border bg-base-100"><div class="card-body p-4">
+      <h4 class="font-bold">Proxmox host (ZFS)</h4>
+      <ul class="space-y-1.5 text-base-content/80">
+        <li>▸ <span class="font-mono">zfs set atime=off rpool</span> — kills a metadata write per file read</li>
+        <li>▸ <span class="font-mono">zfs set compression=zstd rpool</span> — compressed blocks = fewer bytes physically written (lz4 if CPU-shy)</li>
+        <li>▸ Keep zvol <span class="font-mono">volblocksize</span> at the PVE default (16K); don't shrink it</li>
+        <li>▸ <span class="font-mono">sync=standard</span> — never <span class="font-mono">always</span> (2× writes), never <span class="font-mono">disabled</span> (lies to etcd)</li>
+        <li>▸ <span class="font-mono">zpool set autotrim=on rpool</span> + monthly <span class="font-mono">zpool trim rpool</span></li>
+        <li>▸ Single node: <span class="font-mono">systemctl disable --now pve-ha-lrm pve-ha-crm</span> — stops constant HA state writes</li>
+        <li>▸ No swap on ZFS; <span class="font-mono">vm.swappiness=10</span></li>
+      </ul>
+    </div></div>
+    <div class="card card-border bg-base-100"><div class="card-body p-4">
+      <h4 class="font-bold">VM disks (tofu)</h4>
+      <ul class="space-y-1.5 text-base-content/80">
+        <li>▸ virtio-scsi with <span class="font-mono">discard=on</span> and <span class="font-mono">ssd=1</span> — guest TRIM reaches the zvol, keeping thin disks thin</li>
+        <li>▸ <span class="font-mono">iothread=1</span> for etcd latency (cp-1 disk)</li>
+      </ul>
+      <h4 class="font-bold mt-3">Inside the cluster</h4>
+      <ul class="space-y-1.5 text-base-content/80">
+        <li>▸ Flux: reconcile intervals 10m+ for stable Kustomizations (1m polling churns etcd)</li>
+        <li>▸ Prometheus: 60s scrape, ~15d retention; skip log-shipping stacks unless you need them</li>
+        <li>▸ Databases: fewest possible instances; CNPG consolidation is the eventual answer</li>
+      </ul>
+      <h4 class="font-bold mt-3">Watch the wear, don't guess</h4>
+      <ul class="space-y-1.5 text-base-content/80">
+        <li>▸ Baseline now, check quarterly: <span class="font-mono">smartctl -a /dev/nvme0 | grep -E 'Percentage Used|Data Units Written'</span></li>
+        <li>▸ Phase 6 adds a smartctl exporter panel in Grafana</li>
+      </ul>
+    </div></div>
+  </div>
+</section>
+
+<!-- ===== PHASES ===== -->
+<section id="phases" class="space-y-4">
+  <div><p class="kicker">Runbooks</p><h2 class="text-2xl font-bold">Seven phases, strangler-style</h2>
+  <p class="text-sm text-base-content/70 max-w-3xl mt-1">Legacy VMs keep serving until each replacement is verified. Every phase ends demo-able. Rough total: 2–3 months of weekends.</p></div>
+  <div class="grid gap-3 md:grid-cols-2 text-sm">
+    <a href="phase-0.html" class="card card-border bg-base-100 hover:border-primary/50"><div class="card-body p-4"><h4 class="font-bold">Phase 0 — Decisions &amp; scaffold <span class="badge badge-ghost badge-sm">1 evening</span></h4><p class="text-base-content/70">ADRs, SOPS rule for k8s/, CLI tooling, age-key escrow.</p></div></a>
+    <a href="phase-1.html" class="card card-border bg-base-100 hover:border-primary/50"><div class="card-body p-4"><h4 class="font-bold">Phase 1 — Provision <span class="badge badge-ghost badge-sm">1–2 weekends</span></h4><p class="text-base-content/70">Factory image → tofu → Proxmox VMs → bootstrapped Talos; scale drills.</p></div></a>
+    <a href="phase-2.html" class="card card-border bg-base-100 hover:border-primary/50"><div class="card-body p-4"><h4 class="font-bold">Phase 2 — Platform core <span class="badge badge-ghost badge-sm">1–2 weekends</span></h4><p class="text-base-content/70">Flux bootstrap, Cilium, cert-manager, ingress, local-path, VolSync, NFS CSI.</p></div></a>
+    <a href="phase-3.html" class="card card-border bg-base-100 hover:border-primary/50"><div class="card-body p-4"><h4 class="font-bold">Phase 3 — First apps <span class="badge badge-primary badge-soft badge-sm">R2 lands</span></h4><p class="text-base-content/70">Wave 1 stateless apps, Renovate wiring, CI validation, PR-merge deploys proven.</p></div></a>
+    <a href="phase-4.html" class="card card-border bg-base-100 hover:border-primary/50"><div class="card-body p-4"><h4 class="font-bold">Phase 4 — Stateful <span class="badge badge-ghost badge-sm">2–3 weekends</span></h4><p class="text-base-content/70">Data-move recipe, n8n/odoo, VolSync schedules, optional CNPG.</p></div></a>
+    <a href="phase-5.html" class="card card-border bg-base-100 hover:border-primary/50"><div class="card-body p-4"><h4 class="font-bold">Phase 5 — Media &amp; hardware <span class="badge badge-warning badge-soft badge-sm">highest risk</span></h4><p class="text-base-content/70">NFS media, arr/immich, jellyfin GPU decision, caddy retirement, VM keep-list.</p></div></a>
+    <a href="phase-6.html" class="card card-border bg-base-100 hover:border-primary/50"><div class="card-body p-4"><h4 class="font-bold">Phase 6 — Observability &amp; DR drill <span class="badge badge-primary badge-soft badge-sm">R1 proven</span></h4><p class="text-base-content/70">Monitoring, backup automation, offsite copy, the timed rebuild.</p></div></a>
+  </div>
+</section>
+
+<!-- ===== WAVES ===== -->
+<section id="waves" class="space-y-4">
+  <div><p class="kicker">App disposition</p><h2 class="text-2xl font-bold">Every app, accounted for</h2>
+  <p class="text-sm text-base-content/70 max-w-3xl mt-1">Per ADR 0006, each wave ends with a checkpoint: migrate the next apps, or record a "stays on VM" decision in the table below. Nothing migrates by default.</p></div>
+  <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
+    <table class="table table-sm table-zebra">
+      <thead><tr><th>App</th><th>State to move</th><th>Disposition</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>openspeedtest</td><td>none</td><td><span class="badge badge-sm badge-primary badge-soft">wave 1</span></td><td>first migration — trivial, builds confidence</td></tr>
+        <tr><td>stirling-pdf</td><td>config only</td><td><span class="badge badge-sm badge-primary badge-soft">wave 1</span></td><td>—</td></tr>
+        <tr><td>convertx</td><td>light</td><td><span class="badge badge-sm badge-primary badge-soft">wave 1</span></td><td>—</td></tr>
+        <tr><td>video-converter</td><td>light</td><td><span class="badge badge-sm badge-primary badge-soft">wave 1</span></td><td>—</td></tr>
+        <tr><td>car-price-tracker</td><td>app DB</td><td><span class="badge badge-sm badge-primary badge-soft">wave 1</span></td><td>your own image — best end-to-end demo</td></tr>
+        <tr><td>filebrowser</td><td>config + data</td><td><span class="badge badge-sm badge-soft">wave 2</span></td><td>—</td></tr>
+        <tr><td>n8n</td><td>postgres + redis</td><td><span class="badge badge-sm badge-soft">wave 2</span></td><td>first stateful — proves the data recipe</td></tr>
+        <tr><td>ghost <span class="badge badge-ghost badge-xs">staged</span></td><td>db</td><td><span class="badge badge-sm badge-soft">wave 2</span></td><td>deploy fresh in-cluster if still wanted</td></tr>
+        <tr><td>odoo</td><td>postgres</td><td><span class="badge badge-sm badge-soft">wave 3</span></td><td>CNPG candidate</td></tr>
+        <tr><td>dolibarr / erpnext <span class="badge badge-ghost badge-xs">staged</span></td><td>db</td><td><span class="badge badge-sm badge-soft">wave 3</span></td><td>keep-or-drop decision before migrating</td></tr>
+        <tr><td>arr / mediamanager</td><td>config + NFS media</td><td><span class="badge badge-sm badge-warning badge-soft">wave 4</span></td><td>shared NFS mounts</td></tr>
+        <tr><td>immich</td><td>postgres + ML + photos</td><td><span class="badge badge-sm badge-warning badge-soft">wave 4</span></td><td>heaviest; migrate last, after RAM freed</td></tr>
+        <tr><td>jellyfin</td><td>config + iGPU + media</td><td><span class="badge badge-sm badge-warning badge-soft">wave 4 / VM?</span></td><td>ADR 0006 checkpoint — likely stays on VM if GPU passthrough isn't worth it</td></tr>
+        <tr><td>caddy</td><td>—</td><td><span class="badge badge-sm badge-error badge-soft">retire</span></td><td>replaced by ingress-nginx + cert-manager</td></tr>
+        <tr><td>wg-easy</td><td>—</td><td><span class="badge badge-sm badge-ghost">stays — VM</span></td><td>ADR 0005: VPN outside the cluster failure domain</td></tr>
+        <tr><td>ollama (LXC)</td><td>—</td><td><span class="badge badge-sm badge-ghost">stays — LXC</span></td><td>direct iGPU access on the host</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===== DR ===== -->
+<section id="dr" class="space-y-4">
+  <div><p class="kicker">Disaster recovery</p><h2 class="text-2xl font-bold">The &lt; 4 hour rebuild</h2>
+  <p class="text-sm text-base-content/70 max-w-3xl mt-1">Preconditions: the Git repo (on GitHub), the age key (escrowed offline — Phase 0), the NAS backup set (restic repos + offsite copy). Media never needs restoring; it reattaches over NFS.</p></div>
+  <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
+    <table class="table table-sm">
+      <thead><tr><th></th><th>Step</th><th>Time</th><th>What happens</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Fresh Proxmox host</td><td>~30 min</td><td>Install PVE, apply host tuning (<a class="link" href="#nvme">NVMe playbook</a>), clone repo, load age key</td></tr>
+        <tr><td>2</td><td><span class="font-mono">tofu apply</span></td><td>~20 min</td><td>VMs from factory image → machine configs → bootstrap → kubeconfig</td></tr>
+        <tr><td>3</td><td><span class="font-mono">flux bootstrap</span></td><td>~45 min</td><td>Flux self-installs, decrypts with age key, reconciles cilium → platform → apps</td></tr>
+        <tr><td>4</td><td>Data restore</td><td>1–2 h</td><td>VolSync <span class="font-mono">ReplicationDestination</span> per app PVC pulls from the NAS restic repo; CNPG replays WAL; media reattaches via NFS</td></tr>
+        <tr><td>5</td><td>Verify</td><td>~30 min</td><td>DNS, certs, app health, one restore spot-check per data tier</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="text-sm text-base-content/60">Permanent VMs (wg-easy, ADR 0006 keepers) restore via the existing Ansible + volume-backup flow, in parallel. Full drill with a timer: <a class="link" href="phase-6.html">Phase 6</a>.</p>
+</section>
+
+<!-- ===== RISKS ===== -->
+<section id="risks" class="space-y-4">
+  <div><p class="kicker">Risks</p><h2 class="text-2xl font-bold">What can bite, and the plan for each</h2></div>
+  <div class="overflow-x-auto rounded-box border border-base-content/5 bg-base-100">
+    <table class="table table-sm">
+      <thead><tr><th>Risk</th><th>Why it matters</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td class="font-bold">Learning-curve stacking</td><td>Talos + K8s + Flux + Cilium at once can stall the project</td><td>Strangler phases; legacy keeps serving; every phase ends demo-able</td></tr>
+        <tr><td class="font-bold">RAM contention</td><td>64 GB must hold cluster + not-yet-migrated + permanent VMs</td><td>Budget above; waves free RAM before heavier waves; immich last</td></tr>
+        <tr><td class="font-bold">NVMe write endurance</td><td>etcd + K8s churn on consumer SSDs behind ZFS</td><td>Designed down (1 etcd, no replication) + <a class="link" href="#nvme">playbook</a> + quarterly wear checks</td></tr>
+        <tr><td class="font-bold">Jellyfin/immich hw accel</td><td>780M iGPU passthrough to a VM is fiddly</td><td>Gated Phase 5 decision; explicit fallback = stays on VM (ADR 0006)</td></tr>
+        <tr><td class="font-bold">Single physical host</td><td>Multi-CP "HA" can't survive the box dying</td><td>Honest posture: HA practiced via drills; resilience = timed rebuild + 3-2-1</td></tr>
+        <tr><td class="font-bold">Backup locality</td><td>If backups only live on the NAS and it dies with the site, R1 fails</td><td>Phase 6 offsite restic copy → true 3-2-1</td></tr>
+        <tr><td class="font-bold">Age key loss</td><td>Loses every secret; Git can't help</td><td>Phase 0 escrow (password manager + offline), verified in the DR drill</td></tr>
+        <tr><td class="font-bold">Node-pinned PVs (local-path)</td><td>A worker VM loss strands its PVs</td><td>Accepted trade (ADR 0004): restore from VolSync is the recovery path; worker VMs themselves rebuild via tofu in minutes</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer class="text-center text-xs text-base-content/50 pb-8">
+  <p>server-hub · Talos GitOps migration plan · decisions locked 2026-07-19 · verify latest upstream versions (Talos, Flux, Cilium) at implementation time.</p>
+</footer>
+</main>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase 0 — Decisions &amp; scaffold</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, li, td, th, .badge) { overflow-wrap: anywhere; }
+  .kicker { letter-spacing: .14em; text-transform: uppercase; font-size: .72rem; font-weight: 700; opacity: .65; }
+  .codeblock { background: var(--color-base-200); border-radius: var(--radius-box); padding: 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; }
+</style>
+</head>
+<body class="bg-base-100 text-base-content">
+<div class="navbar bg-base-200/95 backdrop-blur sticky top-0 z-50 shadow-sm px-4">
+  <div class="navbar-start"><a class="btn btn-ghost btn-sm" href="index.html">← Plan</a></div>
+  <div class="navbar-end gap-1 text-sm">
+    <span class="btn btn-primary btn-xs pointer-events-none">P0</span>
+    <a class="btn btn-ghost btn-xs" href="phase-1.html">P1</a><a class="btn btn-ghost btn-xs" href="phase-2.html">P2</a>
+    <a class="btn btn-ghost btn-xs" href="phase-3.html">P3</a><a class="btn btn-ghost btn-xs" href="phase-4.html">P4</a>
+    <a class="btn btn-ghost btn-xs" href="phase-5.html">P5</a><a class="btn btn-ghost btn-xs" href="phase-6.html">P6</a>
+  </div>
+</div>
+<main class="mx-auto max-w-4xl p-4 lg:p-8 space-y-8">
+
+<header class="space-y-2">
+  <p class="kicker">Phase 0 · ~1 evening</p>
+  <h1 class="text-3xl font-bold">Decisions &amp; scaffold</h1>
+  <p class="text-base-content/70">Lock the ground so every later phase is mechanical. Most of this is already done on the <span class="font-mono">talos-migration</span> branch — verify, don't redo.</p>
+  <span class="badge badge-soft badge-primary" id="prog"></span>
+</header>
+
+<section class="space-y-3">
+  <h2 class="text-xl font-bold">Steps</h2>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p0-01">
+    <span class="text-sm"><b>Read the six ADRs</b> in <span class="font-mono">docs/adr/</span> (0001–0006). They exist already; edit anything you disagree with now — after this phase they're settled.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p0-02">
+    <span class="text-sm"><b>Install the CLIs</b> on your workstation:
+      <span class="block codeblock mt-2"><code>brew install opentofu talosctl fluxcd/tap/flux kubernetes-cli sops age kubeconform</code></span>
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p0-03">
+    <span class="text-sm"><b>Extend <span class="font-mono">.sops.yaml</span></b> with a rule for Kubernetes secrets so only <span class="font-mono">data</span>/<span class="font-mono">stringData</span> get encrypted (Flux needs readable metadata):
+      <span class="block codeblock mt-2"><code>creation_rules:
+  # …existing dotenv rule stays…
+  - path_regex: k8s/.*\.sops\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: &lt;your-existing-age-public-key&gt;</code></span>
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p0-04">
+    <span class="text-sm"><b>Escrow the age key.</b> It is the only artifact Git cannot restore — losing it loses every secret. Store the private key in your password manager <i>and</i> one offline copy (printed or on a USB stick off-site). You'll verify this escrow during the Phase 6 DR drill.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p0-05">
+    <span class="text-sm"><b>Decide tofu state handling</b> (recommended: keep it simple). Local state file in <span class="font-mono">tofu/</span>, gitignored, with a copy synced to the NAS after meaningful applies. State loss is survivable here — a DR rebuild generates fresh machine secrets anyway — so don't over-engineer a backend. Add to <span class="font-mono">.gitignore</span>:
+      <span class="block codeblock mt-2"><code>tofu/*.tfstate*
+tofu/.terraform/
+tofu/talosconfig
+tofu/kubeconfig</code></span>
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p0-06">
+    <span class="text-sm"><b>Apply the Proxmox host tuning</b> from the <a class="link" href="index.html#nvme">NVMe playbook</a> now (atime, compression, autotrim, HA services off, swappiness) and record the wear baseline:
+      <span class="block codeblock mt-2"><code>smartctl -a /dev/nvme0 | grep -E 'Percentage Used|Data Units Written'   # save output in a note</code></span>
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p0-07">
+    <span class="text-sm"><b>Reserve LAN IPs on the UCG-Fiber</b> (out of the DHCP pool) and note them: 3 node IPs, 1 control-plane VIP, 1 ingress VIP. Example scheme: <span class="font-mono">.20/.21/.22</span> nodes, <span class="font-mono">.30</span> CP VIP, <span class="font-mono">.31</span> ingress VIP.</span>
+  </label>
+</section>
+
+<div role="alert" class="alert alert-soft alert-success text-sm"><span><b>Exit criteria:</b> ADRs settled · CLIs installed · SOPS rule committed · age key escrowed twice · gitignore covers tofu state · host tuning applied + wear baseline saved · IP plan noted.</span></div>
+
+<footer class="flex justify-between text-sm pb-8">
+  <a class="btn btn-ghost btn-sm" href="index.html">← Plan index</a>
+  <a class="btn btn-primary btn-sm" href="phase-1.html">Phase 1: Provision →</a>
+</footer>
+</main>
+<script>
+(function(){var b=[].slice.call(document.querySelectorAll('input[type=checkbox][data-step]')),p=document.getElementById('prog');
+function u(){if(p)p.textContent=b.filter(function(x){return x.checked}).length+' / '+b.length+' done';}
+b.forEach(function(cb){var k='shplan:'+cb.dataset.step;try{cb.checked=localStorage.getItem(k)==='1'}catch(e){}
+cb.addEventListener('change',function(){try{localStorage.setItem(k,cb.checked?'1':'0')}catch(e){}u();});});u();})();
+</script>
+</body>
+</html>

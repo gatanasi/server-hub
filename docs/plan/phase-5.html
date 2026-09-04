@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase 5 — Media &amp; hardware wave</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, li, td, th, .badge) { overflow-wrap: anywhere; }
+  .kicker { letter-spacing: .14em; text-transform: uppercase; font-size: .72rem; font-weight: 700; opacity: .65; }
+  .codeblock { background: var(--color-base-200); border-radius: var(--radius-box); padding: 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; }
+</style>
+</head>
+<body class="bg-base-100 text-base-content">
+<div class="navbar bg-base-200/95 backdrop-blur sticky top-0 z-50 shadow-sm px-4">
+  <div class="navbar-start"><a class="btn btn-ghost btn-sm" href="index.html">← Plan</a></div>
+  <div class="navbar-end gap-1 text-sm">
+    <a class="btn btn-ghost btn-xs" href="phase-0.html">P0</a><a class="btn btn-ghost btn-xs" href="phase-1.html">P1</a>
+    <a class="btn btn-ghost btn-xs" href="phase-2.html">P2</a><a class="btn btn-ghost btn-xs" href="phase-3.html">P3</a>
+    <a class="btn btn-ghost btn-xs" href="phase-4.html">P4</a>
+    <span class="btn btn-primary btn-xs pointer-events-none">P5</span>
+    <a class="btn btn-ghost btn-xs" href="phase-6.html">P6</a>
+  </div>
+</div>
+<main class="mx-auto max-w-4xl p-4 lg:p-8 space-y-8">
+
+<header class="space-y-2">
+  <p class="kicker">Phase 5 · 2–4 weekends · <span class="text-warning">highest risk</span></p>
+  <h1 class="text-3xl font-bold">Media &amp; hardware wave</h1>
+  <p class="text-base-content/70">Outcome: every remaining app either serves from the cluster or has a recorded "stays on VM" decision (ADR 0006). The caddy VM retires. Nothing here blocks anything else — this phase is a sequence of independent gates.</p>
+  <span class="badge badge-soft badge-primary" id="prog"></span>
+</header>
+
+<div role="alert" class="alert alert-soft alert-warning text-sm"><span><b>Prereq:</b> waves 1–3 done and their RAM reclaimed — immich needs it. Do immich and jellyfin last, in that order of certainty: immich <i>will</i> migrate; jellyfin <i>might</i>.</span></div>
+
+<section class="space-y-3">
+  <h2 class="text-xl font-bold">Steps</h2>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p5-01">
+    <span class="text-sm w-full"><b>Media over NFS, shared and read-write-many:</b> static NFS PersistentVolumes (or the <span class="font-mono">nas-nfs</span> StorageClass) for the media library, mounted by arr, mediamanager, and jellyfin alike. Media never enters local-path — it stays on the NAS exactly as today, so migration moves <i>config</i>, not terabytes.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p5-02">
+    <span class="text-sm w-full"><b>Migrate arr + mediamanager</b> with the Phase 4 recipe (config volumes are small). Note the arr stack's gluetun VPN sidecar: replicate it as a pod sidecar container (gluetun runs fine in k8s with <span class="font-mono">NET_ADMIN</span> + <span class="font-mono">/dev/net/tun</span>), keeping the same kill-switch property — qBittorrent only sees the tunnel.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p5-03">
+    <span class="text-sm w-full"><b>Migrate immich</b> — the heaviest app, using the upstream Helm chart. Its Postgres needs the vector-extension image (keep the dedicated immich-postgres from the chart rather than forcing it into CNPG). Photo library: NFS mount, same as media. ML runs on CPU in-cluster (the ROCm variant needs the GPU — see next step; CPU ML is fine, just slower on new imports).</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p5-04">
+    <span class="text-sm w-full"><b>The jellyfin GPU gate — decide with a test, not a hope.</b> In order:
+      <span class="block codeblock mt-2"><code>A. Measure first: how often do you actually transcode? Direct-play
+   (most modern clients) needs no GPU at all. Test CPU transcode of
+   your worst-case file on a worker — the 8745HS is no slouch.
+B. If GPU is genuinely needed in-cluster: iGPU passthrough to ONE
+   worker VM (host: enable IOMMU/vfio for the 780M — this can
+   destabilize the PVE console; snapshot first), then upgrade that
+   node in place to a schematic + amdgpu firmware, and expose it
+   with the AMD device plugin. Budget a full weekend; it may fail.
+C. Fallback (perfectly respectable): jellyfin STAYS on its VM with
+   host iGPU access as today. Record it in ADR 0006's keep-list.</code></span>
+      Whichever branch wins, write the outcome + reasoning into the ADR — that paragraph <i>is</i> the interview answer.
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p5-05">
+    <span class="text-sm w-full"><b>Retire the caddy VM:</b> confirm every remaining route is on ingress-nginx (including any pointing at VM-resident apps — ingress can front those too via Endpoints/ExternalName to the VM's IP), flip the last DNS records, soak, delete the VM and its inventory entry.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p5-06">
+    <span class="text-sm w-full"><b>Final ADR 0006 checkpoint:</b> the permanent VM list is now fact, not plan. Update the ADR + wave table (wg-easy VM ✓, jellyfin per the gate, anything else you chose to keep). Trim <span class="font-mono">ansible/inventory</span> to exactly that list — it remains the VM source of truth. <span class="font-mono">docker/</span> keeps only the kept apps' compose files.</span>
+  </label>
+</section>
+
+<div class="card card-border bg-base-100"><div class="card-body p-4 text-sm">
+  <h3 class="font-bold">Gotchas</h3>
+  <ul class="space-y-1 text-base-content/80">
+    <li>▸ NFS + SQLite (arr apps' config DBs) can corrupt under lock contention — config PVCs on local-path, only <i>media</i> on NFS.</li>
+    <li>▸ iGPU passthrough steals the host console — make sure you have working SSH + a PVE config backup before enabling vfio.</li>
+    <li>▸ Immich major upgrades sometimes require DB migration steps — pin the chart, read release notes before Renovate merges.</li>
+  </ul>
+</div></div>
+
+<div role="alert" class="alert alert-soft alert-success text-sm"><span><b>Exit criteria:</b> arr/mediamanager/immich in-cluster on NFS media · jellyfin gate decided and recorded · caddy VM gone, ingress owns all routes · inventory = exactly the permanent VM list · deployer VM + self-hosted runner retired if no longer needed by kept VMs.</span></div>
+
+<footer class="flex justify-between text-sm pb-8">
+  <a class="btn btn-ghost btn-sm" href="phase-4.html">← Phase 4</a>
+  <a class="btn btn-primary btn-sm" href="phase-6.html">Phase 6: DR drill →</a>
+</footer>
+</main>
+<script>
+(function(){var b=[].slice.call(document.querySelectorAll('input[type=checkbox][data-step]')),p=document.getElementById('prog');
+function u(){if(p)p.textContent=b.filter(function(x){return x.checked}).length+' / '+b.length+' done';}
+b.forEach(function(cb){var k='shplan:'+cb.dataset.step;try{cb.checked=localStorage.getItem(k)==='1'}catch(e){}
+cb.addEventListener('change',function(){try{localStorage.setItem(k,cb.checked?'1':'0')}catch(e){}u();});});u();})();
+</script>
+</body>
+</html>

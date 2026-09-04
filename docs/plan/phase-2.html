@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase 2 — Platform core via Flux</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, li, td, th, .badge) { overflow-wrap: anywhere; }
+  .kicker { letter-spacing: .14em; text-transform: uppercase; font-size: .72rem; font-weight: 700; opacity: .65; }
+  .codeblock { background: var(--color-base-200); border-radius: var(--radius-box); padding: 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; }
+</style>
+</head>
+<body class="bg-base-100 text-base-content">
+<div class="navbar bg-base-200/95 backdrop-blur sticky top-0 z-50 shadow-sm px-4">
+  <div class="navbar-start"><a class="btn btn-ghost btn-sm" href="index.html">← Plan</a></div>
+  <div class="navbar-end gap-1 text-sm">
+    <a class="btn btn-ghost btn-xs" href="phase-0.html">P0</a><a class="btn btn-ghost btn-xs" href="phase-1.html">P1</a>
+    <span class="btn btn-primary btn-xs pointer-events-none">P2</span>
+    <a class="btn btn-ghost btn-xs" href="phase-3.html">P3</a><a class="btn btn-ghost btn-xs" href="phase-4.html">P4</a>
+    <a class="btn btn-ghost btn-xs" href="phase-5.html">P5</a><a class="btn btn-ghost btn-xs" href="phase-6.html">P6</a>
+  </div>
+</div>
+<main class="mx-auto max-w-4xl p-4 lg:p-8 space-y-8">
+
+<header class="space-y-2">
+  <p class="kicker">Phase 2 · 1–2 weekends</p>
+  <h1 class="text-3xl font-bold">Platform core via Flux</h1>
+  <p class="text-base-content/70">Outcome: Flux owns the cluster. Cilium makes nodes Ready, a hello-world app answers on HTTPS at a LAN VIP with a valid wildcard cert, and deleting things by hand just makes Flux put them back.</p>
+  <span class="badge badge-soft badge-primary" id="prog"></span>
+</header>
+
+<div role="alert" class="alert alert-soft alert-info text-sm"><span><b>Prereqs:</b> Phase 1 cluster up. A GitHub personal access token (repo scope) for <span class="font-mono">flux bootstrap</span>. Your DNS provider API token for cert-manager DNS-01.</span></div>
+
+<section class="space-y-3">
+  <h2 class="text-xl font-bold">Steps</h2>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p2-01">
+    <span class="text-sm w-full"><b>Bootstrap Flux into the repo</b> (it commits its own manifests to the branch you point it at — use <span class="font-mono">talos-migration</span> until Phase 3 merges to main):
+      <span class="block codeblock mt-2"><code>export KUBECONFIG=$PWD/tofu/kubeconfig
+flux bootstrap github --owner=gatanasi --repository=server-hub \
+  --branch=talos-migration --path=k8s/clusters/prod --personal</code></span>
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p2-02">
+    <span class="text-sm w-full"><b>Load the age key and enable SOPS decryption</b> on every app/infra Kustomization:
+      <span class="block codeblock mt-2"><code>kubectl -n flux-system create secret generic sops-age \
+  --from-file=age.agekey=/path/to/keys.txt
+
+# In each Flux Kustomization:
+spec:
+  decryption:
+    provider: sops
+    secretRef: { name: sops-age }</code></span>
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p2-03">
+    <span class="text-sm w-full"><b>Define the layer ordering</b> in <span class="font-mono">k8s/clusters/prod/</span> — three Kustomizations with <span class="font-mono">dependsOn</span> and calm intervals (NVMe playbook: don't poll at 1m forever):
+      <span class="block codeblock mt-2"><code>cilium      (k8s/infrastructure/cilium)     interval: 10m
+platform    (k8s/infrastructure/…)          dependsOn: cilium
+apps        (k8s/apps)                      dependsOn: platform</code></span>
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p2-04">
+    <span class="text-sm w-full"><b>Cilium via HelmRelease</b> — the Talos-specific values that matter:
+      <span class="block codeblock mt-2"><code>ipam: { mode: kubernetes }
+kubeProxyReplacement: true
+k8sServiceHost: localhost      # KubePrism
+k8sServicePort: 7445
+securityContext:
+  capabilities:                # Talos-required capability sets — copy from
+    ciliumAgent: [ … ]         # the current Talos + Cilium docs page
+    cleanCiliumState: [ … ]
+cgroup:
+  autoMount: { enabled: false }
+  hostRoot: /sys/fs/cgroup
+l2announcements: { enabled: true }
+externalIPs: { enabled: true }</code></span>
+      Then the LAN VIP pool + announcement policy:
+      <span class="block codeblock mt-2"><code>apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata: { name: lan-pool }
+spec: { blocks: [{ start: 192.168.X.31, stop: 192.168.X.39 }] }
+---
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata: { name: lan-l2 }
+spec: { loadBalancerIPs: true }</code></span>
+      Nodes go <b>Ready</b> when Cilium reconciles. 🎉
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p2-05">
+    <span class="text-sm w-full"><b>cert-manager + wildcard cert via DNS-01</b> (works with zero open ports — fits the LAN/VPN-only model). DNS provider token as a <span class="font-mono">*.sops.yaml</span> secret, a <span class="font-mono">ClusterIssuer</span> with the dns01 solver, and one wildcard <span class="font-mono">Certificate</span> (<span class="font-mono">*.yourdomain.tld</span>) in the ingress namespace.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p2-06">
+    <span class="text-sm w-full"><b>ingress-nginx via HelmRelease</b>, pinned to the ingress VIP:
+      <span class="block codeblock mt-2"><code>controller:
+  service:
+    type: LoadBalancer
+    annotations: { "io.cilium/lb-ipam-ips": "192.168.X.31" }
+  ingressClassResource: { default: true }</code></span>
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p2-07">
+    <span class="text-sm w-full"><b>local-path-provisioner</b> (default StorageClass, path <span class="font-mono">/var/local-path-provisioner</span> — matches the Phase 1 kubelet extraMount) and <b>VolSync</b> (Helm; no snapshot controller needed since we use <span class="font-mono">copyMethod: Direct</span>).</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p2-08">
+    <span class="text-sm w-full"><b>csi-driver-nfs + a <span class="font-mono">nas-nfs</span> StorageClass</b> pointing at the NAS export — used by VolSync restic repositories now, media PVCs in Phase 5.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p2-09">
+    <span class="text-sm w-full"><b>Internal DNS:</b> on the UCG-Fiber, add static DNS records (or a wildcard) pointing <span class="font-mono">*.yourdomain.tld</span> → <span class="font-mono">192.168.X.31</span>. Optional stretch: external-dns with the UniFi webhook provider so records appear automatically per Ingress.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p2-10">
+    <span class="text-sm w-full"><b>Smoke test with podinfo:</b> HelmRelease under <span class="font-mono">k8s/apps/podinfo</span> + Ingress + PVC. Verify <span class="font-mono">https://podinfo.yourdomain.tld</span> from LAN and over wg-easy VPN. Then the GitOps proof: <span class="font-mono">kubectl delete ns podinfo</span> and watch Flux restore it.</span>
+  </label>
+</section>
+
+<div class="card card-border bg-base-100"><div class="card-body p-4 text-sm">
+  <h3 class="font-bold">Gotchas</h3>
+  <ul class="space-y-1 text-base-content/80">
+    <li>▸ Copy Cilium's Talos capability lists from the current docs — they change between versions; don't hand-type from memory.</li>
+    <li>▸ L2 announcements answer ARP on the node network — the VIPs must be in the same L2 segment as the LAN (they are, on vmbr0).</li>
+    <li>▸ If HelmReleases sit in "not ready", check <span class="font-mono">flux get all -A</span> before digging into pods — ordering issues surface there.</li>
+  </ul>
+</div></div>
+
+<div role="alert" class="alert alert-soft alert-success text-sm"><span><b>Exit criteria:</b> nodes Ready · podinfo on HTTPS with valid wildcard cert at the LAN VIP, reachable via VPN · delete-namespace test: Flux restores it · SOPS-encrypted secret decrypted in-cluster · everything above exists only as Git commits.</span></div>
+
+<footer class="flex justify-between text-sm pb-8">
+  <a class="btn btn-ghost btn-sm" href="phase-1.html">← Phase 1</a>
+  <a class="btn btn-primary btn-sm" href="phase-3.html">Phase 3: First apps →</a>
+</footer>
+</main>
+<script>
+(function(){var b=[].slice.call(document.querySelectorAll('input[type=checkbox][data-step]')),p=document.getElementById('prog');
+function u(){if(p)p.textContent=b.filter(function(x){return x.checked}).length+' / '+b.length+' done';}
+b.forEach(function(cb){var k='shplan:'+cb.dataset.step;try{cb.checked=localStorage.getItem(k)==='1'}catch(e){}
+cb.addEventListener('change',function(){try{localStorage.setItem(k,cb.checked?'1':'0')}catch(e){}u();});});u();})();
+</script>
+</body>
+</html>
