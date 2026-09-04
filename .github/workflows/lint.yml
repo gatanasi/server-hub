@@ -32,12 +32,8 @@ jobs:
       - name: ShellCheck
         run: shellcheck deploy/*.sh
 
-      - name: Install Ansible collections
-        run: |
-          pip install ansible-core
-          ansible-galaxy collection install --force -r ansible/requirements.yml -p ~/.ansible/collections
-
       - name: Ansible Lint
         uses: ansible/ansible-lint@665d9e07a1943254d2910faffc106adaf7ea7294 # v26.8.0
         with:
           working_directory: './ansible'
+          requirements_file: 'requirements.yml'
