@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase 4 — Stateful migrations</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, li, td, th, .badge) { overflow-wrap: anywhere; }
+  .kicker { letter-spacing: .14em; text-transform: uppercase; font-size: .72rem; font-weight: 700; opacity: .65; }
+  .codeblock { background: var(--color-base-200); border-radius: var(--radius-box); padding: 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; }
+</style>
+</head>
+<body class="bg-base-100 text-base-content">
+<div class="navbar bg-base-200/95 backdrop-blur sticky top-0 z-50 shadow-sm px-4">
+  <div class="navbar-start"><a class="btn btn-ghost btn-sm" href="index.html">← Plan</a></div>
+  <div class="navbar-end gap-1 text-sm">
+    <a class="btn btn-ghost btn-xs" href="phase-0.html">P0</a><a class="btn btn-ghost btn-xs" href="phase-1.html">P1</a>
+    <a class="btn btn-ghost btn-xs" href="phase-2.html">P2</a><a class="btn btn-ghost btn-xs" href="phase-3.html">P3</a>
+    <span class="btn btn-primary btn-xs pointer-events-none">P4</span>
+    <a class="btn btn-ghost btn-xs" href="phase-5.html">P5</a><a class="btn btn-ghost btn-xs" href="phase-6.html">P6</a>
+  </div>
+</div>
+<main class="mx-auto max-w-4xl p-4 lg:p-8 space-y-8">
+
+<header class="space-y-2">
+  <p class="kicker">Phase 4 · 2–3 weekends</p>
+  <h1 class="text-3xl font-bold">Stateful migrations</h1>
+  <p class="text-base-content/70">Outcome: n8n and odoo (plus filebrowser/ghost) run in-cluster with their history intact, every stateful PVC has a VolSync backup schedule, and the data-move recipe is a documented, repeatable runbook.</p>
+  <span class="badge badge-soft badge-primary" id="prog"></span>
+</header>
+
+<div role="alert" class="alert alert-soft alert-info text-sm"><span><b>The asset you already own:</b> your Ansible backup playbook produces per-volume tarballs on the NAS with containers stopped — clean, consistent archives. They are the migration vehicle; no new export tooling needed.</span></div>
+
+<section class="space-y-3">
+  <h2 class="text-xl font-bold">Steps</h2>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p4-01">
+    <span class="text-sm w-full"><b>Establish the data-move recipe</b> (write it down as you do n8n — it becomes <span class="font-mono">docs/plan/data-migration.md</span> for every later app):
+      <span class="block codeblock mt-2"><code>1. ./deploy/trigger.sh backup n8n          # fresh tarballs on the NAS
+2. Deploy the app in-cluster, replicas: 0  # PVCs get created, app stays down
+3. One restore Job per volume: mounts the target PVC + the NAS export,
+   untars the volume archive into the PVC root
+4. Fix ownership if needed (initContainer chown matching the app's UID)
+5. Scale up → verify data → flip DNS → soak → retire the VM</code></span>
+      Restore-Job skeleton:
+      <span class="block codeblock mt-2"><code>apiVersion: batch/v1
+kind: Job
+metadata: { name: restore-n8n-data, namespace: n8n }
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: restore
+          image: alpine:3.23
+          command: ["sh","-c","tar -xzf /backup/n8n_storage_TIMESTAMP.tar.gz -C /target"]
+          volumeMounts:
+            - { name: target, mountPath: /target }
+            - { name: backup, mountPath: /backup, readOnly: true }
+      volumes:
+        - { name: target, persistentVolumeClaim: { claimName: n8n-data } }
+        - { name: backup, nfs: { server: NAS_IP, path: /backups/n8n } }</code></span>
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p4-02">
+    <span class="text-sm w-full"><b>Migrate n8n first</b> (postgres + redis + app volume — the full pattern in miniature). Redis is cache-only: start it fresh. Postgres + n8n data via the recipe. The n8n <span class="font-mono">ENCRYPTION_KEY</span> from <span class="font-mono">.env.enc</span> must move byte-identical into the new SOPS secret or stored credentials die.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p4-03">
+    <span class="text-sm w-full"><b>Add VolSync backup schedules</b> as each app lands — one <span class="font-mono">ReplicationSource</span> per PVC:
+      <span class="block codeblock mt-2"><code>apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata: { name: n8n-data, namespace: n8n }
+spec:
+  sourcePVC: n8n-data
+  trigger: { schedule: "0 3 * * *" }        # daily 03:00
+  restic:
+    repository: n8n-data-restic-secret      # repo path on NAS + password (SOPS)
+    copyMethod: Direct                      # local-path has no snapshots
+    retain: { daily: 7, weekly: 4 }
+    pruneIntervalDays: 14</code></span>
+      Restore path (used in the DR drill) is the mirror <span class="font-mono">ReplicationDestination</span> into a fresh PVC.
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p4-04">
+    <span class="text-sm w-full"><b>Know the Direct-copy caveat and answer it per app:</b> backing up a <i>running</i> database with file-level restic is crash-consistent, not application-consistent. Acceptable for config-style volumes; for databases either (a) schedule backups at low-activity hours and accept crash-consistency, (b) add a pre-backup dump CronJob (<span class="font-mono">pg_dump</span> to the same PVC), or (c) graduate the app to CNPG (next step). Record the choice per app.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p4-05">
+    <span class="text-sm w-full"><b>Migrate filebrowser, odoo, and (if wanted) ghost</b> with the recipe. Odoo is the CNPG candidate: <b>optional but interview-gold</b> — CloudNativePG operator, one small Postgres cluster, WAL archiving to the NAS via barman-cloud; restore becomes point-in-time instead of last-tarball.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p4-06">
+    <span class="text-sm w-full"><b>Wave checkpoint (ADR 0006):</b> decide keep-or-drop for dolibarr/erpnext (staged, never mapped — don't port dead weight), record any "stays on VM" decisions in the <a class="link" href="index.html#waves">wave table</a>, and reclaim the RAM of every retired VM (optionally grow workers via tofu).</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p4-07">
+    <span class="text-sm w-full"><b>Test one restore end-to-end now</b> — not in Phase 6 for the first time: delete the podinfo PVC (or a scratch copy of n8n's), run a <span class="font-mono">ReplicationDestination</span>, verify contents. An untested backup is a hypothesis.</span>
+  </label>
+</section>
+
+<div role="alert" class="alert alert-soft alert-success text-sm"><span><b>Exit criteria:</b> n8n + odoo (+ filebrowser/ghost) in-cluster with history intact · VolSync schedule on every stateful PVC · one restore proven · data-move recipe written · staged-app decision recorded · retired VMs' RAM reclaimed.</span></div>
+
+<footer class="flex justify-between text-sm pb-8">
+  <a class="btn btn-ghost btn-sm" href="phase-3.html">← Phase 3</a>
+  <a class="btn btn-primary btn-sm" href="phase-5.html">Phase 5: Media &amp; hardware →</a>
+</footer>
+</main>
+<script>
+(function(){var b=[].slice.call(document.querySelectorAll('input[type=checkbox][data-step]')),p=document.getElementById('prog');
+function u(){if(p)p.textContent=b.filter(function(x){return x.checked}).length+' / '+b.length+' done';}
+b.forEach(function(cb){var k='shplan:'+cb.dataset.step;try{cb.checked=localStorage.getItem(k)==='1'}catch(e){}
+cb.addEventListener('change',function(){try{localStorage.setItem(k,cb.checked?'1':'0')}catch(e){}u();});});u();})();
+</script>
+</body>
+</html>

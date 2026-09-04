@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en" data-theme="luxury">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase 3 — First apps + PR-merge deploys</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/daisyui.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daisyui@5.5.19/themes.css">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.2.4/dist/index.global.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  :where(.grid, .flex) > * { min-width: 0; }
+  :where(p, h1, h2, h3, h4, li, td, th, .badge) { overflow-wrap: anywhere; }
+  .kicker { letter-spacing: .14em; text-transform: uppercase; font-size: .72rem; font-weight: 700; opacity: .65; }
+  .codeblock { background: var(--color-base-200); border-radius: var(--radius-box); padding: 1rem; overflow-x: auto; font-size: .8rem; line-height: 1.5; }
+</style>
+</head>
+<body class="bg-base-100 text-base-content">
+<div class="navbar bg-base-200/95 backdrop-blur sticky top-0 z-50 shadow-sm px-4">
+  <div class="navbar-start"><a class="btn btn-ghost btn-sm" href="index.html">← Plan</a></div>
+  <div class="navbar-end gap-1 text-sm">
+    <a class="btn btn-ghost btn-xs" href="phase-0.html">P0</a><a class="btn btn-ghost btn-xs" href="phase-1.html">P1</a>
+    <a class="btn btn-ghost btn-xs" href="phase-2.html">P2</a>
+    <span class="btn btn-primary btn-xs pointer-events-none">P3</span>
+    <a class="btn btn-ghost btn-xs" href="phase-4.html">P4</a><a class="btn btn-ghost btn-xs" href="phase-5.html">P5</a>
+    <a class="btn btn-ghost btn-xs" href="phase-6.html">P6</a>
+  </div>
+</div>
+<main class="mx-auto max-w-4xl p-4 lg:p-8 space-y-8">
+
+<header class="space-y-2">
+  <p class="kicker">Phase 3 · 1 weekend · <span class="text-primary">R2 lands here</span></p>
+  <h1 class="text-3xl font-bold">First apps + PR-merge deploys</h1>
+  <p class="text-base-content/70">Outcome: wave 1 (openspeedtest, stirling-pdf, convertx, video-converter, car-price-tracker) serves from the cluster, and a merged Renovate PR rolls out with zero manual steps.</p>
+  <span class="badge badge-soft badge-primary" id="prog"></span>
+</header>
+
+<div role="alert" class="alert alert-soft alert-info text-sm"><span><b>Prereq:</b> merge <span class="font-mono">talos-migration</span> to <span class="font-mono">main</span> at the start of this phase (and repoint the Flux GitRepository to main) — from here on, main is the deployed truth, which is the whole point.</span></div>
+
+<section class="space-y-3">
+  <h2 class="text-xl font-bold">Steps</h2>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p3-01">
+    <span class="text-sm w-full"><b>Establish the app convention</b> with the bjw-s <span class="font-mono">app-template</span> chart — one shape for every simple app:
+      <span class="block codeblock mt-2"><code># k8s/apps/stirling-pdf/helmrelease.yaml (skeleton)
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata: { name: stirling-pdf, namespace: stirling-pdf }
+spec:
+  chart:
+    spec: { chart: app-template, sourceRef: { kind: HelmRepository, name: bjw-s } }
+  values:
+    controllers:
+      stirling-pdf:
+        containers:
+          app:
+            image: { repository: docker.stirlingpdf.com/stirlingtools/stirling-pdf, tag: 2.14.2 }
+    service: { app: { ports: { http: { port: 8080 } } } }
+    ingress:
+      app:
+        hosts: [{ host: pdf.yourdomain.tld, paths: [{ path: / }] }]
+    persistence:
+      data: { size: 2Gi }     # local-path PVC</code></span>
+      Port over each wave-1 app from its <span class="font-mono">docker/&lt;app&gt;/compose.yaml</span>. Where an env var was in <span class="font-mono">.env.enc</span>, it becomes a <span class="font-mono">*.sops.yaml</span> Secret.
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p3-02">
+    <span class="text-sm w-full"><b>Cut over one app at a time:</b> deploy in cluster → test at a temp hostname → flip the UCG DNS record to the ingress VIP → soak a few days → stop the app's VM (keep it a week as rollback) → remove from Ansible inventory → delete the VM. Repeat ×5.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p3-03">
+    <span class="text-sm w-full"><b>Wire Renovate for k8s</b> — extend <span class="font-mono">renovate.json</span> with the <span class="font-mono">flux</span> and <span class="font-mono">helm-values</span> managers scoped to <span class="font-mono">k8s/</span> (see Renovate docs for the current manager config shape). Result: image/chart bumps arrive as PRs exactly like your compose bumps do today.</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p3-04">
+    <span class="text-sm w-full"><b>PR validation in CI</b> (extend the existing lint workflow):
+      <span class="block codeblock mt-2"><code>- kubeconform: schema-validate everything under k8s/ (skip SOPS files)
+- flux-local diff: render "what would change in the cluster" and post
+  it as a PR comment — YAML reviewed as behavior, not indentation
+- tofu fmt -check && tofu validate</code></span>
+    </span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p3-05">
+    <span class="text-sm w-full"><b>Deploy car-price-tracker</b> — your own image, so this is the full-story demo: code → GHCR image → Renovate PR in this repo → merge → Flux rollout. (Its postgres is small; migrate the DB with the Phase 4 recipe, or start fresh if the data is re-scrapeable.)</span>
+  </label>
+
+  <label class="flex gap-3 items-start rounded-box border border-base-content/10 p-3 cursor-pointer">
+    <input type="checkbox" class="checkbox checkbox-primary checkbox-sm mt-0.5" data-step="p3-06">
+    <span class="text-sm w-full"><b>The R2 proof, on tape:</b> wait for (or trigger) a Renovate bump PR for a wave-1 app, merge it on GitHub from your phone, and watch <span class="font-mono">flux get helmreleases -A --watch</span> roll it out. No SSH, no scripts. That's the deploy model from now on.</span>
+  </label>
+</section>
+
+<div role="alert" class="alert alert-soft alert-success text-sm"><span><b>Exit criteria:</b> 5 wave-1 apps served from the cluster · their VMs removed from inventory · Renovate PRs cover k8s/ · CI validates + diffs PRs · one merged PR = one rollout, demonstrated.</span></div>
+
+<footer class="flex justify-between text-sm pb-8">
+  <a class="btn btn-ghost btn-sm" href="phase-2.html">← Phase 2</a>
+  <a class="btn btn-primary btn-sm" href="phase-4.html">Phase 4: Stateful →</a>
+</footer>
+</main>
+<script>
+(function(){var b=[].slice.call(document.querySelectorAll('input[type=checkbox][data-step]')),p=document.getElementById('prog');
+function u(){if(p)p.textContent=b.filter(function(x){return x.checked}).length+' / '+b.length+' done';}
+b.forEach(function(cb){var k='shplan:'+cb.dataset.step;try{cb.checked=localStorage.getItem(k)==='1'}catch(e){}
+cb.addEventListener('change',function(){try{localStorage.setItem(k,cb.checked?'1':'0')}catch(e){}u();});});u();})();
+</script>
+</body>
+</html>
