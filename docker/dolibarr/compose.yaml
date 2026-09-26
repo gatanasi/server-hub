@@ -1,11 +1,13 @@
 services:
     mariadb:
-        image: mariadb:12.3.3@sha256:805c8e104bd563d5bfa24fadd3f31cd419ea859cb5277f32b5dbf2db714f9ed1
+        image: mariadb:13.0.2@sha256:d4fdec0510ad498e4f3127da30a99df3745bd6d5e611ae6ac5f76403d9284a8d
         environment:
             MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD environment variable is required}
             MYSQL_DATABASE: ${MYSQL_DATABASE:-dolidb}
             MYSQL_USER: ${MYSQL_USER:-dolidbuser}
             MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD environment variable is required}
+            # Run mariadb-upgrade on start when the datadir was created by an older version
+            MARIADB_AUTO_UPGRADE: "1"
         volumes:
             - /home/dolibarr_mariadb:/var/lib/mysql
 
