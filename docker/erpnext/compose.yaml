@@ -84,11 +84,11 @@ services:
         bench new-site --mariadb-user-host-login-scope='%' --admin-password="$$ERP_SITE_ADMIN_PASSWORD" --db-root-username=root --db-root-password="$$ERP_DB_ROOT_PASSWORD" --install-app erpnext --set-default frontend;
 
   db:
-    image: mariadb:12.3@sha256:805c8e104bd563d5bfa24fadd3f31cd419ea859cb5277f32b5dbf2db714f9ed1
+    image: mariadb:13.0@sha256:d4fdec0510ad498e4f3127da30a99df3745bd6d5e611ae6ac5f76403d9284a8d
     networks:
       - frappe_network
     healthcheck:
-      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h localhost"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mariadb-admin ping -h localhost"]
       interval: 1s
       retries: 20
     deploy:
@@ -102,6 +102,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${ERP_DB_ROOT_PASSWORD:?ERP_DB_ROOT_PASSWORD environment variable is required}
       MARIADB_ROOT_PASSWORD: ${ERP_DB_ROOT_PASSWORD:?ERP_DB_ROOT_PASSWORD environment variable is required}
+      # Run mariadb-upgrade on start when the datadir was created by an older version
+      MARIADB_AUTO_UPGRADE: "1"
     volumes:
       - db-data:/var/lib/mysql
 
