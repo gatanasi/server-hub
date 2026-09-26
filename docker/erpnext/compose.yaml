@@ -88,7 +88,7 @@ services:
     networks:
       - frappe_network
     healthcheck:
-      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h localhost"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mariadb-admin ping -h localhost"]
       interval: 1s
       retries: 20
     deploy:
@@ -102,6 +102,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${ERP_DB_ROOT_PASSWORD:?ERP_DB_ROOT_PASSWORD environment variable is required}
       MARIADB_ROOT_PASSWORD: ${ERP_DB_ROOT_PASSWORD:?ERP_DB_ROOT_PASSWORD environment variable is required}
+      # Run mariadb-upgrade on start when the datadir was created by an older version
+      MARIADB_AUTO_UPGRADE: "1"
     volumes:
       - db-data:/var/lib/mysql
 
