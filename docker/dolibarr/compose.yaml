@@ -6,6 +6,8 @@ services:
             MYSQL_DATABASE: ${MYSQL_DATABASE:-dolidb}
             MYSQL_USER: ${MYSQL_USER:-dolidbuser}
             MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD environment variable is required}
+            # Run mariadb-upgrade on start when the datadir was created by an older version
+            MARIADB_AUTO_UPGRADE: "1"
         volumes:
             - /home/dolibarr_mariadb:/var/lib/mysql
 
