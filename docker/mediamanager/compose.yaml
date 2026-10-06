@@ -18,7 +18,7 @@ services:
         condition: service_healthy
   db:
     container_name: mediamanager_postgres
-    image: postgres:17.11@sha256:d74eeac9a635390a49bc21bd49fccd973de707e2a53a76ac49b552b8712ec46f
+    image: postgres:17.11@sha256:ae69c452f483507a6b99fb654cf93aad7fe156ffd2c56247707eef4e36d3c12b
     restart: unless-stopped
     volumes:
       - ./postgres:/var/lib/postgresql/data
