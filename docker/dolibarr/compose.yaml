@@ -12,7 +12,7 @@ services:
             - /home/dolibarr_mariadb:/var/lib/mysql
 
     web:
-        image: dolibarr/dolibarr:24.0.1@sha256:e06185b7050dc806b5044b594aac3eb5f8b7e5ad1e4bf949ce843776e3ec75f0
+        image: dolibarr/dolibarr:24.0.1@sha256:638727a1a035515b8f1e9c7694ee25315c4b79d618d4f19878efda977b20d49f
         environment:
             DOLI_INIT_DEMO: ${DOLI_INIT_DEMO:-0}
             DOLI_DB_HOST: ${DOLI_DB_HOST:-mariadb}
