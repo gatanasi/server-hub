@@ -77,6 +77,12 @@ all:
           managed_apps:
             - car-price-tracker
 
+        first-bite.vm:
+          ansible_user: first-bite
+          ansible_host: first-bite.vm
+          managed_apps:
+            - first-bite
+
         stirling-pdf.vm:
           ansible_user: stirling
           ansible_host: stirling-pdf.vm
