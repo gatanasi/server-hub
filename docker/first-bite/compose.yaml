@@ -34,6 +34,8 @@ services:
     container_name: first-bite
     image: ghcr.io/gatanasi/first-bite:v0.2.0
     restart: unless-stopped
+    env_file:
+      - path: .env
     environment:
       TZ: ${TIMEZONE}
       DATABASE_HOST: db
