@@ -32,7 +32,7 @@ services:
 
   first-bite:
     container_name: first-bite
-    image: ghcr.io/gatanasi/first-bite:v0.4.2@sha256:c30fb314ab64c090bfcce18e1f1e87c544b7d729d731d13c952eeccf981157b7
+    image: ghcr.io/gatanasi/first-bite:v0.5.0@sha256:e2cfdf68f003d131ce23624531fc63aeee1f508e740ed1a25b4e947220f26a94
     restart: unless-stopped
     env_file:
       - path: .env
