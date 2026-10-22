@@ -1,7 +1,7 @@
 services:
   db:
     container_name: first-bite-db
-    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    image: postgres:18-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
     restart: unless-stopped
     environment:
       TZ: ${TIMEZONE}
@@ -32,7 +32,7 @@ services:
 
   first-bite:
     container_name: first-bite
-    image: ghcr.io/gatanasi/first-bite:v1.0.0@sha256:efc66ec76d99b3d8738b16dbb21e38c906129a1736dcef0abe45e6c79e1954a8
+    image: ghcr.io/gatanasi/first-bite:v1.1.0@sha256:97443f671e53625c7c99f54bf8159c181137246294544c84f1e23695662e382e
     restart: unless-stopped
     env_file:
       - path: .env
@@ -70,7 +70,7 @@ services:
 
   adminer:
     container_name: first-bite-adminer
-    image: adminer:6.1.2@sha256:49a7d30e71de97fb18933ffe7d46cc2b343c49fd7a63a7791c8be2548eb65115
+    image: adminer:6.1.2@sha256:4e3a6514c26c625de2020c549d1eb24ddd2515f18311aa4bf32c823713c2f6fe
     restart: unless-stopped
     environment:
       ADMINER_DEFAULT_SERVER: first-bite-db
