@@ -32,7 +32,7 @@ services:
 
   first-bite:
     container_name: first-bite
-    image: ghcr.io/gatanasi/first-bite:v1.1.0@sha256:97443f671e53625c7c99f54bf8159c181137246294544c84f1e23695662e382e
+    image: ghcr.io/gatanasi/first-bite:v1.1.1@sha256:07dd9a79f8607fffd29b5a5a8f8c6b0c55874c438179f71b57df85a521e84290
     restart: unless-stopped
     env_file:
       - path: .env
@@ -70,7 +70,7 @@ services:
 
   adminer:
     container_name: first-bite-adminer
-    image: adminer:6.1.2@sha256:4e3a6514c26c625de2020c549d1eb24ddd2515f18311aa4bf32c823713c2f6fe
+    image: adminer:6.1.2@sha256:251295c1cd51d3889f1c42ffa4864b24eeab51f0caf395cfe5bf4726c5ec9a2a
     restart: unless-stopped
     environment:
       ADMINER_DEFAULT_SERVER: first-bite-db
