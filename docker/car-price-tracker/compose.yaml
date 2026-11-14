@@ -43,6 +43,7 @@ services:
       SCRAPE_INTERVAL_HOURS: ${SCRAPE_INTERVAL_HOURS}
       RETRY_INTERVAL_HOURS: ${RETRY_INTERVAL_HOURS}
       MAX_PAGES_PER_FILTER: ${MAX_PAGES_PER_FILTER}
+    init: true
     ports:
       - "8080:8080"
     depends_on:
