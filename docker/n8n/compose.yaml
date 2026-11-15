@@ -2,7 +2,7 @@ services:
   n8n:
     container_name: n8n
     restart: always
-    image: docker.n8n.io/n8nio/n8n:stable@sha256:f3284c9ad6892dc578dadd506d0969adc28046a5e010cb0c3bc892cae1ef292d
+    image: docker.n8n.io/n8nio/n8n:stable@sha256:b4b90747b81fcda7e76550c0d3aa7f0f64917a1e9573cff40d6834eaf2e0f8ea
     environment:
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
       - N8N_ENCRYPTION_KEY=${ENCRYPTION_KEY}
