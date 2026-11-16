@@ -1,0 +1,53 @@
+---
+# Application settings. https://gethomepage.dev/configs/settings/
+
+title: Server Hub
+description: Homelab dashboard
+
+theme: dark
+color: slate
+headerStyle: clean
+cardStyle: hairline
+blockStyle: refined
+
+# Open services in a new tab so the dashboard stays put.
+target: _blank
+
+# One dot per status source (site monitor, Proxmox guest) instead of raw text.
+statusStyle: dot
+
+useEqualHeights: true
+
+# Image updates arrive as Renovate PRs; no need for the app to poll GitHub as well.
+disableUpdateCheck: true
+
+# The hostname is internal, but ask crawlers to stay away in case it is ever published.
+disableIndexing: true
+
+quicklaunch:
+  searchDescriptions: true
+  hideInternetSearch: true
+
+# Group order and shape. Names must match the groups in services.yaml / bookmarks.yaml.
+layout:
+  - Media:
+      style: row
+      columns: 4
+  - Downloads:
+      style: row
+      columns: 4
+  - Apps:
+      style: row
+      columns: 5
+  - Network:
+      style: row
+      columns: 3
+  - Infrastructure:
+      style: row
+      columns: 4
+  - Homelab:
+      style: row
+      columns: 3
+  - Docs:
+      style: row
+      columns: 4
