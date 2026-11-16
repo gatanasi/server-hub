@@ -48,7 +48,7 @@
 (routes) {
 	@wg-easy expression {host}.startsWith("wg-easy")
 	handle @wg-easy {
-		reverse_proxy http://wireguard.vm:51821 {
+		reverse_proxy http://wireguard.vm:8080 {
 			import common_proxy_headers
 		}
 	}

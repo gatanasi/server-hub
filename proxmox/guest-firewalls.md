@@ -51,6 +51,7 @@ GROUP common-logging
 GROUP common-noise
 GROUP common-allow
 GROUP from-caddy-proxy
+GROUP vm-isolation
 GROUP common-logging
 ```
 
@@ -62,6 +63,7 @@ GROUP common-logging
 GROUP common-noise
 GROUP common-allow
 GROUP from-caddy-proxy
+GROUP vm-isolation
 GROUP common-logging
 ```
 
@@ -73,6 +75,7 @@ GROUP common-logging
 GROUP common-noise
 GROUP common-allow
 GROUP from-caddy-proxy
+GROUP vm-isolation
 GROUP common-logging
 ```
 
@@ -96,6 +99,31 @@ GROUP common-logging
 GROUP common-noise
 GROUP common-allow
 GROUP from-caddy-proxy
+GROUP vm-isolation
+GROUP common-logging
+```
+
+## VMID 204
+- Hostname: car-price-tracker
+- Type: lxc
+- Firewall rules
+```text
+GROUP common-noise
+GROUP common-allow
+GROUP from-caddy-proxy
+GROUP vm-isolation
+GROUP common-logging
+```
+
+## VMID 205
+- Hostname: first-bite
+- Type: lxc
+- Firewall rules
+```text
+GROUP common-noise
+GROUP common-allow
+GROUP from-caddy-proxy
+GROUP vm-isolation
 GROUP common-logging
 ```
 
@@ -168,6 +196,7 @@ GROUP common-logging
 GROUP common-noise
 GROUP common-allow
 GROUP wireguard
+GROUP from-caddy-proxy
 GROUP common-logging
 ```
 
@@ -249,5 +278,6 @@ GROUP common-logging
 GROUP common-noise
 GROUP common-allow
 GROUP from-caddy-proxy
+GROUP vm-isolation
 GROUP common-logging
 ```

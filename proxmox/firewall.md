@@ -36,7 +36,7 @@ dc/gateway-vm
 
 GROUP common-noise
 GROUP common-allow
-IN ACCEPT -p tcp -dport 8006 -log nolog # Proxmox GUI
+IN ACCEPT -source dc/local-network -p tcp -dport 8006 -log nolog # Proxmox GUI
 GROUP common-logging
 
 [group arr-stack]
@@ -86,7 +86,6 @@ OUT DROP -dest dc/local-network -log nolog
 [group vpn-arg]
 
 IN ACCEPT -p udp -dport 61249 -log nolog
-IN ACCEPT -p tcp -dport 51821 -log nolog
 IN ACCEPT -p udp -dport 41641 -log nolog
 IN ACCEPT -p tcp -dport 5252 -log nolog
 
@@ -100,13 +99,12 @@ IN ACCEPT -p udp -dport 443 -log nolog # Web UDP
 OUT ACCEPT -dest dc/gateway-vm -log nolog
 IN RDP(ACCEPT) -source dc/local-network -log nolog
 OUT ACCEPT -dest dc/caddy -log nolog
-OUT DROP -dest dc/vm-network -log nolog
-OUT DROP -dest dc/local-network -log nolog
+OUT DROP -dest dc/vm-network -log debug
+OUT DROP -dest dc/local-network -log debug
 
 [group wireguard]
 
 IN ACCEPT -p udp -dport 62496 -log nolog
-IN ACCEPT -p tcp -dport 51821 -log nolog # WG-Easy Web UI
 
 ```
 
