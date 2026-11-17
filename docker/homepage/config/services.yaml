@@ -54,16 +54,6 @@
           key: "{{HOMEPAGE_VAR_IMMICH_KEY}}"
           version: 2 # Immich >= v1.118
 
-    - MediaManager:
-        icon: mdi-movie-open
-        href: "https://mediamanager.home.{{HOMEPAGE_VAR_DOMAIN}}"
-        description: Library manager
-        siteMonitor: "https://mediamanager.home.{{HOMEPAGE_VAR_DOMAIN}}"
-        proxmoxNode: pve-01
-        proxmoxVMID: 502
-        proxmoxType: lxc
-        # No Homepage widget exists.
-
 - Downloads:
     - Radarr:
         icon: radarr.png
@@ -219,32 +209,6 @@
         proxmoxVMID: 205
         proxmoxType: lxc
 
-    - Ollama:
-        icon: ollama.png
-        href: "https://ollama.home.{{HOMEPAGE_VAR_DOMAIN}}"
-        description: Local LLM API
-        siteMonitor: "https://ollama.home.{{HOMEPAGE_VAR_DOMAIN}}"
-        proxmoxNode: pve-01
-        proxmoxVMID: 220
-        proxmoxType: lxc
-        # No native widget; count the entries of the Ollama API's model list.
-        # https://gethomepage.dev/widgets/services/customapi/
-        widget:
-          type: customapi
-          url: "https://ollama.home.{{HOMEPAGE_VAR_DOMAIN}}/api/tags"
-          refreshInterval: 60000
-          mappings:
-            - field: models
-              label: Models
-              format: size
-
-    - llama.cpp:
-        icon: mdi-brain
-        description: Inference guest (no web route)
-        proxmoxNode: pve-01
-        proxmoxVMID: 221
-        proxmoxType: lxc
-
 - Network:
     - Caddy:
         icon: caddy.png
@@ -270,42 +234,6 @@
           version: 2 # wg-easy >= v15
           username: "{{HOMEPAGE_VAR_WGEASY_USERNAME}}"
           password: "{{HOMEPAGE_VAR_WGEASY_PASSWORD}}"
-
-    - Tailscale:
-        icon: tailscale.png
-        href: https://login.tailscale.com/admin/machines
-        description: Subnet router & exit node
-        proxmoxNode: pve-01
-        proxmoxVMID: 251
-        proxmoxType: lxc
-        widget:
-          type: tailscale
-          deviceid: "{{HOMEPAGE_VAR_TAILSCALE_DEVICE_ID}}"
-          key: "{{HOMEPAGE_VAR_TAILSCALE_KEY}}"
-          fields: ["address", "last_seen", "expires", "update_available"]
-
-    - Cloudflare Tunnel:
-        icon: cloudflare-zero-trust.png
-        href: https://one.dash.cloudflare.com/
-        description: Public ingress (Access-protected)
-        proxmoxNode: pve-01
-        proxmoxVMID: 252
-        proxmoxType: lxc
-        widget:
-          type: cloudflared
-          accountid: "{{HOMEPAGE_VAR_CLOUDFLARED_ACCOUNT_ID}}"
-          tunnelid: "{{HOMEPAGE_VAR_CLOUDFLARED_TUNNEL_ID}}"
-          key: "{{HOMEPAGE_VAR_CLOUDFLARED_KEY}}"
-
-    - UniFi:
-        icon: unifi.png
-        href: https://10.10.0.1
-        description: UCG Fiber gateway
-        widget:
-          type: unifi
-          url: https://10.10.10.1
-          key: "{{HOMEPAGE_VAR_UNIFI_KEY}}"
-          fields: ["uptime", "wan", "lan_users", "wlan_users"]
 
     - OpenSpeedTest:
         icon: openspeedtest.png
