@@ -123,8 +123,6 @@ To avoid documentation drift, this README does not duplicate app name lists.
   secure runner/deployer setup
 - [docs/BACKUP_STRATEGY.md](docs/BACKUP_STRATEGY.md): backup and restore
   architecture, workflows, and safety checks
-- [docs/HOMEPAGE.md](docs/HOMEPAGE.md): dashboard design, first-deployment
-  runbook, and how to add a service tile
 - [docs/ROADMAP.md](docs/ROADMAP.md): planned services and infrastructure decisions
 - [lxc/ollama/README.md](lxc/ollama/README.md): notes for Ollama LXC and ROCm tuning
 

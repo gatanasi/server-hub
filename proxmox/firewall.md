@@ -43,6 +43,7 @@ GROUP common-logging
 
 [group arr-stack]
 
+IN ACCEPT -source dc/homepage -p tcp -dport 8000 -log nolog # Homepage
 IN ACCEPT -source dc/vm-network -p tcp -dport 8080,8989,7878,8686,8787,9696,5055,6767,8191,3000 -log nolog
 OUT ACCEPT -dest dc/jellyfin -p tcp -dport 8080 -log nolog
 OUT ACCEPT -dest dc/vpn-arg -log nolog
