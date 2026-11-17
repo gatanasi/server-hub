@@ -30,7 +30,6 @@ Compose definitions exist, but these are not currently mapped in production inve
 ## Planned Services
 
 - [ ] Invoice Ninja
-- [ ] Homepage (defined in `docker/homepage`, guest not provisioned yet; see [HOMEPAGE.md](HOMEPAGE.md))
 - [ ] Uptime Kuma
 - [ ] InfluxDB
 - [ ] Grafana
