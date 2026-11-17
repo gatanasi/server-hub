@@ -1,6 +1,15 @@
+x-logging: &logging
+    # Most guests already default to journald (daemon.json). Declaring it here
+    # applies it everywhere, including guests still on unbounded json-file.
+    # journald caps its own disk use (SystemMaxUse).
+    driver: journald
+    options:
+        tag: "{{.Name}}"
+
 services:
     openspeedtest:
         container_name: openspeedtest
+        logging: *logging
         image: openspeedtest/latest:v2.0.8@sha256:1127de0693c36bcf8c297c73d09891df8ec243680d027a6b6fab13fa0954ff46
         restart: unless-stopped
         ports:
@@ -20,61 +29,60 @@ services:
 
     certbot:
         container_name: certbot
+        logging: *logging
         image: certbot/dns-cloudflare:5.5.0@sha256:f90db06a98b61bd221fe5a9688d0bb975b444760ef677cb4369ffc2a8a16e579
         restart: unless-stopped
+        environment:
+            # Read by certbot.sh at runtime, so the token never appears in a command line.
+            CERTBOT_DOMAIN: ${CERTBOT_DOMAIN}
+            CERTBOT_EMAIL: ${CERTBOT_EMAIL}
+            CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+            DOCKER_API: http://docker-api:2375
         volumes:
             - ${HOST_CERTBOT_DATA}:/etc/letsencrypt
             - ${HOST_CERT_PATH}:/output_ssl
-            # Mount docker socket to restart openspeedtest on renewal
-            - /var/run/docker.sock:/var/run/docker.sock
-        entrypoint: /bin/sh
-        command: >-
-            -c '
-                set -eu
+            - ./certbot.sh:/certbot.sh:ro
+        entrypoint: ["/bin/sh", "/certbot.sh"]
+        depends_on:
+            - docker-api
+        networks:
+            - default      # Let's Encrypt and the Cloudflare API
+            - docker-api   # the one Docker API call certbot is allowed
 
-                # Create Cloudflare credentials file
-                mkdir -p /secrets
-                printf "dns_cloudflare_api_token = %s\n" "${CLOUDFLARE_API_TOKEN}" > /secrets/cloudflare.ini
-                chmod 600 /secrets/cloudflare.ini
+    # Gives certbot one Docker API call (restart openspeedtest) instead of the
+    # whole socket, which is root on the guest.
+    docker-api:
+        container_name: certbot-docker-api
+        logging: *logging
+        image: wollomatic/socket-proxy:1.13.2@sha256:ff95d6ff6c27853005ef85eb8f4ab5923dc3d2f1e055f98fb6aeeaceec3fe848
+        restart: unless-stopped
+        user: "65534:996" # 996 = group of /var/run/docker.sock on openspeedtest.vm
+        read_only: true
+        cap_drop:
+            - ALL
+        security_opt:
+            - no-new-privileges:true
+        mem_limit: 64M
+        command:
+            - -loglevel=info
+            - -listenip=0.0.0.0
+            - -allowfrom=certbot
+            # Patterns are anchored (^...$) by socket-proxy.
+            - -allowPOST=(/v1\.[0-9]+)?/containers/openspeedtest/restart
+            - -allowhealthcheck
+            - -watchdoginterval=3600
+            - -stoponwatchdog
+            - -shutdowngracetime=5
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        healthcheck:
+            test: ["CMD", "./healthcheck"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+        networks:
+            - docker-api
 
-                echo "Attempting to obtain initial certificate for ${CERTBOT_DOMAIN}..."
-
-                # Install docker-cli (for the deploy-hook)
-                if ! command -v docker &> /dev/null; then
-                    echo "Installing docker-cli..."
-                    apk add --no-cache docker-cli
-                fi;
-
-                # Get certificate
-                if [ ! -f "/etc/letsencrypt/live/${CERTBOT_DOMAIN}/fullchain.pem" ]; then
-                    echo "No certificate found. Obtaining initial certificate for ${CERTBOT_DOMAIN}..."
-                    certbot certonly \
-                        --non-interactive \
-                        --agree-tos \
-                        --dns-cloudflare \
-                        --email ${CERTBOT_EMAIL} \
-                        --dns-cloudflare-credentials /secrets/cloudflare.ini \
-                        --dns-cloudflare-propagation-seconds 60 \
-                        -d ${CERTBOT_DOMAIN}
-
-                    echo "Copying certificates to output directory for openspeedtest..."
-                    cp /etc/letsencrypt/live/${CERTBOT_DOMAIN}/fullchain.pem /output_ssl/nginx.crt
-                    cp /etc/letsencrypt/live/${CERTBOT_DOMAIN}/privkey.pem /output_ssl/nginx.key
-
-                    chmod 644 /output_ssl/nginx.crt /output_ssl/nginx.key
-
-                    docker restart openspeedtest
-                else
-                    echo "Certificate found. Skipping initial-obtainment"
-                fi
-
-                # Start renewal loop
-                while :; do
-                    echo "Starting renewal loop..."
-                    certbot renew --quiet \
-                        --deploy-hook "cp /etc/letsencrypt/live/${CERTBOT_DOMAIN}/fullchain.pem /output_ssl/nginx.crt && \
-                                       cp /etc/letsencrypt/live/${CERTBOT_DOMAIN}/privkey.pem /output_ssl/nginx.key && \
-                                       docker restart openspeedtest";
-                    sleep 12h;
-                done;
-            '
+networks:
+    docker-api:
+        internal: true
