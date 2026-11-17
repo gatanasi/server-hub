@@ -1,6 +1,15 @@
+x-logging: &logging
+  # Most guests already default to journald (daemon.json). Declaring it here
+  # applies it everywhere, including guests still on unbounded json-file.
+  # journald caps its own disk use (SystemMaxUse).
+  driver: journald
+  options:
+    tag: "{{.Name}}"
+
 services:
   video-converter:
     container_name: video-converter
+    logging: *logging
     image: ghcr.io/gatanasi/video-converter:3.0.3@sha256:528df1f2f5cb64af9cbf293e8f29bcd0d722d2cbb569a1bf4fc56fe60ba28dfd
     restart: unless-stopped
     ports:

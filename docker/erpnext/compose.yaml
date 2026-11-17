@@ -1,8 +1,17 @@
 version: "3"
 
+x-logging: &logging
+  # Most guests already default to journald (daemon.json). Declaring it here
+  # applies it everywhere, including guests still on unbounded json-file.
+  # journald caps its own disk use (SystemMaxUse).
+  driver: journald
+  options:
+    tag: "{{.Name}}"
+
 services:
   backend:
     image: frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84
+    logging: *logging
     networks:
       - frappe_network
     deploy:
@@ -17,6 +26,7 @@ services:
 
   configurator:
     image: frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84
+    logging: *logging
     networks:
       - frappe_network
     deploy:
@@ -46,6 +56,7 @@ services:
 
   create-site:
     image: frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84
+    logging: *logging
     networks:
       - frappe_network
     deploy:
@@ -85,6 +96,7 @@ services:
 
   db:
     image: mariadb:13.0@sha256:54f493ea0d60b621a5bff84e5b20100f8b86b6efa6b79158e04756c5194a5e4d
+    logging: *logging
     networks:
       - frappe_network
     healthcheck:
@@ -109,6 +121,7 @@ services:
 
   frontend:
     image: frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84
+    logging: *logging
     networks:
       - frappe_network
     depends_on:
@@ -135,6 +148,7 @@ services:
 
   queue-long:
     image: frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84
+    logging: *logging
     networks:
       - frappe_network
     deploy:
@@ -154,6 +168,7 @@ services:
 
   queue-short:
     image: frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84
+    logging: *logging
     networks:
       - frappe_network
     deploy:
@@ -173,6 +188,7 @@ services:
 
   redis-queue:
     image: redis:8.10-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
+    logging: *logging
     networks:
       - frappe_network
     deploy:
@@ -183,6 +199,7 @@ services:
 
   redis-cache:
     image: redis:8.10-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
+    logging: *logging
     networks:
       - frappe_network
     deploy:
@@ -191,6 +208,7 @@ services:
 
   scheduler:
     image: frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84
+    logging: *logging
     networks:
       - frappe_network
     deploy:
@@ -205,6 +223,7 @@ services:
 
   websocket:
     image: frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84
+    logging: *logging
     networks:
       - frappe_network
     deploy:

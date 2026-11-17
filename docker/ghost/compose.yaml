@@ -1,8 +1,17 @@
+x-logging: &logging
+  # Most guests already default to journald (daemon.json). Declaring it here
+  # applies it everywhere, including guests still on unbounded json-file.
+  # journald caps its own disk use (SystemMaxUse).
+  driver: journald
+  options:
+    tag: "{{.Name}}"
+
 services:
   ghost:
     # Do not alter this without updating the Tinybird Sync container as well
     image: ghost:${GHOST_VERSION:-6-alpine}
     restart: always
+    logging: *logging
     ports:
       - "${GHOST_PORT:-2368}:2368"
     environment:
@@ -28,6 +37,7 @@ services:
   db:
     image: mysql:8.4.13@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
     restart: always
+    logging: *logging
     expose:
       - "3306"
     environment:
@@ -51,6 +61,7 @@ services:
   activitypub:
     image: ghcr.io/tryghost/activitypub:1.2.20@sha256:bf8cc656afb8f75c50af6f8215a094075d5feb931fa4c51aef61d6842dbc80c5
     restart: always
+    logging: *logging
     ports:
       - "8080:8080"
     volumes:
@@ -84,6 +95,7 @@ services:
       db:
         condition: service_healthy
     restart: no
+    logging: *logging
 
 volumes:
   traffic_analytics_data:
