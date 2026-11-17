@@ -33,7 +33,7 @@ services:
 
   car-price-tracker:
     container_name: car-price-tracker
-    image: ghcr.io/gatanasi/car-price-tracker:v3.1.3@sha256:2503fa0b11af80c070f5f28f3d9c95b5bcd3971becc345bfb3ce115d46b7e39a
+    image: ghcr.io/gatanasi/car-price-tracker:v3.2.0@sha256:5c471881f68a3755f9c8b304ff764619807a10b2b6f40bfb9dd751cf7721d65f
     restart: unless-stopped
     environment:
       TZ: ${TIMEZONE}
@@ -71,7 +71,7 @@ services:
 
   adminer:
     container_name: car-price-tracker-adminer
-    image: adminer:6.3.0@sha256:3a07decd833c2375ea749aa8018250c1db4859a78bd55354f797bfb591733233
+    image: adminer:6.3.0@sha256:7605e298e5a2ac74d806283362fa253a4e0a42cfd881e8fa2c155f0631899f6c
     restart: unless-stopped
     environment:
       ADMINER_DEFAULT_SERVER: car-price-tracker-db
