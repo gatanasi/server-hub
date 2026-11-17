@@ -112,13 +112,11 @@
         proxmoxNode: pve-01
         proxmoxVMID: 501
         proxmoxType: lxc
-        # Opt-in: the widget needs Gluetun's control server (port 8000) published and
-        # authenticated, which is a change to docker/arr. See docs/HOMEPAGE.md.
-        # widget:
-        #   type: gluetun
-        #   url: http://arr.vm:8000
-        #   key: "{{HOMEPAGE_VAR_GLUETUN_KEY}}"
-        #   version: 2 # Gluetun >= 3.40.1
+        widget:
+          type: gluetun
+          url: http://arr.vm:8000
+          key: "{{HOMEPAGE_VAR_GLUETUN_KEY}}"
+          version: 2 # Gluetun >= 3.40.1
 
     - FlareSolverr:
         icon: flaresolverr.png
