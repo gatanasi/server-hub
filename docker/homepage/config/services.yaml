@@ -59,8 +59,10 @@
         href: "https://mediamanager.home.{{HOMEPAGE_VAR_DOMAIN}}"
         description: Library manager
         siteMonitor: "https://mediamanager.home.{{HOMEPAGE_VAR_DOMAIN}}"
-        # No Homepage widget exists. Guest is not in proxmox/guest-firewalls.md yet; add
-        # proxmoxNode / proxmoxVMID / proxmoxType here once its VMID is recorded.
+        proxmoxNode: pve-01
+        proxmoxVMID: 502
+        proxmoxType: lxc
+        # No Homepage widget exists.
 
 - Downloads:
     - Radarr:

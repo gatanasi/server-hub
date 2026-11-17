@@ -151,16 +151,13 @@ file).
 
 ## Assumptions To Check
 
-These came from the repository, not from the running system:
+Checked against the running system on 2026-11-17: the node is named `pve-01`, the VMIDs
+match `pct list` / `qm list`, and from the homepage guest `<app>.home.<domain>` resolves to
+Caddy and `arr.vm`, Caddy and the UniFi gateway answer.
 
-- The Proxmox node is named `pve-01` (run `hostname` on the node). If not, replace it in
-  `config/proxmox.yaml` and `config/services.yaml`.
-- Every app is reachable internally as `<app>.home.<domain>`.
-- VMIDs are those in [proxmox/guest-firewalls.md](../proxmox/guest-firewalls.md).
-  `mediamanager` is not listed there, so its tile has no guest stats yet.
-- The health paths used for Jellyfin (`/health`), Immich (`/api/server/ping`), Filebrowser
-  (`/health`) and Ollama (`/api/tags`) come from those projects, not from this repo's
-  compose files. A wrong one only turns that tile's dot red.
+Still unverified: the health paths used for Immich (`/api/server/ping`), Filebrowser
+(`/health`) and Ollama (`/api/tags`) come from those projects, not from this repo's compose
+files. A wrong one only turns that tile's dot red.
 
 Not on the dashboard: Ghost, ERPNext, Dolibarr and `insights` have Caddy routes but are not
 in `managed_apps`. Unpackerr and Recyclarr have no web interface.
