@@ -19,7 +19,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8081"]
       interval: 2m
       timeout: 10s
       retries: 3
