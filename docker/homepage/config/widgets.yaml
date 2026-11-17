@@ -1,0 +1,16 @@
+---
+# Header (info) widgets. https://gethomepage.dev/configs/info-widgets/
+#
+# No `resources` widget on purpose: it reports the Homepage container's own CPU and memory,
+# not the host's. The Proxmox tile carries the node figures.
+
+- search:
+    provider: duckduckgo
+    target: _blank
+
+- datetime:
+    text_size: xl
+    format:
+      dateStyle: medium
+      timeStyle: short
+      hourCycle: h23

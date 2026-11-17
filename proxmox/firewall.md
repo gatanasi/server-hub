@@ -14,6 +14,7 @@ gateway 10.10.0.1 # UCG Fiber
 gateway-v6 fe80::fcf2:13ff:febc:a282 # UCG Fiber IPv6
 gateway-vm 10.10.10.1 # UCG Fiber VM
 github-runner 10.10.10.229
+homepage 10.10.10.206
 jellyfin 10.10.10.50
 local-network 10.10.0.0/24
 mac-mini 10.10.0.50
@@ -37,10 +38,12 @@ dc/gateway-vm
 GROUP common-noise
 GROUP common-allow
 IN ACCEPT -source dc/local-network -p tcp -dport 8006 -log nolog # Proxmox GUI
+IN ACCEPT -source dc/homepage -p tcp -dport 8006 -log nolog # Homepage, read-only API token
 GROUP common-logging
 
 [group arr-stack]
 
+IN ACCEPT -source dc/homepage -p tcp -dport 8000 -log nolog # Homepage
 IN ACCEPT -source dc/vm-network -p tcp -dport 8080,8989,7878,8686,8787,9696,5055,6767,8191,3000 -log nolog
 OUT ACCEPT -dest dc/jellyfin -p tcp -dport 8080 -log nolog
 OUT ACCEPT -dest dc/vpn-arg -log nolog

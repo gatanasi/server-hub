@@ -1,0 +1,275 @@
+---
+# Services and their widgets. https://gethomepage.dev/configs/services/
+#
+# Conventions
+# - {{HOMEPAGE_VAR_*}} is replaced from the container environment (.env.enc). Always quote it.
+# - Anything Caddy fronts is linked AND queried at https://<app>.home.<domain>. Homepage then
+#   needs no inbound firewall rule on the target guest, and the status dot reflects what a
+#   user actually gets. Trade-off: if Caddy is down, every one of these shows as down.
+# - arr.vm services have no Caddy route; they are reached directly (the arr-stack firewall
+#   group already allows these ports from the VM network).
+# - siteMonitor uses the health endpoint each app's own compose healthcheck uses, where it
+#   has one. https://gethomepage.dev/configs/services/#site-monitor
+# - proxmoxNode / proxmoxVMID / proxmoxType add guest status and CPU/memory from the Proxmox
+#   API. VMIDs come from proxmox/guest-firewalls.md. https://gethomepage.dev/configs/proxmox/
+
+- Media:
+    - Jellyfin:
+        icon: jellyfin.png
+        href: "https://jellyfin.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Movies & TV
+        siteMonitor: "https://jellyfin.home.{{HOMEPAGE_VAR_DOMAIN}}/health"
+        proxmoxNode: pve-01
+        proxmoxVMID: 500
+        proxmoxType: lxc
+        widget:
+          type: jellyfin
+          url: "https://jellyfin.home.{{HOMEPAGE_VAR_DOMAIN}}"
+          key: "{{HOMEPAGE_VAR_JELLYFIN_KEY}}"
+          # version 1 (default) is correct below Jellyfin 10.12; set `version: 2` from 10.12.
+          enableBlocks: true
+          enableNowPlaying: true
+
+    - Seerr:
+        icon: seerr.png
+        href: "https://seerr.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Media requests
+        siteMonitor: "https://seerr.home.{{HOMEPAGE_VAR_DOMAIN}}/api/v1/status"
+        widget:
+          type: seerr
+          url: "https://seerr.home.{{HOMEPAGE_VAR_DOMAIN}}"
+          key: "{{HOMEPAGE_VAR_SEERR_KEY}}"
+
+    - Immich:
+        icon: immich.png
+        href: "https://immich.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Photos & videos
+        siteMonitor: "https://immich.home.{{HOMEPAGE_VAR_DOMAIN}}/api/server/ping"
+        proxmoxNode: pve-01
+        proxmoxVMID: 160
+        proxmoxType: lxc
+        widget:
+          type: immich
+          url: "https://immich.home.{{HOMEPAGE_VAR_DOMAIN}}"
+          key: "{{HOMEPAGE_VAR_IMMICH_KEY}}"
+          version: 2 # Immich >= v1.118
+
+- Downloads:
+    - Radarr:
+        icon: radarr.png
+        href: http://arr.vm:7878
+        description: Movies
+        siteMonitor: http://arr.vm:7878
+        widget:
+          type: radarr
+          url: http://arr.vm:7878
+          key: "{{HOMEPAGE_VAR_RADARR_KEY}}"
+
+    - Sonarr:
+        icon: sonarr.png
+        href: http://arr.vm:8989
+        description: Series
+        siteMonitor: http://arr.vm:8989
+        widget:
+          type: sonarr
+          url: http://arr.vm:8989
+          key: "{{HOMEPAGE_VAR_SONARR_KEY}}"
+
+    - Prowlarr:
+        icon: prowlarr.png
+        href: http://arr.vm:9696
+        description: Indexers
+        siteMonitor: http://arr.vm:9696
+        widget:
+          type: prowlarr
+          url: http://arr.vm:9696
+          key: "{{HOMEPAGE_VAR_PROWLARR_KEY}}"
+
+    - Bazarr:
+        icon: bazarr.png
+        href: http://arr.vm:6767
+        description: Subtitles
+        siteMonitor: http://arr.vm:6767
+        widget:
+          type: bazarr
+          url: http://arr.vm:6767
+          key: "{{HOMEPAGE_VAR_BAZARR_KEY}}"
+
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: http://arr.vm:8080
+        description: Download client (behind Gluetun)
+        siteMonitor: http://arr.vm:8080
+        widget:
+          type: qbittorrent
+          url: http://arr.vm:8080
+          username: "{{HOMEPAGE_VAR_QBITTORRENT_USERNAME}}"
+          password: "{{HOMEPAGE_VAR_QBITTORRENT_PASSWORD}}"
+
+    - Gluetun:
+        icon: gluetun.png
+        description: VPN gateway (arr guest)
+        proxmoxNode: pve-01
+        proxmoxVMID: 501
+        proxmoxType: lxc
+        widget:
+          type: gluetun
+          url: http://arr.vm:8000
+          key: "{{HOMEPAGE_VAR_GLUETUN_KEY}}"
+          version: 2 # Gluetun >= 3.40.1
+
+    - FlareSolverr:
+        icon: flaresolverr.png
+        href: http://arr.vm:8191
+        description: Challenge solver for Prowlarr
+        siteMonitor: http://arr.vm:8191
+
+    - Recommendarr:
+        icon: mdi-star-circle
+        href: http://arr.vm:3000
+        description: Recommendations
+        siteMonitor: http://arr.vm:3000
+
+- Apps:
+    - n8n:
+        icon: n8n.png
+        href: "https://n8n.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Workflow automation
+        siteMonitor: "https://n8n.home.{{HOMEPAGE_VAR_DOMAIN}}/healthz"
+        proxmoxNode: pve-01
+        proxmoxVMID: 310
+
+    - Odoo:
+        icon: odoo.png
+        href: "https://odoo.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: ERP
+        siteMonitor: "https://odoo.home.{{HOMEPAGE_VAR_DOMAIN}}/web/health"
+        proxmoxNode: pve-01
+        proxmoxVMID: 112
+        proxmoxType: lxc
+
+    - Filebrowser:
+        icon: filebrowser.png
+        href: "https://filebrowser.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Files
+        siteMonitor: "https://filebrowser.home.{{HOMEPAGE_VAR_DOMAIN}}/health"
+        proxmoxNode: pve-01
+        proxmoxVMID: 600
+        proxmoxType: lxc
+        widget:
+          type: filebrowser
+          url: "https://filebrowser.home.{{HOMEPAGE_VAR_DOMAIN}}"
+          username: "{{HOMEPAGE_VAR_FILEBROWSER_USERNAME}}"
+          password: "{{HOMEPAGE_VAR_FILEBROWSER_PASSWORD}}"
+
+    - Stirling-PDF:
+        icon: stirling-pdf.png
+        href: "https://stirling-pdf.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: PDF tools
+        siteMonitor: "https://stirling-pdf.home.{{HOMEPAGE_VAR_DOMAIN}}/api/v1/info/status"
+        proxmoxNode: pve-01
+        proxmoxVMID: 120
+        proxmoxType: lxc
+
+    - ConvertX:
+        icon: convertx.png
+        href: "https://convertx.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: File converter
+        siteMonitor: "https://convertx.home.{{HOMEPAGE_VAR_DOMAIN}}/healthcheck"
+        proxmoxNode: pve-01
+        proxmoxVMID: 114
+        proxmoxType: lxc
+
+    - Video Converter:
+        icon: mdi-video-switch
+        href: "https://video-converter.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Drive video transcoding
+        siteMonitor: "https://video-converter.home.{{HOMEPAGE_VAR_DOMAIN}}/api/config"
+        proxmoxNode: pve-01
+        proxmoxVMID: 202
+        proxmoxType: lxc
+
+    - Car Price Tracker:
+        icon: mdi-car
+        href: "https://car-price-tracker.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Listing price history
+        siteMonitor: "https://car-price-tracker.home.{{HOMEPAGE_VAR_DOMAIN}}/api/health"
+        proxmoxNode: pve-01
+        proxmoxVMID: 204
+        proxmoxType: lxc
+
+    - First Bite:
+        icon: mdi-silverware-fork-knife
+        href: "https://first-bite.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: Restaurant openings radar
+        siteMonitor: "https://first-bite.home.{{HOMEPAGE_VAR_DOMAIN}}/api/health"
+        proxmoxNode: pve-01
+        proxmoxVMID: 205
+        proxmoxType: lxc
+
+- Network:
+    - Caddy:
+        icon: caddy.png
+        description: Reverse proxy & TLS
+        # Homepage's own health endpoint fetched through Caddy: proves DNS, TLS and proxying.
+        # /api/healthcheck is exempt from the auth gate.
+        siteMonitor: "https://homepage.home.{{HOMEPAGE_VAR_DOMAIN}}/api/healthcheck"
+        proxmoxNode: pve-01
+        proxmoxVMID: 301
+        # No caddy widget on purpose: it reads Caddy's admin API, which is unauthenticated
+        # and can rewrite the whole proxy config. It stays bound to localhost.
+
+    - WG-Easy:
+        icon: wireguard.png
+        href: "https://wg-easy.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        description: WireGuard VPN
+        siteMonitor: "https://wg-easy.home.{{HOMEPAGE_VAR_DOMAIN}}"
+        proxmoxNode: pve-01
+        proxmoxVMID: 250
+        widget:
+          type: wgeasy
+          url: "https://wg-easy.home.{{HOMEPAGE_VAR_DOMAIN}}"
+          version: 2 # wg-easy >= v15
+          username: "{{HOMEPAGE_VAR_WGEASY_USERNAME}}"
+          password: "{{HOMEPAGE_VAR_WGEASY_PASSWORD}}"
+
+    - OpenSpeedTest:
+        icon: openspeedtest.png
+        href: "{{HOMEPAGE_VAR_OPENSPEEDTEST_URL}}"
+        description: LAN speed test
+        siteMonitor: "{{HOMEPAGE_VAR_OPENSPEEDTEST_URL}}"
+        proxmoxNode: pve-01
+        proxmoxVMID: 200
+        proxmoxType: lxc
+
+- Infrastructure:
+    - Proxmox:
+        icon: proxmox.png
+        href: https://10.10.10.10:8006
+        description: pve-01
+        siteMonitor: https://10.10.10.10:8006
+        widget:
+          type: proxmox
+          url: https://10.10.10.10:8006
+          username: "{{HOMEPAGE_VAR_PROXMOX_TOKEN_ID}}"
+          password: "{{HOMEPAGE_VAR_PROXMOX_TOKEN_SECRET}}"
+          node: pve-01
+
+    - Deployer:
+        icon: ansible.png
+        description: Ansible + SOPS deploy host
+        proxmoxNode: pve-01
+        proxmoxVMID: 230
+
+    - GitHub Runner:
+        icon: github.png
+        href: https://github.com/gatanasi/server-hub/actions
+        description: Self-hosted Actions runner
+        proxmoxNode: pve-01
+        proxmoxVMID: 229
+
+    - VPN ARG:
+        icon: mdi-vpn
+        description: Egress VPN gateway
+        proxmoxNode: pve-01
+        proxmoxVMID: 249

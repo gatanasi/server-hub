@@ -30,7 +30,6 @@ Compose definitions exist, but these are not currently mapped in production inve
 ## Planned Services
 
 - [ ] Invoice Ninja
-- [ ] Homepage
 - [ ] Uptime Kuma
 - [ ] InfluxDB
 - [ ] Grafana

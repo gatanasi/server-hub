@@ -1,0 +1,11 @@
+---
+# Proxmox connection used for per-guest status and CPU/memory on service tiles.
+# https://gethomepage.dev/configs/proxmox/
+#
+# The key must equal the Proxmox node name (`hostname` on the node) and the `proxmoxNode`
+# of every service in services.yaml. The token only needs the PVEAuditor role.
+
+pve-01:
+  url: https://10.10.10.10:8006
+  token: "{{HOMEPAGE_VAR_PROXMOX_TOKEN_ID}}"
+  secret: "{{HOMEPAGE_VAR_PROXMOX_TOKEN_SECRET}}"

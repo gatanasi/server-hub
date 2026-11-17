@@ -127,6 +127,17 @@ GROUP vm-isolation
 GROUP common-logging
 ```
 
+## VMID 206
+- Hostname: homepage
+- Type: lxc
+- Firewall rules
+```text
+GROUP common-noise
+GROUP common-allow
+GROUP from-caddy-proxy
+GROUP common-logging
+```
+
 ## VMID 220
 - Hostname: ollama
 - Type: lxc

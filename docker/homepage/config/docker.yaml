@@ -1,0 +1,6 @@
+---
+# Intentionally empty. https://gethomepage.dev/configs/docker/
+#
+# Each app runs on its own guest, so there is no single Docker daemon to query, and no
+# Docker socket or API is exposed to this container. Guest status comes from proxmox.yaml.
+# The file must exist: Homepage copies a default into the (read-only) config mount otherwise.

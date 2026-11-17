@@ -173,6 +173,13 @@
 		}
 	}
 
+	@homepage expression {host}.startsWith("homepage")
+	handle @homepage {
+		reverse_proxy http://homepage.vm:8080 {
+			import common_proxy_headers
+		}
+	}
+
 	@ghost expression {host}.startsWith("ghost")
 	handle @ghost {
 		handle /.ghost/activitypub/* {

@@ -1,0 +1,31 @@
+---
+# Plain links. https://gethomepage.dev/configs/bookmarks/
+# Group names must differ from the service groups in services.yaml.
+
+- Homelab:
+    - server-hub:
+        - icon: github.png
+          href: https://github.com/gatanasi/server-hub
+          description: Infrastructure repository
+    - Deployments:
+        - icon: mdi-rocket-launch
+          href: https://github.com/gatanasi/server-hub/actions
+          description: GitHub Actions runs
+    - Renovate PRs:
+        - icon: mdi-source-pull
+          href: https://github.com/gatanasi/server-hub/pulls
+          description: Pending image updates
+
+- Docs:
+    - Homepage:
+        - icon: homepage.png
+          href: https://gethomepage.dev/
+    - Proxmox VE:
+        - icon: proxmox.png
+          href: https://pve.proxmox.com/pve-docs/
+    - Caddy:
+        - icon: caddy.png
+          href: https://caddyserver.com/docs/
+    - Servarr Wiki:
+        - icon: sonarr.png
+          href: https://wiki.servarr.com/

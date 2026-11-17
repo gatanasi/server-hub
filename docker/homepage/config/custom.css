@@ -1,0 +1,3 @@
+/* Intentionally empty. https://gethomepage.dev/configs/custom-css-js/
+   Served without authentication (it styles the sign-in page): never put secrets or
+   internal URLs here. The file must exist because the config mount is read-only. */

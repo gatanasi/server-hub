@@ -142,6 +142,12 @@ all:
           ansible_host: filebrowser.vm
           managed_apps:
             - filebrowser
+
+        homepage.vm:
+          ansible_user: homepage
+          ansible_host: homepage.vm
+          managed_apps:
+            - homepage
         # Add more hosts as needed:
         # multi-app.vm:
         #   ansible_user: apps
