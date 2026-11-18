@@ -16,7 +16,7 @@ services:
     # `stable` was 2.48.5, `beta` 2.49.1, and 3.3.0 a pre-release). Renovate
     # cannot tell them apart, so a version pin gets beta PRs. Follow the
     # stable tag by digest instead.
-    image: n8nio/n8n:stable@sha256:b4b90747b81fcda7e76550c0d3aa7f0f64917a1e9573cff40d6834eaf2e0f8ea
+    image: n8nio/n8n:stable@sha256:c0ea1246a81a34ce8e2b3cfb1f718b97de64b0a1b3747ad24d6d431826bb71ad
     environment:
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
       - N8N_ENCRYPTION_KEY=${ENCRYPTION_KEY}
