@@ -30,7 +30,7 @@ services:
     certbot:
         container_name: certbot
         logging: *logging
-        image: certbot/dns-cloudflare:v5.5.0@sha256:f90db06a98b61bd221fe5a9688d0bb975b444760ef677cb4369ffc2a8a16e579
+        image: certbot/dns-cloudflare:v5.10.0@sha256:6d5e1e84f687ce81786c97cbeccb9dda94d86bbb29a81dbb85527bd68008d77d
         restart: unless-stopped
         environment:
             # Read by certbot.sh at runtime, so the token never appears in a command line.
