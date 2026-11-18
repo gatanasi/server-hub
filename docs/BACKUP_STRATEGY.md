@@ -80,6 +80,9 @@ skipped silently**, so anything an app writes to a host directory is not backed 
 
 ### Coverage per app
 
+Target state once the per-app migration PRs (#754 to #761) are merged. Until an app's PR is
+deployed, its state is still in bind mounts and **not** covered.
+
 | App | Named volumes (backed up) | Deliberately not backed up here |
 |---|---|---|
 | arr | one `<service>-config` volume per service (10) | `/mnt/data` media and downloads |
@@ -111,10 +114,15 @@ ssh arr@arr.vm 'bash -s' -- arr radarr-config /opt/apps/arr/config/radarr < depl
 # ...one call per directory, then merge the PR; the deploy starts the app on the volumes
 ```
 
-The script refuses to run while a container still mounts the directory, creates the volume with
-Compose's own labels, copies with `cp -a`, optionally chowns (`uid:gid` as 4th argument), and
-compares file lists and sizes. It never deletes the source: until you remove the old directory, a
-deploy rollback still starts the app on its pre-migration data.
+The script refuses to run while a container mounts the directory, a parent or anything inside it
+(resolved paths). It creates the volume with Compose's own labels, copies with `cp -a`, optionally
+chowns (`uid:gid` as 4th argument), and compares file lists and sizes. It never deletes the source:
+until you remove the old directory, a deploy rollback still starts the app on its pre-migration data.
+
+> **Merge right after copying.** Between the copy and the deploy of the new `compose.yaml`, run no
+> backup and no other deploy of that app. The backup playbook stops and **starts** the app, and the
+> old `compose.yaml` would start it on the bind mounts again; anything written then is missing from
+> the volume.
 
 ### Retention Policy
 

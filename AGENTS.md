@@ -72,7 +72,7 @@ While GitOps is the default, you can trigger deployments manually from the `depl
 -   **Variables:** Prefer passing variables via `-e` (extra vars) or defining them in inventory over hardcoding.
 
 ### Docker Compose
--   **Healthchecks:** Mandatory. Used by Ansible to determine if a deployment succeeded.
+-   **Healthchecks:** Mandatory. Used by Ansible to determine if a deployment succeeded. Two exceptions, each with a comment in the compose file: one-shot jobs (`restart: "no"`, gating another service through `service_completed_successfully`), whose exit code is the check; and schedulers with nothing to probe (e.g. recyclarr), whose process exit already triggers the restart policy.
 -   **Restart Policies:** Use `restart: always` or `unless-stopped`.
 -   **Versions:** Pin image versions (e.g., `image: n8n:1.2.3`). Avoid `latest` tags in production.
 -   **State:** Persistent data goes in named volumes. The backup playbook only archives volumes named `<project>_*` and skips bind mounts. Bind mounts are for config tracked in Git, media libraries, and devices. See `docs/BACKUP_STRATEGY.md`.

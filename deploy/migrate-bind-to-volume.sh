@@ -8,13 +8,18 @@
 # lives in bind mounts is never backed up. This moves it.
 #
 # What it does:
-#   1. Refuses to run while a running container still mounts the source directory.
+#   1. Refuses to run while a running container mounts the source directory, a parent
+#      of it, or anything inside it (paths are compared after resolving symlinks).
 #   2. Creates <project>_<volume> with the labels Docker Compose sets itself, so
 #      Compose adopts the volume on the next deploy without a warning.
 #   3. Copies the directory with `cp -a` (owners, modes, timestamps preserved),
 #      optionally chowns the copy, and compares file lists and sizes.
 # The source directory is left untouched: until it is deleted by hand, a deploy
 # rollback (which restores the previous compose.yaml) still finds the old data.
+#
+# Merge the PR that switches compose.yaml right after this, and run no backup or deploy
+# of the app in between: both start the app again on the old bind mounts, and whatever it
+# writes there would be missing from the volume.
 #
 # Usage (from deployer.vm, or anywhere that can ssh to the app host):
 #   ssh <user>@<app>.vm 'bash -s' -- <project> <volume> <source-dir> [<uid:gid>] \
@@ -66,17 +71,28 @@ volume="${project}_${volume_key}"
 [[ "${volume_key}" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] || die "invalid volume name: ${volume_key}"
 [[ "${source_dir}" == /* ]] || die "source-dir must be an absolute path: ${source_dir}"
 [[ -d "${source_dir}" ]] || die "source-dir does not exist: ${source_dir}"
+realpath -e -- / >/dev/null 2>&1 || die "needs GNU realpath (coreutils), as on the Debian guests"
+source_dir="$(realpath -e -- "${source_dir}")"
 [[ -z "${owner}" || "${owner}" =~ ^[0-9]+:[0-9]+$ ]] || die "uid:gid must be numeric, got: ${owner}"
 command -v docker >/dev/null || die "docker not found"
 
 # 1. The app must be stopped, or the copy can catch a half-written database.
+#    Compare resolved paths, and treat a mount of a parent or a child as in use too.
 running_ids="$(docker ps -q)"
+in_use=""
 if [[ -n "${running_ids}" ]]; then
     # shellcheck disable=SC2086  # one argument per container ID
-    users="$(docker inspect --format '{{.Name}}{{range .Mounts}} {{.Source}}{{end}}' ${running_ids} \
-        | awk -v src="${source_dir}" '{ for (i = 2; i <= NF; i++) if ($i == src) print substr($1, 2) }')"
-    [[ -z "${users}" ]] || die "still mounted by running container(s): ${users//$'\n'/, }. Stop the app first (docker compose stop)."
+    while IFS=$'\t' read -r name mount_source; do
+        [[ -n "${mount_source}" ]] || continue
+        mount_real="$(realpath -m -- "${mount_source}")"
+        if [[ "${mount_real}" == "${source_dir}" \
+            || "${mount_real}" == "${source_dir}/"* \
+            || "${source_dir}" == "${mount_real%/}/"* ]]; then
+            in_use+="${in_use:+, }${name#/} (${mount_source})"
+        fi
+    done < <(docker inspect --format '{{$name := .Name}}{{range .Mounts}}{{$name}}{{"\t"}}{{.Source}}{{"\n"}}{{end}}' ${running_ids})
 fi
+[[ -z "${in_use}" ]] || die "in use by running container(s): ${in_use}. Stop the app first (docker compose stop)."
 
 # 2. Create the volume the way Compose would, or reuse an empty one from an earlier attempt.
 if docker volume inspect "${volume}" >/dev/null 2>&1; then
@@ -118,3 +134,5 @@ docker run --rm \
     '
 
 log "Done. ${source_dir} is unchanged; delete it by hand once the app runs from ${volume}."
+log "Merge the compose change now. Until it is deployed, run no backup or deploy of this app:"
+log "both would start it again on the old bind mount."
