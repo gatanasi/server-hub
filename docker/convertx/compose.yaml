@@ -15,6 +15,11 @@ services:
     ports:
       - "8080:3000"
     environment:
+      # Login is off on purpose (single user; decided 2026-11-18, audit M9). The gates are:
+      #   - internet: Cloudflare Access on the public hostname (Tunnel -> Caddy);
+      #   - network: the guest firewall (group from-caddy-proxy) lets only Caddy reach :8080.
+      # Inside the network (LAN, WireGuard, Tailscale) DNS points straight at Caddy, so anyone
+      # there gets ConvertX without a login. If either gate changes, set this to false.
       - ALLOW_UNAUTHENTICATED=true
       - AUTO_DELETE_EVERY_N_HOURS=6
       - JWT_SECRET=${JWT_SECRET}
