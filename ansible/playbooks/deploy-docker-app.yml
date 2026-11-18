@@ -60,6 +60,18 @@
           ansible.builtin.set_fact:
             deploy_skipped: true
 
+        # Silent: Renovate updates these stacks often and nothing needs doing.
+        - name: Send skip notification
+          ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
+          vars:
+            notify_title: "Deployment Skipped"
+            notify_emoji: "⏭️"
+            notify_message: |-
+              App: <code>{{ app_name }}</code>
+              No host lists it in <code>managed_apps</code>, so nothing was deployed.
+              Add it to a host in <code>inventory/production.yml</code> to deploy it.
+            notify_silent: true
+
         - name: End the play without deploying
           ansible.builtin.meta: end_play
 
@@ -416,6 +428,7 @@
   gather_facts: false
 
   tasks:
+    # .github/workflows/deploy.yml matches this text to mark the run as skipped.
     - name: Display skip message
       ansible.builtin.debug:
         msg: "Nothing deployed: no host manages '{{ app_name }}'."

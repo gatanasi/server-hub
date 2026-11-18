@@ -147,21 +147,30 @@ jobs:
           # SSH to deployer.vm - the forced command will execute trigger-deploy.sh
           # We pass the app name as part of the SSH command
           # Notifications are handled by the deployer VM scripts
-            ssh -i "${SSH_KEY_PATH}" \
-              -o BatchMode=yes \
-              -o ConnectTimeout=30 \
-              -o StrictHostKeyChecking=yes \
-              "${DEPLOYER_USER}@${DEPLOYER_HOST}" \
-              "deploy ${APP}"
-
-          DEPLOY_EXIT=$?
+          # The output is kept to tell a skip from a deploy. pipefail keeps ssh's exit status
+          # through tee, and "|| DEPLOY_EXIT=$?" stops bash -e from exiting before we report it.
+          set -o pipefail
+          DEPLOY_LOG="${RUNNER_TEMP}/deploy-${APP}.log"
+          DEPLOY_EXIT=0
+          ssh -i "${SSH_KEY_PATH}" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=30 \
+            -o StrictHostKeyChecking=yes \
+            "${DEPLOYER_USER}@${DEPLOYER_HOST}" \
+            "deploy ${APP}" | tee "${DEPLOY_LOG}" || DEPLOY_EXIT=$?
 
           echo "::endgroup::"
 
-          if [[ $DEPLOY_EXIT -eq 0 ]]; then
-            echo "✅ Deployment successful for ${APP}"
-          else
+          if [[ $DEPLOY_EXIT -ne 0 ]]; then
             echo "::error::Deployment failed for ${APP}"
             exit $DEPLOY_EXIT
+          fi
+
+          # Matches the "Display skip message" task in ansible/playbooks/deploy-docker-app.yml.
+          if grep -q "Nothing deployed: no host manages" "${DEPLOY_LOG}"; then
+            echo "::notice title=Deployment skipped::No host manages ${APP}, so nothing was deployed."
+            echo "⏭️ Deployment skipped for ${APP}"
+          else
+            echo "✅ Deployment successful for ${APP}"
           fi
 
