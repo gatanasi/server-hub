@@ -1,3 +1,11 @@
+x-logging: &logging
+  # Most guests already default to journald (daemon.json). Declaring it here
+  # applies it everywhere, including guests still on unbounded json-file.
+  # journald caps its own disk use (SystemMaxUse).
+  driver: journald
+  options:
+    tag: "{{.Name}}"
+
 services:
   odoo:
     image: odoo:19.0-20251208@sha256:4d344f40154dd0627b7078c3dcb40cf1db7c0944473c1898eb63492659b398ef
@@ -17,6 +25,7 @@ services:
       - PGPASSWORD=${POSTGRES_PASSWORD}
     command: --init base --db-filter=.*
     restart: unless-stopped
+    logging: *logging
     networks:
       - odoo_net
     healthcheck:
@@ -41,6 +50,7 @@ services:
       retries: 5
       start_period: 40s
     restart: unless-stopped
+    logging: *logging
     networks:
       - odoo_net
 

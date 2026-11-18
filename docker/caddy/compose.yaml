@@ -1,6 +1,15 @@
+x-logging: &logging
+  # Most guests already default to journald (daemon.json). Declaring it here
+  # applies it everywhere, including guests still on unbounded json-file.
+  # journald caps its own disk use (SystemMaxUse).
+  driver: journald
+  options:
+    tag: "{{.Name}}"
+
 services:
   caddy:
     container_name: caddy
+    logging: *logging
     build: .
     restart: unless-stopped
     environment:

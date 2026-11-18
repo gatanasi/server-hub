@@ -1,9 +1,18 @@
 volumes:
   etc_wireguard:
 
+x-logging: &logging
+  # Most guests already default to journald (daemon.json). Declaring it here
+  # applies it everywhere, including guests still on unbounded json-file.
+  # journald caps its own disk use (SystemMaxUse).
+  driver: journald
+  options:
+    tag: "{{.Name}}"
+
 services:
   wg-easy:
     container_name: wg-easy
+    logging: *logging
     environment:
       - WG_PORT=${WG_PORT}
       - DISABLE_IPV6=true

@@ -1,6 +1,15 @@
+x-logging: &logging
+  # Most guests already default to journald (daemon.json). Declaring it here
+  # applies it everywhere, including guests still on unbounded json-file.
+  # journald caps its own disk use (SystemMaxUse).
+  driver: journald
+  options:
+    tag: "{{.Name}}"
+
 services:
   mediamanager:
     container_name: mediamanager
+    logging: *logging
     image: ghcr.io/maxdorninger/mediamanager/mediamanager:1.12.3@sha256:83b80dce26f8cdbbf8afec06784a85e7eedcba05ad4be57d2f70b006304d7a8c
     ports:
       - "8080:8000"
@@ -18,6 +27,7 @@ services:
         condition: service_healthy
   db:
     container_name: mediamanager_postgres
+    logging: *logging
     image: postgres:17.12@sha256:0d938e975177bef9f1f61f3f9dbcf2e0aa0a139568f66d3415ed8892eb97f6ac
     restart: unless-stopped
     volumes:

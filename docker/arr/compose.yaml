@@ -1,8 +1,17 @@
+x-logging: &logging
+  # Most guests already default to journald (daemon.json). Declaring it here
+  # applies it everywhere, including guests still on unbounded json-file.
+  # journald caps its own disk use (SystemMaxUse).
+  driver: journald
+  options:
+    tag: "{{.Name}}"
+
 services:
   # --- Network & VPN Gateway ---
   gluetun:
     image: ghcr.io/qdm12/gluetun:v3.41.3@sha256:fa19cc76b2af13d57a8d3dc3066f2ada061b1c761b8aecf989b3877c0486e027
     container_name: gluetun
+    logging: *logging
     cap_add:
       - NET_ADMIN
     devices:
@@ -37,6 +46,7 @@ services:
   qbittorrent:
     image: ghcr.io/linuxserver/qbittorrent:5.1.4-r2-ls442@sha256:95941f2d9663f841c5fa595d7b904403838dc29dbe20eb7646b02cda82eb16b7
     container_name: qbittorrent
+    logging: *logging
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -56,6 +66,7 @@ services:
   unpackerr:
     image: golift/unpackerr:v0.16.1@sha256:244fc45cb207308f60e8f52dd703c2b3463385752de0f9517c58ff9d331ed15e
     container_name: unpackerr
+    logging: *logging
     user: ${PUID}:${PGID}
     environment:
       - TZ=${TZ}
@@ -91,6 +102,7 @@ services:
   radarr:
     image: lscr.io/linuxserver/radarr:6.4.4@sha256:7a20f20de63706eee2ff6e4ac1f989a70c961f456aa47ccb6c78f2bb7657d9ae
     container_name: radarr
+    logging: *logging
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -107,6 +119,7 @@ services:
   sonarr:
     image: lscr.io/linuxserver/sonarr:4.0.20@sha256:c7d1df25e428da6c9ace05daea0d34e59522978a3843ea1944812f855af4086c
     container_name: sonarr
+    logging: *logging
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -123,6 +136,7 @@ services:
   prowlarr:
     image: lscr.io/linuxserver/prowlarr:2.7.0@sha256:6660787a99b2e58203539583663c973b48979fc00ff2cb78dc0ea17429e1f6ef
     container_name: prowlarr
+    logging: *logging
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -138,6 +152,7 @@ services:
   flaresolverr:
     image: ghcr.io/flaresolverr/flaresolverr:v3.5.2@sha256:c80ae007ce2ccdcd217a12426e4f039ef763ff90738c808d38810c3e59323767
     container_name: flaresolverr
+    logging: *logging
     environment:
       - TZ=${TZ}
     ports:
@@ -149,6 +164,7 @@ services:
   bazarr:
     image: lscr.io/linuxserver/bazarr:1.6.2@sha256:832820dec70bce9e912c6eee7a95baf6551e03dbc63325a7208daaa455423752
     container_name: bazarr
+    logging: *logging
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -165,6 +181,7 @@ services:
   recommendarr:
     image: tannermiddleton/recommendarr:v1.4.4@sha256:c946dd24542ab3cf6b0d56ab1d69e1ea1ff1d84f8a293ceeeaf3f53f09e50db6
     container_name: recommendarr
+    logging: *logging
     ports:
       - 3000:3000
     environment:
@@ -182,6 +199,7 @@ services:
   recyclarr:
     image: ghcr.io/recyclarr/recyclarr:8.8.1@sha256:3e9c41b9ec29bbf65fe846864058730d321a21f7695d8c0d9437b73e34d50ad9
     container_name: recyclarr
+    logging: *logging
     user: ${PUID}:${PGID}
     volumes:
       - ./config/recyclarr:/config
@@ -200,6 +218,7 @@ services:
     image: ghcr.io/seerr-team/seerr:v3.5.2@sha256:aadee014b40e28cf9aa4928bc9d1183a6eb08f8c44d543cddc9efdcb16549be2
     init: true
     container_name: seerr
+    logging: *logging
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
