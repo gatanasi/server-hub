@@ -81,7 +81,11 @@ command -v docker >/dev/null || die "docker not found"
 running_ids="$(docker ps -q)"
 in_use=""
 if [[ -n "${running_ids}" ]]; then
+    # Captured first so a failing `docker inspect` stops the script (set -e) instead of
+    # leaving the list empty and letting the copy go ahead.
     # shellcheck disable=SC2086  # one argument per container ID
+    mounts="$(docker inspect --format '{{$name := .Name}}{{range .Mounts}}{{$name}}{{"\t"}}{{.Source}}{{"\n"}}{{end}}' ${running_ids})" \
+        || die "could not inspect the running containers' mounts; refusing to copy"
     while IFS=$'\t' read -r name mount_source; do
         [[ -n "${mount_source}" ]] || continue
         mount_real="$(realpath -m -- "${mount_source}")"
@@ -90,7 +94,7 @@ if [[ -n "${running_ids}" ]]; then
             || "${source_dir}" == "${mount_real%/}/"* ]]; then
             in_use+="${in_use:+, }${name#/} (${mount_source})"
         fi
-    done < <(docker inspect --format '{{$name := .Name}}{{range .Mounts}}{{$name}}{{"\t"}}{{.Source}}{{"\n"}}{{end}}' ${running_ids})
+    done <<< "${mounts}"
 fi
 [[ -z "${in_use}" ]] || die "in use by running container(s): ${in_use}. Stop the app first (docker compose stop)."
 
