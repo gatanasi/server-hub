@@ -30,6 +30,16 @@ services:
       database:
         condition: service_healthy
     restart: always
+    # Non-root (audit M4), as documented in Immich's FAQ. UPLOAD_LOCATION must be owned by
+    # 1000:1000; Docker creates a missing bind directory as root, so chown it on a new host.
+    user: "1000:1000"
+    group_add:
+      - "992" # render on immich.vm: /dev/dri/renderD128 (VAAPI transcoding)
+      - "44" # video on immich.vm: /dev/dri/card1
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     healthcheck:
       disable: false
 
@@ -47,8 +57,31 @@ services:
     env_file:
       - .env
     restart: always
+    # Non-root (audit M4). hwaccel.ml.yml already adds `video`; ROCm also needs render.
+    user: "1000:1000"
+    group_add:
+      - "992" # render on immich.vm: /dev/kfd and /dev/dri/renderD128
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      ml-cache-owner:
+        condition: service_completed_successfully
     healthcheck:
       disable: false
+
+  # One-shot: hands the model-cache volume to the ML user before it starts. Its models are
+  # root-owned from when ML ran as root, and a new volume is root-owned too. Runs on every
+  # deploy; no healthcheck, its exit code is the check.
+  ml-cache-owner:
+    image: alpine:3.23.2@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62
+    logging: *logging
+    command: ["chown", "-R", "1000:1000", "/cache"]
+    volumes:
+      - model-cache:/cache
+    network_mode: none
+    restart: "no"
 
   redis:
     container_name: immich_redis
