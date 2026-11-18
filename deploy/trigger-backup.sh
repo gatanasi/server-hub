@@ -78,8 +78,9 @@ run_backup_playbook() {
     # Run the backup playbook in a subshell to avoid cd side effects
     # Capture output to file for error analysis
     # Create temporary file for Ansible output
+    local output_file
     output_file=$(mktemp)
-    trap 'rm -f -- "$output_file"' EXIT HUP INT QUIT TERM
+    register_temp_file "${output_file}"
 
     local exit_code=0
     (
@@ -97,10 +98,6 @@ run_backup_playbook() {
         error "${error_message}"
     fi
 
-    # On success, clean up the temp file and disarm the trap
-    rm -f -- "${output_file}"
-    trap - EXIT HUP INT QUIT TERM
-    
     log "Backup playbook completed successfully"
 }
 
@@ -164,6 +161,7 @@ main() {
     fi
     
     # Validate inputs using common functions
+    NOTIFY_APP="${app_name}"
     validate_app_name "${app_name}" "true"  # allow 'all' for backups
     
     # Create log directory

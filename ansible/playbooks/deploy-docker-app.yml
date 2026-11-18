@@ -63,51 +63,36 @@
         - name: End the play without deploying
           ansible.builtin.meta: end_play
 
-    - name: Resolve and setup target host
-      block:
-        - name: Fail if no host or multiple hosts are found
-          ansible.builtin.fail:
-            msg: |
-              {% if not _target_hosts %}
-              No host found that manages app '{{ app_name }}'.
-              Please add the app to a host's 'managed_apps' list in inventory/production.yml.
-              {% else %}
-              Multiple hosts found that manage app '{{ app_name }}': {{ _target_hosts | join(', ') }}.
-              An app must be managed by exactly one host.
-              {% endif %}
-          when: _target_hosts | length != 1
+    # No rescue here: trigger-deploy.sh sends the failure notification for any run that fails.
+    - name: Fail if no host or multiple hosts are found
+      ansible.builtin.fail:
+        msg: |
+          {% if not _target_hosts %}
+          No host found that manages app '{{ app_name }}'.
+          Please add the app to a host's 'managed_apps' list in inventory/production.yml.
+          {% else %}
+          Multiple hosts found that manage app '{{ app_name }}': {{ _target_hosts | join(', ') }}.
+          An app must be managed by exactly one host.
+          {% endif %}
+      when: _target_hosts | length != 1
 
-        - name: Set target host
-          ansible.builtin.set_fact:
-            target_host: "{{ _target_hosts[0] }}"
+    - name: Set target host
+      ansible.builtin.set_fact:
+        target_host: "{{ _target_hosts[0] }}"
 
-        - name: Display target host
-          ansible.builtin.debug:
-            msg: "Will deploy '{{ app_name }}' to host '{{ target_host }}'"
+    - name: Display target host
+      ansible.builtin.debug:
+        msg: "Will deploy '{{ app_name }}' to host '{{ target_host }}'"
 
-        - name: Add target host to runtime group
-          ansible.builtin.add_host:
-            name: "{{ target_host }}"
-            groups: deploy_targets
-            deploy_app_name: "{{ app_name }}"
-            deploy_repo_dir: "{{ repo_dir }}"
-            deploy_telegram_bot_token: "{{ telegram_bot_token }}"
-            deploy_telegram_chat_id: "{{ telegram_chat_id }}"
-            deploy_telegram_enabled: "{{ telegram_enabled }}"
-
-      rescue:
-        - name: Send initialization failure notification
-          ansible.builtin.include_tasks: tasks/send-telegram-notification.yml
-          vars:
-            notify_title: "Deployment Init Failed"
-            notify_emoji: "❌"
-            notify_message: |
-              App: <code>{{ app_name }}</code>
-              Error: <pre>{{ ansible_failed_result.msg | default('Unknown error during initialization') }}</pre>
-
-        - name: Fail playbook
-          ansible.builtin.fail:
-            msg: "Deployment initialization failed. Reason: {{ ansible_failed_result.msg | default('Unknown error during initialization') }}"
+    - name: Add target host to runtime group
+      ansible.builtin.add_host:
+        name: "{{ target_host }}"
+        groups: deploy_targets
+        deploy_app_name: "{{ app_name }}"
+        deploy_repo_dir: "{{ repo_dir }}"
+        deploy_telegram_bot_token: "{{ telegram_bot_token }}"
+        deploy_telegram_chat_id: "{{ telegram_chat_id }}"
+        deploy_telegram_enabled: "{{ telegram_enabled }}"
 
 
 - name: Deploy Docker Compose application
@@ -327,7 +312,7 @@
           vars:
             notify_title: "Deployment Failed - Rolling Back"
             notify_emoji: "⚠️"
-            notify_message: "App: <code>{{ app_name }}</code>\nError: {{ ansible_failed_result.msg | default('Check logs') }}\nAction: Restoring <code>{{ old_version }}</code>" # noqa: yaml[line-length]
+            notify_message: "App: <code>{{ app_name }}</code>\nError: {{ ansible_failed_result.msg | default('Check logs') | e }}\nAction: Restoring <code>{{ old_version }}</code>" # noqa: yaml[line-length]
 
         # === ROLLBACK ===
         - name: Attempt rollback steps
