@@ -1,0 +1,4 @@
+# Only the Dockerfile is needed to build. Keep conf/, compose.yaml and the
+# decrypted .env (written here on deploy) out of the build context.
+*
+!Dockerfile
