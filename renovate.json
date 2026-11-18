@@ -12,6 +12,12 @@
       "groupSlug": "github-actions"
     },
     {
+      "description": "Odoo publishes dated builds (19.0-YYYYMMDD). Docker versioning reads the date as a compatibility suffix and never proposes a newer build, so treat the date as the patch version.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["odoo"],
+      "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)-(?<patch>\\d{8})$"
+    },
+    {
       "description": "Group Non-Major updates for Dockerfiles by filename",
       "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["minor", "patch", "digest"],
