@@ -31,15 +31,40 @@
     - name: Load Telegram credentials
       ansible.builtin.include_tasks: tasks/load-telegram-credentials.yml
 
+    - name: Find hosts that manage this app
+      ansible.builtin.set_fact:
+        _target_hosts: "{{
+                          groups['docker_hosts'] | map('extract', hostvars) | selectattr('managed_apps', 'defined') |
+                          selectattr('managed_apps', 'contains', app_name) | map(attribute='inventory_hostname') | list
+                        }}"
+
+    - name: Check whether the app exists in docker/
+      ansible.builtin.stat:
+        path: "{{ repo_dir }}/docker/{{ app_name }}/compose.yaml"
+      register: _app_compose
+
+    # Stacks can be kept in docker/ (and updated by Renovate) before they get a host.
+    # A push that touches one of them should not fail the deploy workflow.
+    - name: Skip apps that exist in docker/ but no host manages
+      when:
+        - _target_hosts | length == 0
+        - _app_compose.stat.exists
+      block:
+        - name: Explain why nothing is deployed
+          ansible.builtin.debug:
+            msg: >-
+              Skipping '{{ app_name }}': docker/{{ app_name }} exists, but no host lists it in managed_apps.
+              Add it to a host in inventory/production.yml to deploy it.
+
+        - name: Record that this run deployed nothing
+          ansible.builtin.set_fact:
+            deploy_skipped: true
+
+        - name: End the play without deploying
+          ansible.builtin.meta: end_play
+
     - name: Resolve and setup target host
       block:
-        - name: Find hosts that manage this app
-          ansible.builtin.set_fact:
-            _target_hosts: "{{
-                              groups['docker_hosts'] | map('extract', hostvars) | selectattr('managed_apps', 'defined') |
-                              selectattr('managed_apps', 'contains', app_name) | map(attribute='inventory_hostname') | list
-                            }}"
-
         - name: Fail if no host or multiple hosts are found
           ansible.builtin.fail:
             msg: |
@@ -406,7 +431,13 @@
   gather_facts: false
 
   tasks:
+    - name: Display skip message
+      ansible.builtin.debug:
+        msg: "Nothing deployed: no host manages '{{ app_name }}'."
+      when: deploy_skipped | default(false)
+
     - name: Display completion message
+      when: not (deploy_skipped | default(false))
       ansible.builtin.debug:
         msg: |
           ========================================
