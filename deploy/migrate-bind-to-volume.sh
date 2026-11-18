@@ -99,13 +99,18 @@ fi
 [[ -z "${in_use}" ]] || die "in use by running container(s): ${in_use}. Stop the app first (docker compose stop)."
 
 # 2. Create the volume the way Compose would, or reuse an empty one from an earlier attempt.
-if docker volume inspect "${volume}" >/dev/null 2>&1; then
-    labels="$(docker volume inspect --format '{{index .Labels "com.docker.compose.project"}}/{{index .Labels "com.docker.compose.volume"}}' "${volume}")"
+#    Every Docker call that decides whether copying is safe runs outside an `if`, so a failed
+#    call stops the script (fail closed) instead of reading as "absent" or "empty".
+all_volumes="$(docker volume ls -q)" || die "could not list volumes; refusing to copy"
+if grep -Fxq -- "${volume}" <<< "${all_volumes}"; then
+    labels="$(docker volume inspect --format '{{index .Labels "com.docker.compose.project"}}/{{index .Labels "com.docker.compose.volume"}}' "${volume}")" \
+        || die "could not inspect volume ${volume}; refusing to copy"
     [[ "${labels}" == "${project}/${volume_key}" ]] \
         || die "volume ${volume} exists with other Compose labels (${labels}); not touching it"
-    if [[ -n "$(docker run --rm -v "${volume}:/to:ro" "${HELPER_IMAGE}" find /to -mindepth 1 -maxdepth 1)" ]]; then
-        die "volume ${volume} exists and is not empty; already migrated? Remove it by hand to start over."
-    fi
+    contents="$(docker run --rm -v "${volume}:/to:ro" "${HELPER_IMAGE}" find /to -mindepth 1 -maxdepth 1)" \
+        || die "could not check whether volume ${volume} is empty; refusing to copy"
+    [[ -z "${contents}" ]] \
+        || die "volume ${volume} exists and is not empty; already migrated? Remove it by hand to start over."
     log "Reusing empty volume ${volume}"
 else
     docker volume create \
