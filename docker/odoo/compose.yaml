@@ -36,13 +36,17 @@ services:
       start_period: 120s
 
   db:
-    image: postgres:16.16@sha256:dd2bf3ce2dc83a81674cf7f217fcfd8a5009a4b325dda5b843bfee82a06cff6f
+    image: postgres:18.7@sha256:2ea8630df176ad090ec92136dee850397c5af8781e4bcf2e4162593691c61bbc
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - db_data:/var/lib/postgresql/data
+      # 18+ keeps data in /var/lib/postgresql/<major>/docker, so the volume is
+      # mounted one level up and a later pg_upgrade can sit next to it. A major
+      # bump is a dump/restore cutover, never a tag change: the old PG16 volume
+      # (odoo_db_data) stays on the host, unmounted, as the rollback.
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -56,7 +60,7 @@ services:
 
 volumes:
   odoo_data:
-  db_data:
+  pgdata:
 
 networks:
   odoo_net:
