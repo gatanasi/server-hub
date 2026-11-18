@@ -11,8 +11,12 @@
 #   certbot.sh deploy-hook   install the renewed certificate (run by certbot)
 #
 # Environment: CERTBOT_DOMAIN, CERTBOT_EMAIL, CLOUDFLARE_API_TOKEN, DOCKER_API.
+#
+# Runs inside the certbot image (busybox sh), which has no copy of deploy/common.sh,
+# so it defines its own log().
 
-set -eu
+# shellcheck disable=SC3040  # busybox sh (the certbot image's /bin/sh) supports pipefail
+set -euo pipefail
 
 : "${CERTBOT_DOMAIN:?CERTBOT_DOMAIN is required}"
 : "${CERTBOT_EMAIL:?CERTBOT_EMAIL is required}"
@@ -23,6 +27,9 @@ LIVE_DIR="/etc/letsencrypt/live/${CERTBOT_DOMAIN}"
 OUT_DIR="/output_ssl"
 CREDENTIALS="/secrets/cloudflare.ini"
 SELF="/bin/sh /certbot.sh"
+# Present while openspeedtest still has to be restarted onto new certificate files.
+# Kept with the certbot data so it survives a container restart.
+RESTART_PENDING="/etc/letsencrypt/.openspeedtest-restart-pending"
 # openspeedtest runs nginx as uid 101; the key is readable by that uid only.
 NGINX_UID=101
 
@@ -32,9 +39,20 @@ log() {
 
 restart_openspeedtest() {
     if wget -q -O /dev/null --post-data='' "${DOCKER_API}/containers/openspeedtest/restart"; then
+        rm -f "${RESTART_PENDING}"
         log "Restarted openspeedtest"
     else
-        log "ERROR: could not restart openspeedtest through ${DOCKER_API}" >&2
+        # The new files are already in place, so the next comparison sees no change.
+        # The marker makes the next pass (or the next container start) retry.
+        touch "${RESTART_PENDING}"
+        log "ERROR: could not restart openspeedtest through ${DOCKER_API}; will retry" >&2
+    fi
+}
+
+retry_pending_restart() {
+    if [ -f "${RESTART_PENDING}" ]; then
+        log "Retrying the openspeedtest restart from an earlier failure"
+        restart_openspeedtest
     fi
 }
 
@@ -87,9 +105,11 @@ fi
 
 # Also fixes ownership and mode of files written by older versions of this script.
 install_cert
+retry_pending_restart
 
 while :; do
     log "Checking for renewal"
+    retry_pending_restart
     # A failed renewal is retried on the next pass instead of restarting the container.
     certbot renew --quiet --deploy-hook "${SELF} deploy-hook" \
         || log "ERROR: certbot renew failed; retrying in 12h" >&2
