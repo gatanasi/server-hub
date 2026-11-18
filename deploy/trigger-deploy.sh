@@ -41,8 +41,9 @@ run_ansible_playbook() {
     # Run the deployment playbook in a subshell to avoid cd side effects
     # Capture output to file for error analysis
     # Create temporary file for Ansible output
+    local output_file
     output_file=$(mktemp)
-    trap 'rm -f -- "$output_file"' EXIT HUP INT QUIT TERM
+    register_temp_file "${output_file}"
 
     local exit_code=0
     (
@@ -64,10 +65,6 @@ run_ansible_playbook() {
         printf -v error_message "Ansible playbook failed with exit code: %s\n\nDetails:\n%s" "${exit_code}" "${error_details}"
         error "${error_message}"
     fi
-
-    # On success, clean up the temp file and disarm the trap
-    rm -f -- "${output_file}"
-    trap - EXIT HUP INT QUIT TERM
 
     log "Ansible playbook completed successfully"
 }

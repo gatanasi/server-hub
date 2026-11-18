@@ -41,10 +41,11 @@ log() {
     echo "[${timestamp}] $*" | tee -a "${LOG_FILE}"
 }
 
+# Log the error and exit. on_exit sends the failure alert with this message as the reason.
 error() {
     local msg="$*"
     log "ERROR: ${msg}"
-    notify_failure "${msg}"
+    FAILURE_REASON="${msg}"
     exit 1
 }
 
@@ -76,10 +77,7 @@ send_telegram() {
     ) || log "WARNING: Could not send the Telegram failure notification"
 }
 
-# Report a failed run. error() calls this, so every failure that ends a trigger script
-# reaches Telegram, including the ones Ansible can't report itself: an unreachable
-# host, or a task that fails outside a rescue block.
-# Set NOTIFY_APP in the calling script to name the app in the message.
+# Report a failed run. Set NOTIFY_APP in the calling script to name the app in the message.
 notify_failure() {
     local details="$1"
     local text="❌ <b>${OPERATION_TYPE} Failed</b>"$'\n\n'
@@ -89,6 +87,38 @@ notify_failure() {
     text+="<pre>$(html_escape "${details}")</pre>"
     send_telegram "${text}"
 }
+
+# ============================================================================
+# Exit Handling
+# ============================================================================
+
+# Every script that sources this file leaves through on_exit, whatever ends it: error(),
+# a command failing under set -e, or a signal. It is the one place that removes temp files
+# and sends the failure alert, so no failure skips the alert and none sends two.
+# Scripts must not set their own EXIT trap; they register temp files instead.
+TEMP_FILES=()
+FAILURE_REASON=""
+
+register_temp_file() {
+    TEMP_FILES+=("$1")
+}
+
+on_exit() {
+    local rc=$?
+    if [[ ${#TEMP_FILES[@]} -gt 0 ]]; then
+        rm -f -- "${TEMP_FILES[@]}"
+    fi
+    if [[ ${rc} -ne 0 ]]; then
+        notify_failure "${FAILURE_REASON:-Exited with status ${rc} before finishing. Log on deployer: ${LOG_FILE}}"
+    fi
+}
+
+trap on_exit EXIT
+# Leave through on_exit on these signals too (exit status 128 + signal number).
+trap 'FAILURE_REASON="Interrupted by SIGHUP (connection to the runner lost?)"; exit 129' HUP
+trap 'FAILURE_REASON="Interrupted by SIGINT"; exit 130' INT
+trap 'FAILURE_REASON="Interrupted by SIGQUIT"; exit 131' QUIT
+trap 'FAILURE_REASON="Interrupted by SIGTERM"; exit 143' TERM
 
 # ============================================================================
 # Ansible Configuration
@@ -208,16 +238,14 @@ extract_ansible_errors() {
 pull_latest_repo() {
     log "Pulling latest changes from git..."
 
-    (
-        cd "${REPO_DIR}" || exit 1
-        # Get current branch name
-        current_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
-        if [[ -z "$current_branch" ]]; then
-            error "Cannot deploy from a detached HEAD state. Please check out a branch."
-        fi
-        git fetch origin "${current_branch}"
-        git reset --hard "origin/${current_branch}"
-    )
+    # No subshell: error() has to run in the main shell for on_exit to see its reason.
+    local current_branch
+    current_branch=$(git -C "${REPO_DIR}" symbolic-ref --short HEAD 2>/dev/null) ||
+        error "Cannot deploy from a detached HEAD state. Please check out a branch."
+    git -C "${REPO_DIR}" fetch origin "${current_branch}" ||
+        error "git fetch of '${current_branch}' from origin failed. Check GitHub access from deployer."
+    git -C "${REPO_DIR}" reset --hard "origin/${current_branch}" ||
+        error "git reset to origin/${current_branch} failed."
 
-    log "Git pull complete. Current commit: $(cd "${REPO_DIR}" && git rev-parse --short HEAD)"
+    log "Git pull complete. Current commit: $(git -C "${REPO_DIR}" rev-parse --short HEAD)"
 }

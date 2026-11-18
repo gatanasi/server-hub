@@ -93,8 +93,9 @@ run_restore_playbook() {
     
     # Run the restore playbook in a subshell to avoid cd side effects
     # Create temporary file for Ansible output
+    local output_file
     output_file=$(mktemp)
-    trap 'rm -f -- "$output_file"' EXIT
+    register_temp_file "${output_file}"
     local exit_code=0
     (
         cd "${ANSIBLE_DIR}" || exit 1
