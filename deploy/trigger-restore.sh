@@ -177,6 +177,7 @@ main() {
     fi
     
     # Validate app name first to prevent injection in subsequent logic
+    NOTIFY_APP="${app_name}"
     validate_app_name "${app_name}"  # 'all' not allowed for restore
     
     if [[ -z "${restore_op}" ]]; then

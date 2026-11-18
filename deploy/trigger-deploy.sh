@@ -87,6 +87,7 @@ main() {
         exit 1
     fi
 
+    NOTIFY_APP="${app_name}"
     # Validate app name
     validate_app_name "${app_name}"
 

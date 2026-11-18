@@ -44,7 +44,50 @@ log() {
 error() {
     local msg="$*"
     log "ERROR: ${msg}"
+    notify_failure "${msg}"
     exit 1
+}
+
+# ============================================================================
+# Notification Functions
+# ============================================================================
+
+# Escape the characters Telegram's HTML parse mode reads as markup.
+html_escape() {
+    printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+}
+
+# Send a Telegram message with the credentials in SECRETS_FILE.
+# Best effort: a missing file, empty credentials or an API error never fail the caller.
+# The subshell keeps the sourced secrets out of the caller's variables.
+send_telegram() {
+    local text="$1"
+    (
+        [[ -f "${SECRETS_FILE}" ]] || exit 0
+        # shellcheck disable=SC1090
+        source "${SECRETS_FILE}"
+        [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_CHAT_ID:-}" ]] || exit 0
+        # The URL goes through a curl config on stdin so the bot token stays out of the process list.
+        printf 'url = "https://api.telegram.org/bot%s/sendMessage"\n' "${TELEGRAM_BOT_TOKEN}" |
+            curl --config - --silent --show-error --fail --max-time 10 --output /dev/null \
+                --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+                --data-urlencode "parse_mode=HTML" \
+                --data-urlencode "text=${text}"
+    ) || log "WARNING: Could not send the Telegram failure notification"
+}
+
+# Report a failed run. error() calls this, so every failure that ends a trigger script
+# reaches Telegram, including the ones Ansible can't report itself: an unreachable
+# host, or a task that fails outside a rescue block.
+# Set NOTIFY_APP in the calling script to name the app in the message.
+notify_failure() {
+    local details="$1"
+    local text="❌ <b>${OPERATION_TYPE} Failed</b>"$'\n\n'
+    if [[ -n "${NOTIFY_APP:-}" ]]; then
+        text+="App: <code>$(html_escape "${NOTIFY_APP}")</code>"$'\n'
+    fi
+    text+="<pre>$(html_escape "${details}")</pre>"
+    send_telegram "${text}"
 }
 
 # ============================================================================

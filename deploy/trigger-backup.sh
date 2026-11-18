@@ -164,6 +164,7 @@ main() {
     fi
     
     # Validate inputs using common functions
+    NOTIFY_APP="${app_name}"
     validate_app_name "${app_name}" "true"  # allow 'all' for backups
     
     # Create log directory
