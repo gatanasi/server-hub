@@ -428,6 +428,7 @@
   gather_facts: false
 
   tasks:
+    # .github/workflows/deploy.yml matches this text to mark the run as skipped.
     - name: Display skip message
       ansible.builtin.debug:
         msg: "Nothing deployed: no host manages '{{ app_name }}'."
