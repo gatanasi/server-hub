@@ -201,7 +201,7 @@ services:
       start_interval: 5s
 
   bazarr:
-    image: lscr.io/linuxserver/bazarr:1.6.2@sha256:832820dec70bce9e912c6eee7a95baf6551e03dbc63325a7208daaa455423752
+    image: lscr.io/linuxserver/bazarr:1.6.2@sha256:e0c5d45965242830c5eeddaafe9ae2b5e8ca3f6c01ecda9ee9364f550921dc50
     container_name: bazarr
     logging: *logging
     environment:
@@ -306,7 +306,7 @@ services:
   # root. Without this, recommendarr can't write its key (EACCES) yet keeps running.
   # Runs on every deploy; cheap (a few KB). No healthcheck: its exit code is the check.
   recommendarr-data-owner:
-    image: alpine:3.23.2@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62
+    image: alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     logging: *logging
     command: ["chown", "-R", "${PUID}:${PGID}", "/data"]
     volumes:
