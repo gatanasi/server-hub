@@ -12,6 +12,18 @@ services:
     logging: *logging
     image: ghcr.io/c4illin/convertx:v0.20.0@sha256:6259e0c1e063120b1ddbc6937372a83be58182b2c9dc82264f58e100907b3e51
     restart: unless-stopped
+    # The entrypoint starts as root only to chown /app/data, then drops to the image's
+    # `convertx` user (uid 1000) with gosu (PUID/PGID below). These three capabilities are
+    # all that step needs. It skips the chown when /app/data itself is already 1000-owned,
+    # so files left root-owned by older root runs need a one-time `chown -R 1000:1000 data`.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
     ports:
       - "8080:3000"
     environment:
@@ -24,6 +36,8 @@ services:
       - AUTO_DELETE_EVERY_N_HOURS=6
       - JWT_SECRET=${JWT_SECRET}
       - FFMPEG_ARGS=-c:v libx265 -preset slow -c:a copy -map_metadata 0
+      - PUID=1000
+      - PGID=1000
     volumes:
       - ./data:/app/data
     healthcheck:
