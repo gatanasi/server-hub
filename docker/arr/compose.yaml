@@ -65,7 +65,7 @@ services:
 
   # --- Extraction Manager ---
   unpackerr:
-    image: golift/unpackerr:v0.16.1@sha256:244fc45cb207308f60e8f52dd703c2b3463385752de0f9517c58ff9d331ed15e
+    image: golift/unpackerr:v1.0.1@sha256:fc8b69571033f197d4db5cf22a573acb3bb891c9f8033431b9a1fcf679ca3e9c
     container_name: unpackerr
     logging: *logging
     user: ${PUID}:${PGID}
@@ -88,8 +88,8 @@ services:
       - UN_PARALLEL=1
       - UN_FILE_MODE=0644
       - UN_DIR_MODE=0755
-      ## Web server, only for the healthcheck: localhost inside the container, no port published
-      - UN_WEBSERVER_METRICS=true
+      ## Web server, only for the healthcheck: localhost inside the container, no port published.
+      ## v1 starts it from LISTEN_ADDR alone; /metrics stays off (UN_WEBSERVER_METRICS unset).
       - UN_WEBSERVER_LISTEN_ADDR=127.0.0.1:5656
       - UN_SONARR_0_URL=${SONARR_URL}
       - UN_SONARR_0_API_KEY=${SONARR_API_KEY}
@@ -111,7 +111,7 @@ services:
 
   # --- The "Managers" ---
   radarr:
-    image: lscr.io/linuxserver/radarr:6.4.4@sha256:7a20f20de63706eee2ff6e4ac1f989a70c961f456aa47ccb6c78f2bb7657d9ae
+    image: lscr.io/linuxserver/radarr:7.0.3@sha256:044788f5508b7f67a3e0368cdd142c77c4d4cd5aec2efaba53e1a68b6b6231e7
     container_name: radarr
     logging: *logging
     environment:
@@ -159,7 +159,7 @@ services:
       start_interval: 5s
 
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:2.7.0@sha256:6660787a99b2e58203539583663c973b48979fc00ff2cb78dc0ea17429e1f6ef
+    image: lscr.io/linuxserver/prowlarr:3.0.2@sha256:45117ba8439e2337a92ffe38a451a4dafc0be771754d05d88cdf102419d09646
     container_name: prowlarr
     logging: *logging
     environment:
