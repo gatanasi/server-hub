@@ -72,9 +72,12 @@ While GitOps is the default, you can trigger deployments manually from the `depl
 -   **Variables:** Prefer passing variables via `-e` (extra vars) or defining them in inventory over hardcoding.
 
 ### Docker Compose
--   **Healthchecks:** Mandatory. Used by Ansible to determine if a deployment succeeded.
+-   **Healthchecks:** Mandatory. Used by Ansible to determine if a deployment succeeded. Two exceptions, each with a comment in the compose file: one-shot jobs (`restart: "no"`, gating another service through `service_completed_successfully`), whose exit code is the check; and schedulers with nothing to probe (e.g. recyclarr), whose process exit already triggers the restart policy.
 -   **Restart Policies:** Use `restart: always` or `unless-stopped`.
 -   **Versions:** Pin image versions (e.g., `image: n8n:1.2.3`). Avoid `latest` tags in production.
+-   **State:** Bind mounts under the app directory are fine and preferred for files someone edits or browses; named volumes suit data nobody touches by hand. Proxmox backups of each guest are the backup of record and cover both. Don't move existing data between the two for backups. The Ansible volume playbook only archives named volumes. See `docs/BACKUP_STRATEGY.md`.
+-   **Logging:** Use the shared `x-logging` anchor (`driver: journald`) on every service, one-shots included. car-price-tracker, first-bite and homepage keep their own rotated `json-file` logging.
+-   **Privileges:** Know how each service avoids root: the image's `USER`, an entrypoint drop (`PUID`/`PGID`, only where the image documents it), or `user:` in compose. Use `user:` when nothing else drops root, and chown its data first (a one-shot service, or a one-time host step).
 
 ### Shell Scripts
 -   Use `set -euo pipefail` for robustness.

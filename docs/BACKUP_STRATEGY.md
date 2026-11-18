@@ -1,21 +1,76 @@
-# Docker Volume Backup Strategy
+# Backup Strategy
 
-This document describes the backup and restore strategy for Docker volumes across all managed applications.
+This document describes how the data of the managed applications is backed up and restored.
 
 ## Overview
 
-All persistent data is stored in **Docker named volumes** on each host. A centralized backup strategy copies these volumes to a shared NFS/SMB mount for disaster recovery.
+There are two layers, and the first one is the backup of record:
+
+1. **Proxmox backups of each guest.** Every app runs in its own LXC on pve-01. A Proxmox backup
+   (vzdump) or a ZFS snapshot of a guest captures its whole disk: the app directory under
+   `/opt/apps/<app>` with its bind mounts, Docker's named volumes, and the images.
+2. **The Ansible volume playbook (optional).** `backup-docker-volumes.yml` archives an app's Docker
+   **named volumes** to `/mnt/backups`, on demand. It skips bind mounts, so it is never a full
+   backup of an app on its own.
+
+Apps keep their state in bind mounts under `/opt/apps/<app>` or in named volumes, and layer 1 covers
+both the same way. Choose by convenience: a bind mount for files you edit or browse, a named
+volume where nobody needs hand access. Don't move data between the two for backup coverage.
 
 ### Architecture
 
 ```mermaid
 flowchart TD
-    subgraph AppVMs [Application VMs]
-        data["Service Data & Configs"]
+    subgraph PVE [pve-01]
+        subgraph Guest [App LXC]
+            binds["Bind mounts in /opt/apps/APP"]
+            vols["Docker named volumes"]
+        end
+        hostmp["Host-path mount points<br/>(Immich library and database, media)"]
     end
 
-    data --> Backups["<b>/mnt/backups</b><br/>(NFS/SMB Share)"]
+    Guest -->|"vzdump, snapshot mode"| Store["Backup storage<br/>on another device"]
+    vols -.->|"backup-docker-volumes.yml (optional)"| Backups["<b>/mnt/backups</b><br/>(NFS/SMB share)"]
+    hostmp -.->|"never in a vzdump"| Separate["Backed up separately"]
 ```
+
+## Proxmox Backups (System of Record)
+
+### What a guest backup misses
+
+Proxmox never includes **host-path mount points** (`mpX: /rpool/...,mp=...`) in a container
+backup, whatever the job settings. These need their own backup:
+
+| Data | Mount point (pve-01 → guest) | Guests | Coverage |
+|---|---|---|---|
+| Immich photo library | `/rpool/data/immich/library` → `/mnt/immich/library` | immich | Backed up by hand, separately. Also holds Immich's nightly database dumps in `backups/` (`immich-db-backup-*.sql.gz`) |
+| Immich Postgres data | `/rpool/data/immich/postgres` → `/mnt/immich/postgres` | immich | Through those nightly dumps. Restore from a dump rather than copying this folder |
+| Media | `/rpool/data/media` → `/mnt/data` | jellyfin, arr, mediamanager | None by default |
+
+Check with `pct config <vmid> | grep ^mp` on pve-01.
+
+### Consistent copies
+
+- **Snapshot mode.** On ZFS, `vzdump --mode snapshot` backs up a running guest from one instant.
+  Databases recover from that like from a power cut.
+- **No rsync of a running database.** A copy of a live Postgres folder or SQLite file (Jellyfin,
+  the arr apps, ConvertX) can be torn mid-write. Stop the app first
+  (`docker compose stop`), or copy from a ZFS snapshot.
+- **Another device.** A backup stored on `rpool` (Proxmox's `local` storage lives there) dies
+  with that pool. Send backups to Proxmox Backup Server, a NAS or a USB disk.
+
+### Recommended job
+
+In the Proxmox UI, **Datacenter → Backup → Add**:
+- Selection: all guests.
+- Mode: snapshot. Compression: zstd.
+- Storage: one on a device other than `rpool`.
+- Retention: for example keep-daily 7, keep-weekly 4, keep-monthly 3.
+
+Restore a guest with **Restore** on its backup in the storage view, or `pct restore` on the CLI.
+Mount-point data is not in it (see above).
+
+## Ansible Volume Playbook (Optional)
 
 ### Directory Structure Example
 
@@ -31,8 +86,6 @@ flowchart TD
 └── stirling-pdf/
     └── data_*.tar.gz
 ```
-
-## Backup Playbook
 
 ### Usage
 
@@ -63,6 +116,9 @@ For each application:
 | Item | Description |
 |------|-------------|
 | Docker Volumes | All named volumes defined in compose.yaml |
+
+The playbook selects volumes with `docker volume ls --filter name=^<project>_`. **Bind mounts are
+skipped silently**, so files an app keeps under `/opt/apps/<app>` are only in the Proxmox backup.
 
 > **Note:** Configuration files (`compose.yaml` and `.env`) are **NOT** backed up by this playbook. They are stored in GitHub (with [SOPS](https://github.com/getsops/sops) encryption for `.env`). To restore config files, use the deploy playbook.
 
@@ -253,9 +309,9 @@ export TELEGRAM_CHAT_ID="your-chat-id"
 
 ---
 
-## Scheduling Backups
+## Scheduling the Playbook
 
-### Option 1: GitHub Actions (Recommended)
+### Option 1: GitHub Actions
 
 Use the **Backup Docker Volumes** workflow from the GitHub Actions UI for on-demand backups.
 
@@ -309,6 +365,12 @@ WantedBy=timers.target
 ## Disaster Recovery
 
 ### Scenario: Host VM Lost
+
+Restore the guest from its latest Proxmox backup (see [Recommended job](#recommended-job)).
+That brings back bind mounts and named volumes together. Then restore any mount-point data
+separately.
+
+Without a Proxmox backup, rebuild from Git and the playbook archives:
 
 1. Create new VM with same hostname
 2. Install Docker and configure user
@@ -370,8 +432,8 @@ du -sh /mnt/backups/*/
 
 ## Security Considerations
 
-1. **SOPS-encrypted secrets**: Environment files are stored in GitHub encrypted with SOPS, not in backups
-2. **Restricted permissions**: Backup directories use mode 0750
+1. **Backups hold secrets**: Git holds `.env` files only SOPS-encrypted, and the volume playbook doesn't archive them. A Proxmox guest backup does contain each app's **decrypted** `/opt/apps/<app>/.env`, and every backup holds app data such as databases. Treat backup storage like a secret store: restrict who can read it, and encrypt it where the target supports it (Proxmox Backup Server has client-side encryption).
+2. **Restricted permissions**: The playbook's backup directories use mode 0750
 3. **Network security**: Ensure NFS/SMB share is only accessible from Docker hosts
 4. **Retention policy**: Old backups automatically deleted after retention period
 
