@@ -81,8 +81,8 @@ Mount-point data is not in it (see above).
 │   ├── n8n_storage_*.tar.gz
 │   └── redis_storage_*.tar.gz
 ├── odoo/
-│   ├── db_data_*.tar.gz
-│   └── odoo_data_*.tar.gz
+│   ├── odoo_data_*.tar.gz
+│   └── pgdata_*.tar.gz
 └── stirling-pdf/
     └── data_*.tar.gz
 ```

@@ -19,6 +19,13 @@
       "versioning": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)-(?<patch>\\d{8})$"
     },
     {
+      "description": "An Odoo major needs a database migration (OpenUpgrade or upgrade.odoo.com), not a tag bump. Hold it on the Dependency Dashboard until approved, so it never rides along with other majors in one PR again (#773).",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["odoo"],
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    },
+    {
       "description": "Group Non-Major updates for Dockerfiles by filename",
       "matchManagers": ["dockerfile"],
       "matchUpdateTypes": ["minor", "patch", "digest"],
