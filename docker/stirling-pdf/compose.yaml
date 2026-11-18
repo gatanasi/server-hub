@@ -5,11 +5,13 @@ services:
     ports:
       - '8080:8080'
     volumes:
-      - ./StirlingPDF/trainingData:/usr/share/tessdata # Required for extra OCR languages
-      - ./StirlingPDF/extraConfigs:/configs
-      - ./StirlingPDF/customFiles:/customFiles/
+      - ./StirlingPDF/trainingData:/usr/share/tessdata # Required for extra OCR languages; downloadable
+      # Settings, the credential encryption key, custom files and pipelines: named volumes,
+      # which backup-docker-volumes.yml archives (it skips bind mounts).
+      - extra-configs:/configs
+      - custom-files:/customFiles
+      - pipeline:/pipeline
       - ./StirlingPDF/logs:/logs/
-      - ./StirlingPDF/pipeline:/pipeline/
     environment:
       - DISABLE_ADDITIONAL_FEATURES=false
       - LANGS=en_US
@@ -20,3 +22,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+volumes:
+  extra-configs:
+  custom-files:
+  pipeline:
