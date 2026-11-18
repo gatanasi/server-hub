@@ -8,8 +8,10 @@ services:
       - "8080:8069"
     volumes:
       - odoo_data:/var/lib/odoo
-      - ./config:/etc/odoo
-      - ./addons:/mnt/extra-addons
+      # odoo.conf (holds admin_passwd) and custom addons live only on the host, not in Git,
+      # so they need backing up: named volumes, which backup-docker-volumes.yml archives.
+      - config:/etc/odoo
+      - addons:/mnt/extra-addons
     environment:
       - HOST=db
       - PGDATABASE=${POSTGRES_DB}
@@ -47,6 +49,8 @@ services:
 volumes:
   odoo_data:
   db_data:
+  config:
+  addons:
 
 networks:
   odoo_net:
