@@ -235,6 +235,15 @@ services:
       - DOCKER_ENV=false 
       - PORT=3000
       - PUBLIC_URL=http://localhost:3000
+    # Runs as root by default and nothing in the image drops it.
+    user: ${PUID}:${PGID}
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      recommendarr-data-owner:
+        condition: service_completed_successfully
     volumes:
       - ./config/recommendarr:/app/server/data
     restart: unless-stopped
@@ -291,6 +300,19 @@ services:
     restart: unless-stopped
     networks:
       - arr-net
+
+  # One-shot: hands ./config/recommendarr to ${PUID} before recommendarr starts. Its files
+  # are root-owned from when it ran as root, and Docker creates a missing bind directory as
+  # root. Without this, recommendarr can't write its key (EACCES) yet keeps running.
+  # Runs on every deploy; cheap (a few KB). No healthcheck: its exit code is the check.
+  recommendarr-data-owner:
+    image: alpine:3.23.2@sha256:865b95f46d98cf867a156fe4a135ad3fe50d2056aa3f25ed31662dff6da4eb62
+    logging: *logging
+    command: ["chown", "-R", "${PUID}:${PGID}", "/data"]
+    volumes:
+      - ./config/recommendarr:/data
+    network_mode: none
+    restart: "no"
 
 networks:
   arr-net:
