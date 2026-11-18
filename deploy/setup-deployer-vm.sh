@@ -5,7 +5,7 @@
 # This script should be run ON the deployer.vm as the 'deployer' user.
 # It sets up:
 #   1. Required directories and permissions
-#   2. Ansible installation (if not present)
+#   2. Ansible, rsync and curl (installed if missing)
 #   3. Log directories
 #   4. SSH configuration
 #
@@ -55,40 +55,48 @@ setup_directories() {
     log "Directories configured"
 }
 
-install_ansible() {
-    log "Checking Ansible installation..."
-    
-    if command -v ansible &> /dev/null; then
-        log "Ansible is already installed: $(ansible --version | head -1)"
+install_packages() {
+    log "Checking required packages..."
+
+    # ansible and rsync run the deploys; curl sends the failure alerts from common.sh.
+    # Package names match the command names on every package manager below.
+    local missing=()
+    local cmd
+    for cmd in ansible rsync curl; do
+        command -v "${cmd}" &> /dev/null || missing+=("${cmd}")
+    done
+
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        log "Required packages already installed. Ansible: $(ansible --version | head -1)"
         return 0
     fi
-    
-    log "Installing Ansible..."
-    
+
+    log "Installing: ${missing[*]}"
+
     # Detect package manager
-    if command -v apt get &> /dev/null; then
+    if command -v apt-get &> /dev/null; then
         # Debian/Ubuntu
-        sudo apt get update
-        sudo apt get install -y ansible rsync
+        sudo apt-get update
+        sudo apt-get install -y "${missing[@]}"
     elif command -v dnf &> /dev/null; then
         # Fedora/RHEL
-        sudo dnf install -y ansible rsync
+        sudo dnf install -y "${missing[@]}"
     elif command -v yum &> /dev/null; then
         # Older RHEL/CentOS
-        sudo yum install -y ansible rsync
+        sudo yum install -y "${missing[@]}"
     elif command -v pacman &> /dev/null; then
         # Arch
-        sudo pacman -Sy ansible rsync --noconfirm
+        sudo pacman -Sy "${missing[@]}" --noconfirm
     elif command -v apk &> /dev/null; then
         # Alpine
-        sudo apk add ansible rsync
+        sudo apk add "${missing[@]}"
     else
-        log "ERROR: Unknown package manager. Please install Ansible manually."
+        log "ERROR: Unknown package manager. Please install manually: ${missing[*]}"
         log "See: https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html"
         exit 1
     fi
-    
-    log "Ansible installed: $(ansible --version | head -1)"
+
+    log "Installed ${missing[*]}. Ansible: $(ansible --version | head -1)"
 }
 
 install_ansible_collections() {
@@ -210,7 +218,7 @@ main() {
     log "=========================================="
 
     setup_directories
-    install_ansible
+    install_packages
     install_ansible_collections
     setup_git_repo
     setup_secrets_file
