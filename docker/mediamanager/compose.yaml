@@ -25,6 +25,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # The startup script runs as root only to chown /app/config and /data, then drops to
+    # the image's mediamanager user (uid 1000) with gosu. These capabilities cover that step.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
   db:
     container_name: mediamanager_postgres
     logging: *logging
