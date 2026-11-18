@@ -10,8 +10,8 @@ services:
       - "8080:8096/udp"
       - "7359:7359/udp"
     volumes:
-      - ./config:/config
-      - ./cache:/cache
+      - config:/config # backed up (named volume)
+      - ./cache:/cache # rebuilt by Jellyfin, deliberately not backed up
       - type: bind
         source: /mnt/data/media
         target: /media
@@ -24,3 +24,7 @@ services:
     restart: unless-stopped
     extra_hosts:
       - 'host.docker.internal:host-gateway'
+
+# App state lives in a named volume so backup-docker-volumes.yml archives it (it skips bind mounts).
+volumes:
+  config:
