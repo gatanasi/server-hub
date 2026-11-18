@@ -75,6 +75,9 @@ While GitOps is the default, you can trigger deployments manually from the `depl
 -   **Healthchecks:** Mandatory. Used by Ansible to determine if a deployment succeeded.
 -   **Restart Policies:** Use `restart: always` or `unless-stopped`.
 -   **Versions:** Pin image versions (e.g., `image: n8n:1.2.3`). Avoid `latest` tags in production.
+-   **State:** Persistent data goes in named volumes. The backup playbook only archives volumes named `<project>_*` and skips bind mounts. Bind mounts are for config tracked in Git, media libraries, and devices. See `docs/BACKUP_STRATEGY.md`.
+-   **Logging:** Use the shared `x-logging` anchor (`driver: journald`) on every service.
+-   **Privileges:** Know how each service avoids root: the image's `USER`, an entrypoint drop (`PUID`/`PGID`, only where the image documents it), or `user:` in compose. Use `user:` when nothing else drops root.
 
 ### Shell Scripts
 -   Use `set -euo pipefail` for robustness.

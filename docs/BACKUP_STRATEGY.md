@@ -66,6 +66,56 @@ For each application:
 
 > **Note:** Configuration files (`compose.yaml` and `.env`) are **NOT** backed up by this playbook. They are stored in GitHub (with [SOPS](https://github.com/getsops/sops) encryption for `.env`). To restore config files, use the deploy playbook.
 
+The playbook selects volumes with `docker volume ls --filter name=^<project>_`. **Bind mounts are
+skipped silently**, so anything an app writes to a host directory is not backed up.
+
+### Where state must live
+
+| Kind of data | Where | Backed up by the playbook |
+|---|---|---|
+| App state: databases, settings, keys, sessions | Named volume | ✅ |
+| Config tracked in Git (`Caddyfile`, Homepage `config/`, `recyclarr.yml`, mediamanager `config.toml`) | Bind mount from the app directory | Not needed, Git has it |
+| Media libraries (`/mnt/data`, Immich `UPLOAD_LOCATION`) | Bind mount | ❌ by design: too large for tar.gz archives. Back them up separately |
+| Caches and logs that rebuild themselves | Bind mount or anonymous volume | ❌ by design |
+
+### Coverage per app
+
+| App | Named volumes (backed up) | Deliberately not backed up here |
+|---|---|---|
+| arr | one `<service>-config` volume per service (10) | `/mnt/data` media and downloads |
+| caddy | `caddy_data`, `caddy_config` | `conf/` (in Git) |
+| car-price-tracker, first-bite | `pgdata` | |
+| convertx | `data` | |
+| filebrowser | `filebrowser_config`, `filebrowser_database`, `filebrowser_data` | |
+| homepage | | `config/` (in Git) |
+| immich | `pgdata` | Photo library (`UPLOAD_LOCATION`, which also holds Immich's own nightly DB dumps): backed up separately, by hand. ML model cache: re-downloads |
+| jellyfin | `config` | `cache`, `/mnt/data/media` |
+| mediamanager | `postgres`, `images` | `config/` (in Git), media root |
+| n8n | `n8n_data` | |
+| odoo | `odoo_data`, `db_data`, `config`, `addons` | |
+| openspeedtest | | certbot data and certs: Let's Encrypt reissues them |
+| stirling-pdf | `extra-configs`, `custom-files`, `pipeline` | `logs`, `trainingData` |
+| video-converter | | `uploads`, `converted`: transient files |
+| wg-easy | `etc_wireguard` | |
+
+### Moving a bind mount to a named volume
+
+`deploy/migrate-bind-to-volume.sh` copies a directory into a volume that Compose will adopt on the
+next deploy. Run it on the app host while the app is stopped, **before** merging the PR that
+switches `compose.yaml`:
+
+```bash
+# from deployer.vm
+ssh arr@arr.vm 'cd /opt/apps/arr && docker compose stop'
+ssh arr@arr.vm 'bash -s' -- arr radarr-config /opt/apps/arr/config/radarr < deploy/migrate-bind-to-volume.sh
+# ...one call per directory, then merge the PR; the deploy starts the app on the volumes
+```
+
+The script refuses to run while a container still mounts the directory, creates the volume with
+Compose's own labels, copies with `cp -a`, optionally chowns (`uid:gid` as 4th argument), and
+compares file lists and sizes. It never deletes the source: until you remove the old directory, a
+deploy rollback still starts the app on its pre-migration data.
+
 ### Retention Policy
 
 By default, only the **last 3 backups per volume** are retained. Older backups are automatically deleted after each backup run. This prevents disk space from filling up while maintaining recent restore points.
