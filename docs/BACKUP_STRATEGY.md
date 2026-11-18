@@ -432,8 +432,8 @@ du -sh /mnt/backups/*/
 
 ## Security Considerations
 
-1. **SOPS-encrypted secrets**: Environment files are stored in GitHub encrypted with SOPS, not in backups
-2. **Restricted permissions**: Backup directories use mode 0750
+1. **Backups hold secrets**: Git holds `.env` files only SOPS-encrypted, and the volume playbook doesn't archive them. A Proxmox guest backup does contain each app's **decrypted** `/opt/apps/<app>/.env`, and every backup holds app data such as databases. Treat backup storage like a secret store: restrict who can read it, and encrypt it where the target supports it (Proxmox Backup Server has client-side encryption).
+2. **Restricted permissions**: The playbook's backup directories use mode 0750
 3. **Network security**: Ensure NFS/SMB share is only accessible from Docker hosts
 4. **Retention policy**: Old backups automatically deleted after retention period
 
