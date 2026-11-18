@@ -11,7 +11,7 @@ services:
     container_name: n8n
     logging: *logging
     restart: always
-    image: docker.n8n.io/n8nio/n8n:2.47.7@sha256:b4b90747b81fcda7e76550c0d3aa7f0f64917a1e9573cff40d6834eaf2e0f8ea
+    image: n8nio/n8n:2.47.7@sha256:b4b90747b81fcda7e76550c0d3aa7f0f64917a1e9573cff40d6834eaf2e0f8ea
     environment:
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
       - N8N_ENCRYPTION_KEY=${ENCRYPTION_KEY}
