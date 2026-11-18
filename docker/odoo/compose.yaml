@@ -8,7 +8,7 @@ x-logging: &logging
 
 services:
   odoo:
-    image: odoo:19.0-20251208@sha256:4d344f40154dd0627b7078c3dcb40cf1db7c0944473c1898eb63492659b398ef
+    image: odoo:19.0-20261112@sha256:49c9d2a9935f07f15e2404ce8649a84c4f0d4e70a880f7209ad27a19ab415f77
     depends_on:
       db:
         condition: service_healthy
