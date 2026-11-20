@@ -8,7 +8,7 @@ x-logging: &logging
 
 services:
   odoo:
-    image: odoo:19.0-20261112@sha256:49c9d2a9935f07f15e2404ce8649a84c4f0d4e70a880f7209ad27a19ab415f77
+    image: odoo:19.0-20261112@sha256:03a47921f9eef2c225ded1167fe7828465d2b3177883f30d173bb1c3c792949b
     depends_on:
       db:
         condition: service_healthy
@@ -36,7 +36,7 @@ services:
       start_period: 120s
 
   db:
-    image: postgres:18.7@sha256:e754b839f447639b7004895f4d8a4bfcb4e9dbe3a1bc035f27f646562a16fd61
+    image: postgres:18.7@sha256:eb63372c1e05c755f55fa30cbd07aecc443676fc6c0fa90b9002d01537841e1a
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
