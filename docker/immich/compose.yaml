@@ -48,7 +48,7 @@ services:
     logging: *logging
     # For hardware acceleration, add one of -[armnn, cuda, rocm, openvino, rknn] to the image tag.
     # Example tag: ${IMMICH_VERSION:-release}-cuda
-    image: ghcr.io/immich-app/immich-machine-learning:v3.4.1-rocm@sha256:3a54d7a2e7c00b7888388e1cb9bb943a68e5576add7640c17283e059454eda13
+    image: ghcr.io/immich-app/immich-machine-learning:v3.4.2-rocm@sha256:d6910817cb774b1211b2475eb5844af783386eaed00106dea1f0fee9d6184042
     extends:
       file: hwaccel.ml.yml
       service: rocm # set to one of [armnn, cuda, rocm, openvino, openvino-wsl, rknn] for accelerated inference - use the `-wsl` version for WSL2 where applicable
@@ -86,7 +86,7 @@ services:
   redis:
     container_name: immich_redis
     logging: *logging
-    image: docker.io/valkey/valkey:9.1.4@sha256:3ab0eca823ebbf0fe352476ebac330ac9e5f14b592b9a954eab296d341e81b0e
+    image: docker.io/valkey/valkey:9.2.0@sha256:1c2b25b09f354c66fe994733acdf12fcfd4bdf6f3bd92b88a93a70378d884056
     healthcheck:
       test: redis-cli ping || exit 1
     restart: always
