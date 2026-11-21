@@ -38,10 +38,14 @@ services:
   db:
     container_name: mediamanager_postgres
     logging: *logging
-    image: postgres:17.12@sha256:b60e90042aa6b8dbecd58e224b3e36114dbf8ad754465264c2476ad58a86e45c
+    image: postgres:19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60
     restart: unless-stopped
     volumes:
-      - ./postgres:/var/lib/postgresql/data
+      # 18+ keeps data in /var/lib/postgresql/<major>/docker, so the volume is
+      # mounted one level up and a later pg_upgrade can sit next to it. A major
+      # bump is a dump/restore cutover, never a tag change: the old PG17 bind
+      # dir (./postgres) stays on the host, unmounted, as the rollback.
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}" ]
       interval: 10s
@@ -51,3 +55,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+volumes:
+  pgdata:
