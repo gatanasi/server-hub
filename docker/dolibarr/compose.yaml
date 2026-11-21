@@ -21,7 +21,7 @@ services:
             - /home/dolibarr_mariadb:/var/lib/mysql
 
     web:
-        image: dolibarr/dolibarr:24.0.2@sha256:0fab863277ca8f88759ecf6857325a55ee43a0457c94c54459db036bf19d3cae
+        image: dolibarr/dolibarr:24.0.3@sha256:0af875a593fff2d6ed7fc4b0fa0edfb904f60464199075238144eb3721e3bb32
         logging: *logging
         environment:
             DOLI_INIT_DEMO: ${DOLI_INIT_DEMO:-0}
